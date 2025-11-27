@@ -1,0 +1,32 @@
+name: tiro_tracker
+description: A new Flutter project.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # --- LIBRERÍAS DE BASE DE DATOS ---
+  sqflite: ^2.3.0
+  path: ^1.9.0
+  # CAMBIO: Usamos el rango estándar ^2.3.0 para que busque la versión más compatible y correcta
+  sqflite_common_ffi: ^2.3.0
+  # ----------------------------------
+
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  
+  # Asegúrate de que esta sección de assets exista si usas el logo
+  assets:
+     - assets/logo.png
