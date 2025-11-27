@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 // 1. IMPORTANTE: Importamos la pantalla del catálogo que acabamos de crear
 import 'catalogo_tipos_screen.dart';
+import 'catalogo_calibres_screen.dart';
 
 class ConfigScreen extends StatelessWidget {
   const ConfigScreen({super.key});
@@ -57,7 +58,7 @@ class ConfigScreen extends StatelessWidget {
             'Catálogo Calibres', 
             Icons.straighten, 
             Colors.blueGrey, 
-            () => print('Ir a Calibres'),
+            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogoCalibresScreen())),
           ),
         ],
       ),
