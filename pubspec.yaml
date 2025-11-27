@@ -13,7 +13,6 @@ dependencies:
   # --- LIBRERÍAS DE BASE DE DATOS ---
   sqflite: ^2.3.0
   path: ^1.9.0
-  # CAMBIO: Usamos el rango estándar ^2.3.0 para que busque la versión más compatible y correcta
   sqflite_common_ffi: ^2.3.0
   # ----------------------------------
 
