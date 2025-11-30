@@ -159,6 +159,9 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
                     child: const Icon(Icons.category, color: Colors.blueGrey, size: 20),
                   ),
                   title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.w500)),
+                  
+                  onLongPress: () => _confirmarBorrado(item),
+
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min, // Ocupa solo el espacio necesario
                     children: [

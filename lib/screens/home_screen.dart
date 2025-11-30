@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+// Importamos las pantallas de destino
 import 'competicion_screen.dart';
 import 'entrenamiento_screen.dart';
 import 'historial_screen.dart';
-import 'backup_screen.dart';
+import 'backup_screen.dart'; 
 import 'config_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -25,37 +26,18 @@ class HomeScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              // --- SECCIÓN LOGO (IMAGEN PERSONALIZADA) ---
-              Padding(
-                padding: const EdgeInsets.only(bottom: 40.0),
+              // --- LOGO ---
+              const Padding(
+                padding: EdgeInsets.only(bottom: 40.0),
                 child: Column(
                   children: [
-                    // CAMBIO: Usamos Image.asset en lugar de Icon
-                    Container(
-                      height: 120, // Altura del logo
-                      width: 120,  // Anchura del logo
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      // Asegúrate de tener 'assets/logo.png' en tu proyecto
-                      child: Image.asset(
-                        'assets/logo.png', 
-                        fit: BoxFit.contain, // Ajusta la imagen sin recortarla
-                        errorBuilder: (context, error, stackTrace) {
-                          // Si falla la carga (olvidaste el paso 2), muestra esto:
-                          return const Icon(Icons.broken_image, size: 50, color: Colors.red);
-                        },
-                      ),
+                    Icon(
+                      Icons.adjust,
+                      size: 100,
+                      color: Colors.blueGrey,
                     ),
-                    const SizedBox(height: 15),
-                    const Text(
+                    SizedBox(height: 15),
+                    Text(
                       'Registro de Tiro',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -69,24 +51,25 @@ class HomeScreen extends StatelessWidget {
               ),
 
               // --- BOTONES DEL MENÚ ---
+              // Nota: No usamos 'const' aquí para evitar errores de instanciación
               _buildMenuItem(context, '1. Competición', Icons.emoji_events, Colors.amber[700]!, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompeticionScreen()))
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => CompeticionScreen()))
               ),
 
-              _buildMenuItem(context, '2. Entrenamientos', Icons.sports_baseball, Colors.teal, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EntrenamientoScreen()))
+              _buildMenuItem(context, '2. Entrenamiento', Icons.sports_baseball, Colors.teal, 
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => EntrenamientoScreen()))
               ),
 
-              _buildMenuItem(context, '3. Listado (Historial)', Icons.list_alt, Colors.indigo, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistorialScreen()))
+              _buildMenuItem(context, '3. Historial y Análisis', Icons.analytics, Colors.indigo, 
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistorialScreen()))
               ),
 
-              _buildMenuItem(context, '4. Importación/Exportación', Icons.cloud_sync, Colors.blueGrey, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BackupScreen()))
+              _buildMenuItem(context, '4. Copia de Seguridad', Icons.cloud_sync, Colors.blueGrey, 
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => BackupScreen()))
               ),
 
               _buildMenuItem(context, '5. Configuración', Icons.settings, Colors.grey[700]!, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfigScreen()))
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConfigScreen()))
               ),
             ],
           ),

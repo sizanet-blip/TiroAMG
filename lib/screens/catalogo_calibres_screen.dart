@@ -155,6 +155,9 @@ class _CatalogoCalibresScreenState extends State<CatalogoCalibresScreen> {
                     child: const Icon(Icons.straighten, color: Colors.blueGrey, size: 20),
                   ),
                   title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.w500)),
+
+                  onLongPress: () => _confirmarBorrado(item),
+
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

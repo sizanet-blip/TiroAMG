@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
-// 1. IMPORTANTE: Importamos la pantalla del catálogo que acabamos de crear
+// Importamos todas las pantallas de gestión
+import 'gestion_equipos_screen.dart';
+import 'gestion_municion_screen.dart';
+import 'gestion_tiempos_screen.dart';
 import 'catalogo_tipos_screen.dart';
 import 'catalogo_calibres_screen.dart';
+import 'catalogo_dianas_screen.dart'; // <--- 1. IMPORTANTE: Añade esta línea
+import 'perfil_form_screen.dart';
 
 class ConfigScreen extends StatelessWidget {
   const ConfigScreen({super.key});
@@ -10,80 +15,118 @@ class ConfigScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuración'),
+        title: const Text('Configuración del Sistema'),
         backgroundColor: Colors.blueGrey,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: <Widget>[
-          // --- SECCIÓN A: EQUIPO ---
-          _buildSectionHeader('A. Mi Equipo'),
-          _buildMenuItem(
+          // --- SECCIÓN A ---
+          _buildSectionHeader('A. Mi Equipo Personal'),
+          _buildConfigItem(
             context, 
-            'Gestión de Armas', 
+            'Mis Datos (Perfil)', 
+            'Nombre, Licencia, Club...', 
+            Icons.account_circle, 
+            Colors.teal, 
+            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PerfilFormScreen())),
+          ),          
+          _buildConfigItem(
+            context, 
+            'Gestión de Armas (Equipos)', 
+            'Añadir, modificar y borrar perfiles de armas.', 
             Icons.hardware, 
             Colors.teal, 
-            () => print('Ir a Armas'), // Aquí pondremos la pantalla de armas luego
+            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GestionEquiposScreen())),
           ),
-
+          _buildConfigItem(
+            context, 
+            'Gestión de Munición', 
+            'Registro y seguimiento de lotes de munición.', 
+            Icons.local_fire_department, 
+            Colors.teal, 
+            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GestionMunicionScreen())),
+          ),
+          
           const Divider(height: 30),
 
-          // --- SECCIÓN B: REGLAS ---
-          _buildSectionHeader('B. Reglas'),
-          _buildMenuItem(
+          // --- SECCIÓN B ---
+          _buildSectionHeader('B. Reglas de Entrenamiento'),
+          _buildConfigItem(
             context, 
-            'Plantillas de Tiempos', 
+            'Plantillas de Tiempos/Series', 
+            'Crear reglas de Duelo (3s/7s), Precisión, Estándar.', 
             Icons.timer, 
             Colors.indigo, 
-            () => print('Ir a Tiempos'),
+            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GestionTiemposScreen())),
           ),
 
           const Divider(height: 30),
 
-          // --- SECCIÓN C: CATÁLOGOS ---
-          _buildSectionHeader('C. Datos del Sistema'),
+          // --- SECCIÓN C ---
+          _buildSectionHeader('C. Datos del Sistema (Catálogos)'),
           
-          // 2. AQUÍ ESTÁ EL CÓDIGO QUE ME PEDISTE
-          _buildMenuItem(
+          _buildConfigItem(
             context, 
             'Catálogo Tipos de Arma', 
+            'Añadir/modificar categorías de armas.', 
             Icons.category, 
             Colors.blueGrey, 
-            // Navegamos a la pantalla que creamos en el paso anterior
             () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogoTiposScreen())),
           ),
           
-          _buildMenuItem(
+          _buildConfigItem(
             context, 
-            'Catálogo Calibres', 
+            'Catálogo de Calibres', 
+            'Añadir/modificar calibres no estándar.', 
             Icons.straighten, 
             Colors.blueGrey, 
             () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogoCalibresScreen())),
+          ),
+
+          // 2. AQUÍ VA EL NUEVO BOTÓN (Justo al final de la sección C)
+          _buildConfigItem(
+            context, 
+            'Catálogo de Dianas', 
+            'Definir tipos de diana (Precisión, Duelo...).', 
+            Icons.adjust, // Icono de diana
+            Colors.blueGrey, 
+            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogoDianasScreen())),
           ),
         ],
       ),
     );
   }
 
-  // Título de las secciones (A, B, C)
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
       child: Text(
         title,
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey[700]),
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.blueGrey.shade700,
+        ),
       ),
     );
   }
 
-  // El diseño de cada botón
-  Widget _buildMenuItem(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildConfigItem(
+      BuildContext context,
+      String title,
+      String subtitle,
+      IconData icon,
+      Color color,
+      VoidCallback onTap) {
     return Card(
       elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 5),
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: ListTile(
         leading: Icon(icon, color: color, size: 30),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
         onTap: onTap,
       ),

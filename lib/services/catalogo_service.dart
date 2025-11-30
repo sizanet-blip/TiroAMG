@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import '../database/database_provider.dart';
 import '../models/catalogo_model.dart';
+import '../models/tipo_diana_model.dart';
 
 class CatalogoService {
   final dbProvider = DatabaseProvider.instance;
@@ -56,5 +57,31 @@ class CatalogoService {
   Future<int> borrarCalibre(int id) async {
     final db = await dbProvider.database;
     return await db.delete('CatalogoCalibres', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ==========================================
+  //           GESTIÓN DE TIPOS DE DIANA
+  // ==========================================
+  
+  Future<List<TipoDiana>> obtenerTiposDiana() async {
+    final db = await dbProvider.database;
+    final res = await db.query('CatalogoDianas', orderBy: 'nombre');
+    return res.map((e) => TipoDiana.fromMap(e)).toList();
+  }
+
+  Future<int> crearTipoDiana(TipoDiana diana) async {
+    final db = await dbProvider.database;
+    return await db.insert('CatalogoDianas', diana.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+  
+  // Actualizar
+  Future<int> actualizarTipoDiana(TipoDiana diana) async {
+    final db = await dbProvider.database;
+    return await db.update('CatalogoDianas', diana.toMap(), where: 'id = ?', whereArgs: [diana.id]);
+  }
+
+  Future<int> borrarTipoDiana(int id) async {
+    final db = await dbProvider.database;
+    return await db.delete('CatalogoDianas', where: 'id = ?', whereArgs: [id]);
   }
 }

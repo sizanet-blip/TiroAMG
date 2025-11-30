@@ -25,7 +25,7 @@ class TiroTrackerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Tiro Tracker',
+      title: 'Tiro Deportivo AMG',
       theme: ThemeData(
         primarySwatch: Colors.blueGrey,
         useMaterial3: true,
