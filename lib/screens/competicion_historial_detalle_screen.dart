@@ -8,6 +8,7 @@ import '../services/pdf_service.dart';
 import '../services/perfil_service.dart'; 
 import '../services/equipo_service.dart';
 import 'sesion_detalle_screen.dart';
+import 'estadisticas_screen.dart'; // <--- NUEVO IMPORT
 
 class CompeticionHistorialDetalleScreen extends StatefulWidget {
   final int idModalidad;
@@ -36,7 +37,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
   List<SesionResumen> _fases = [];
   bool _cargando = true;
 
-  // Datos editables
+  // Datos editables del torneo
   EquipoDetalle? _equipoUsado;
   String _notasGuardadas = "";
   String _lugarGuardado = ""; 
@@ -63,11 +64,10 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
           equipoDetectado = equipos.firstWhere((e) => e.id == sesionFull.idEquipo);
         } catch (_) {}
         
-        // Limpiamos la nota técnica
         if (sesionFull.nota != null && !sesionFull.nota!.contains("Torneo:")) {
             notasDetectadas = sesionFull.nota!;
         }
-        lugarDetectado = sesionFull.lugar ?? ""; // Cargamos el lugar real
+        lugarDetectado = sesionFull.lugar ?? "";
       }
     }
 
@@ -85,20 +85,13 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
   void _editarDatosTorneo() async {
     final equipos = await _equipoService.obtenerEquiposDetallados();
     
-    // CORRECCIÓN: Buscar el objeto en la lista nueva por ID
-    // Esto evita el error de "DropdownButton value not in items"
     EquipoDetalle? equipoTemp;
-    
     if (_equipoUsado != null) {
       try {
         equipoTemp = equipos.firstWhere((e) => e.id == _equipoUsado!.id);
       } catch (_) {}
     }
-    
-    // Si no se encontró o no había, usamos el primero por defecto
-    if (equipoTemp == null && equipos.isNotEmpty) {
-      equipoTemp = equipos.first;
-    }
+    if (equipoTemp == null && equipos.isNotEmpty) equipoTemp = equipos.first;
     
     final lugarCtrl = TextEditingController(text: _lugarGuardado);
     final notasCtrl = TextEditingController(text: _notasGuardadas);
@@ -158,7 +151,6 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
     if (nuevoEquipo == null) return;
     setState(() => _cargando = true);
 
-    // GUARDADO REAL EN BASE DE DATOS
     await _service.actualizarDatosTorneoCompleto(
       idModalidad: widget.idModalidad,
       fecha: widget.fecha,
@@ -195,6 +187,24 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
     );
   }
 
+  // --- FUNCIÓN NUEVA: IR A ESTADÍSTICAS ---
+  void _irAEstadisticas() {
+    if (_fases.isEmpty) return;
+    
+    // Extraemos los IDs de todas las sesiones que componen este torneo
+    List<int> idsSesiones = _fases.map((f) => f.id).toList();
+    
+    Navigator.push(
+      context, 
+      MaterialPageRoute(
+        builder: (_) => EstadisticasScreen(
+          modo: 2, // Modo competición
+          idsSesionFijos: idsSesiones, // Filtramos SOLO por este torneo
+        )
+      )
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -203,13 +213,18 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
         title: const Text('Detalle Competición'),
         backgroundColor: Colors.amber[800],
         actions: [
+          // BOTÓN ESTADÍSTICAS (¡NUEVO!)
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: "Analizar Torneo",
+            onPressed: _irAEstadisticas,
+          ),
           IconButton(icon: const Icon(Icons.edit), tooltip: "Editar Datos", onPressed: _editarDatosTorneo),
           IconButton(icon: const Icon(Icons.print), tooltip: "Imprimir Acta", onPressed: _generarPDF)
         ],
       ),
       body: Column(
         children: [
-          // CABECERA
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.white,
@@ -240,7 +255,6 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                     const SizedBox(width: 5),
                     Text(_equipoUsado?.nombre ?? "Arma no especificada", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500)),
                 ]),
-                // LUGAR
                 if (_lugarGuardado.isNotEmpty) ...[
                     const SizedBox(height: 5),
                     Row(children: [
@@ -249,7 +263,6 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                         Text(_lugarGuardado, style: const TextStyle(color: Colors.black87)),
                     ]),
                 ],
-                // NOTAS
                 if (_notasGuardadas.isNotEmpty) ...[
                     const SizedBox(height: 5),
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -295,9 +308,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                         const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
                       ],
                     ),
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => SesionDetalleScreen(sesionId: fase.id)));
-                    },
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SesionDetalleScreen(sesionId: fase.id))),
                   ),
                 );
               },

@@ -1,7 +1,7 @@
 import 'dart:math'; 
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-// Ocultamos DateTimeRange del servicio para evitar conflictos
+// Ocultamos DateTimeRange del servicio para evitar conflictos con el de Flutter
 import '../services/estadisticas_service.dart' hide DateTimeRange;
 import '../services/equipo_service.dart';
 import '../services/catalogo_service.dart';
@@ -11,7 +11,7 @@ import '../models/disparo_model.dart';
 
 class EstadisticasScreen extends StatefulWidget {
   final int modo; 
-  final List<int>? idsSesionFijos; // ¡NUEVO! Para venir directo desde el detalle
+  final List<int>? idsSesionFijos; // Para venir directo desde el detalle
 
   const EstadisticasScreen({
     super.key, 
@@ -31,24 +31,27 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   List<EquipoDetalle> _equipos = [];
   List<TipoDiana> _dianas = [];
 
+  // Filtros Generales
   int _filtroFechaSeleccionado = 0; 
   DateTimeRange? _rangoFechasManual; 
-  
   EquipoDetalle? _equipoSel;
-  TipoDiana? _dianaSel;
+  TipoDiana? _dianaSel; // Filtro manual (modo general)
+  
+  // LOGICA PESTAÑAS DIANAS (Modo Detalle)
+  List<TipoDiana> _dianasEnContexto = []; // Dianas detectadas en el torneo
+  TipoDiana? _dianaPestanaSeleccionada;  // Cuál estamos viendo ahora
+  
   bool _filtrosAbiertos = true; 
   bool _cargando = true;
 
   List<Map<String, dynamic>> _datosProgreso = [];
   AnalisisAgrupacion? _analisis;
 
-  // Propiedad para saber si estamos en modo detalle (con IDs fijos)
   bool get _esModoDetalle => widget.idsSesionFijos != null && widget.idsSesionFijos!.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
-    // Si venimos en modo detalle, cerramos los filtros por defecto
     if (_esModoDetalle) _filtrosAbiertos = false;
     _cargarFiltrosIniciales();
   }
@@ -72,42 +75,79 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     setState(() => _cargando = true);
 
     DateTimeRange? rangoCalculado;
-    
-    // Solo calculamos filtros de fecha si NO estamos en modo detalle
+    final now = DateTime.now();
+
     if (!_esModoDetalle) {
-        final now = DateTime.now();
         switch (_filtroFechaSeleccionado) {
-          case 1: rangoCalculado = DateTimeRange(start: DateTime(now.year, now.month, 1), end: now); break;
-          case 2: rangoCalculado = DateTimeRange(start: now.subtract(const Duration(days: 90)), end: now); break;
-          case 3: rangoCalculado = DateTimeRange(start: DateTime(now.year, 1, 1), end: now); break;
-          case 4: rangoCalculado = _rangoFechasManual; break;
+          case 1: rangoCalculado = DateTimeRange(start: DateTime(now.year, now.month, now.day), end: now); break;
+          case 2: rangoCalculado = DateTimeRange(start: DateTime(now.year, now.month, 1), end: now); break;
+          case 3: rangoCalculado = DateTimeRange(start: now.subtract(const Duration(days: 90)), end: now); break;
+          case 4: rangoCalculado = DateTimeRange(start: DateTime(now.year, 1, 1), end: now); break;
+          case 5: rangoCalculado = _rangoFechasManual; break;
           default: rangoCalculado = null; break;
         }
     }
 
-    final progreso = await _statsService.obtenerEvolucionPuntos(
+    // 1. Detectar qué dianas hay en los datos actuales
+    final dianasDetectadas = await _statsService.obtenerTiposDianaEnFiltro(
       rangoFechas: rangoCalculado,
       idEquipo: _equipoSel?.id,
-      idTipoDiana: _dianaSel?.id,
-      filtroModo: _esModoDetalle ? null : widget.modo, // Ignoramos modo si es detalle
-      idsSesiones: widget.idsSesionFijos, // Pasamos los IDs específicos
-    );
-
-    final analisis = await _statsService.calcularAnalisisAgrupacion(
-      rangoFechas: rangoCalculado,
-      idEquipo: _equipoSel?.id,
-      idTipoDiana: _dianaSel?.id,
       filtroModo: _esModoDetalle ? null : widget.modo,
       idsSesiones: widget.idsSesionFijos,
     );
 
+    // Ajustar selección de pestaña automática
+    TipoDiana? dianaParaAnalisis;
+    
+    if (_esModoDetalle || (dianasDetectadas.isNotEmpty && dianasDetectadas.length > 1)) {
+        if (dianasDetectadas.isNotEmpty) {
+           if (_dianaPestanaSeleccionada != null && dianasDetectadas.any((d) => d.id == _dianaPestanaSeleccionada!.id)) {
+             dianaParaAnalisis = _dianaPestanaSeleccionada;
+           } else {
+             dianaParaAnalisis = dianasDetectadas.first;
+             _dianaPestanaSeleccionada = dianaParaAnalisis;
+           }
+        }
+    } else {
+        dianaParaAnalisis = _dianaSel;
+    }
+
+    // 2. Cargar Datos
+    final progreso = await _statsService.obtenerEvolucionPuntos(
+      rangoFechas: rangoCalculado,
+      idEquipo: _equipoSel?.id,
+      idTipoDiana: _dianaSel?.id,
+      filtroModo: _esModoDetalle ? null : widget.modo, 
+      idsSesiones: widget.idsSesionFijos,
+    );
+
+    AnalisisAgrupacion? analisis;
+    if (dianaParaAnalisis != null) {
+      analisis = await _statsService.calcularAnalisisAgrupacion(
+        rangoFechas: rangoCalculado,
+        idEquipo: _equipoSel?.id,
+        idTipoDiana: dianaParaAnalisis.id,
+        filtroModo: _esModoDetalle ? null : widget.modo,
+        idsSesiones: widget.idsSesionFijos,
+      );
+    }
+
     if (mounted) {
       setState(() {
+        _dianasEnContexto = dianasDetectadas;
+        _dianaPestanaSeleccionada = dianaParaAnalisis;
         _datosProgreso = progreso;
         _analisis = analisis;
         _cargando = false;
       });
     }
+  }
+  
+  void _cambiarDianaVisualizada(TipoDiana nuevaDiana) {
+    setState(() {
+      _dianaPestanaSeleccionada = nuevaDiana;
+    });
+    _refrescarDatos(); 
   }
 
   void _seleccionarFechasManuales() async {
@@ -117,13 +157,14 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       initialDateRange: _rangoFechasManual,
+      saveText: 'ACEPTAR', helpText: 'RANGO', cancelText: 'CANCELAR', confirmText: 'ACEPTAR',
       builder: (context, child) => Theme(data: ThemeData.light().copyWith(primaryColor: Colors.purple, colorScheme: const ColorScheme.light(primary: Colors.purple)), child: child!),
     );
     if (picked != null) {
-      setState(() { _rangoFechasManual = picked; _filtroFechaSeleccionado = 4; });
+      setState(() { _rangoFechasManual = picked; _filtroFechaSeleccionado = 5; });
       _refrescarDatos();
     } else {
-      if (_filtroFechaSeleccionado == 4 && _rangoFechasManual == null) { setState(() => _filtroFechaSeleccionado = 0); _refrescarDatos(); }
+      if (_filtroFechaSeleccionado == 5 && _rangoFechasManual == null) { setState(() => _filtroFechaSeleccionado = 0); _refrescarDatos(); }
     }
   }
   
@@ -142,7 +183,6 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       appBar: AppBar(title: Text(titulo), backgroundColor: Colors.purple),
       body: Column(
         children: [
-          // SOLO MOSTRAMOS TARJETA DE FILTROS SI NO ES MODO DETALLE
           if (!_esModoDetalle)
           Card(
             margin: EdgeInsets.zero,
@@ -168,12 +208,13 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                           value: _filtroFechaSeleccionado,
                           items: [
                             const DropdownMenuItem(value: 0, child: Text('Todo', overflow: TextOverflow.ellipsis)),
-                            const DropdownMenuItem(value: 1, child: Text('Este Mes', overflow: TextOverflow.ellipsis)),
-                            const DropdownMenuItem(value: 2, child: Text('Últimos 3 Meses', overflow: TextOverflow.ellipsis)),
-                            const DropdownMenuItem(value: 3, child: Text('Este Año', overflow: TextOverflow.ellipsis)),
-                            DropdownMenuItem(value: 4, child: Text(_filtroFechaSeleccionado == 4 && _rangoFechasManual != null ? '${_formatoCorto(_rangoFechasManual!.start)} - ${_formatoCorto(_rangoFechasManual!.end)}' : 'Personalizado...', overflow: TextOverflow.ellipsis)),
+                            const DropdownMenuItem(value: 1, child: Text('Hoy', overflow: TextOverflow.ellipsis)),
+                            const DropdownMenuItem(value: 2, child: Text('Este Mes', overflow: TextOverflow.ellipsis)),
+                            const DropdownMenuItem(value: 3, child: Text('Últimos 3 Meses', overflow: TextOverflow.ellipsis)),
+                            const DropdownMenuItem(value: 4, child: Text('Este Año', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 5, child: Text(_filtroFechaSeleccionado == 5 && _rangoFechasManual != null ? '${_formatoCorto(_rangoFechasManual!.start)} - ${_formatoCorto(_rangoFechasManual!.end)}' : 'Personalizado...', overflow: TextOverflow.ellipsis)),
                           ],
-                          onChanged: (v) { if (v == 4) { _seleccionarFechasManuales(); } else { setState(() { _filtroFechaSeleccionado = v!; _refrescarDatos(); }); } },
+                          onChanged: (v) { if (v == 5) { _seleccionarFechasManuales(); } else { setState(() { _filtroFechaSeleccionado = v!; _refrescarDatos(); }); } },
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<EquipoDetalle>(
@@ -217,7 +258,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : TabBarView(
                         children: [
-                          _buildMapaCalor(),
+                          _buildVistaAgrupacion(),
                           _buildGraficaProgreso(),
                         ],
                       ),
@@ -264,10 +305,43 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     );
   }
 
-  Widget _buildMapaCalor() {
-    // En modo detalle, si no hay diana seleccionada, intentamos adivinarla, pero si no, mostramos aviso
-    if (_dianaSel == null && !_esModoDetalle) return const Center(child: Text("Selecciona un Tipo de Diana arriba\npara ver el mapa de calor."));
-    if (_analisis == null || _analisis!.disparos.isEmpty) return const Center(child: Text("No hay impactos registrados."));
+  Widget _buildVistaAgrupacion() {
+    if (_dianasEnContexto.isEmpty && _dianaSel == null && !_esModoDetalle) return const Center(child: Text("No hay datos para mostrar."));
+
+    return Column(
+      children: [
+        if (_dianasEnContexto.length > 1)
+          Container(
+            height: 50,
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _dianasEnContexto.length,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              itemBuilder: (ctx, i) {
+                final d = _dianasEnContexto[i];
+                final isSel = d.id == _dianaPestanaSeleccionada?.id;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(d.nombre),
+                    selected: isSel,
+                    selectedColor: Colors.purple[100],
+                    onSelected: (sel) { if(sel) _cambiarDianaVisualizada(d); },
+                  ),
+                );
+              },
+            ),
+          ),
+        Expanded(child: _buildMapaCalorContent()),
+      ],
+    );
+  }
+
+  Widget _buildMapaCalorContent() {
+    TipoDiana? dianaActiva = _dianaPestanaSeleccionada ?? _dianaSel;
+    if (dianaActiva == null) return const Center(child: Text("Selecciona Diana"));
+    if (_analisis == null || _analisis!.disparos.isEmpty) return const Center(child: Text("No hay impactos."));
 
     String consejo = "Agrupación Centrada";
     IconData iconoConsejo = Icons.check_circle;
@@ -278,7 +352,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     double devY = _analisis!.mpi.y; 
     
     double radioFisicoMm = 250.0; 
-    if (_dianaSel != null && _dianaSel!.nombre.toLowerCase().contains("aire")) radioFisicoMm = 78.0;
+    if (dianaActiva.nombre.toLowerCase().contains("aire")) radioFisicoMm = 78.0;
 
     double mmX = devX * radioFisicoMm; 
     double mmY = devY * radioFisicoMm; 
@@ -288,14 +362,11 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     if (valorClic > 0) {
       int clicsH = (mmX.abs() / valorClic).round();
       int clicsV = (mmY.abs() / valorClic).round();
-
       String dirH = mmX > 0 ? "Izquierda (L)" : "Derecha (R)"; 
       String dirV = mmY > 0 ? "Arriba (U)" : "Abajo (D)";      
-      
       List<String> correcciones = [];
       if (clicsH > 0) correcciones.add("$clicsH clics $dirH");
       if (clicsV > 0) correcciones.add("$clicsV clics $dirV");
-      
       if (correcciones.isNotEmpty) {
         consejo = "CORREGIR MIRAS";
         iconoConsejo = Icons.build_circle;
@@ -305,23 +376,21 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     } else {
       String horiz = devX > 0.05 ? "IZQUIERDA" : (devX < -0.05 ? "DERECHA" : "");
       String vert = devY > 0.05 ? "ARRIBA" : (devY < -0.05 ? "ABAJO" : "");
-      
       if (horiz != "" || vert != "") {
-        consejo = "Mover miras hacia: $horiz $vert";
-        detalleClics = "Configura los mm/clic de tu arma para ver el número exacto.";
-        iconoConsejo = Icons.info_outline;
+        consejo = "Mover miras: $horiz $vert";
+        detalleClics = "Configura los mm/clic de tu arma.";
+        iconoConsejo = Icons.info;
         colorConsejo = Colors.blue;
       }
     }
 
     double puntosPerdidos = _analisis!.puntuacionPotencialMedia - _analisis!.puntuacionRealMedia;
     
-    // Config Diana: Si no hay seleccionada, usamos default seguro
-    int vm = _dianaSel?.valorMinimo ?? 1;
-    int an = _dianaSel?.anilloNegroInicio ?? 7;
-    bool fn = _dianaSel?.esFondoNegro ?? false;
-    bool tm = _dianaSel?.tieneMosca ?? true;
-    bool tg = _dianaSel?.tieneGuias ?? false;
+    int vm = dianaActiva.valorMinimo;
+    int an = dianaActiva.anilloNegroInicio;
+    bool fn = dianaActiva.esFondoNegro;
+    bool tm = dianaActiva.tieneMosca;
+    bool tg = dianaActiva.tieneGuias;
     bool ed = an <= 5;
 
     return SingleChildScrollView(
@@ -339,7 +408,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                   Text(detalleClics, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), textAlign: TextAlign.center),
                 ],
                 const SizedBox(height: 10),
-                Text(puntosPerdidos > 0.5 ? "Pierdes ${puntosPerdidos.toStringAsFixed(1)} puntos de media por el desvío." : "Ajuste correcto.", style: const TextStyle(fontStyle: FontStyle.italic), textAlign: TextAlign.center),
+                Text(puntosPerdidos > 0.5 ? "Pierdes ${puntosPerdidos.toStringAsFixed(1)} puntos de media por desvío." : "Ajuste correcto.", style: const TextStyle(fontStyle: FontStyle.italic), textAlign: TextAlign.center),
                 const Divider(),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_datoEstadistico("Media Real", _analisis!.puntuacionRealMedia.toStringAsFixed(2)), const Icon(Icons.arrow_forward, color: Colors.grey), _datoEstadistico("Media Potencial", _analisis!.puntuacionPotencialMedia.toStringAsFixed(2), esVerde: true)]),
               ],
@@ -387,6 +456,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   }
 }
 
+// --- PINTOR DE DIANA (RESTAURADO COMPLETO) ---
 class DianaPainter extends CustomPainter {
   final List<Offset> impactos;
   final int valorMinimo;
@@ -420,12 +490,11 @@ class DianaPainter extends CustomPainter {
     int totalZonas = 11 - valorMinimo; 
     if (totalZonas < 1) totalZonas = 1;
     
-    // VARIABLE QUE FALTABA: Declaramos el ancho de cada zona
     double anchoZona = radius / totalZonas; 
 
     final paintNegro = Paint()..color = Colors.black..style = PaintingStyle.fill;
     final paintLineaClara = Paint()..color = Colors.grey[400]!..style = PaintingStyle.stroke..strokeWidth = 1.0;
-    final paintLineaBlanca = Paint()..color = Colors.white70..style = PaintingStyle.stroke..strokeWidth = 1.0;
+    final paintLineaBlanca = Paint()..color = Colors.white70..style = PaintingStyle.stroke..strokeWidth = 1.2;
 
     if (esEstiloDuelo) {
        double paso = radius / 6;
@@ -433,6 +502,7 @@ class DianaPainter extends CustomPainter {
           double r = radius - (i * paso);
           canvas.drawCircle(center, r, paintLineaBlanca);
           int numeroAnillo = 5 + i;
+          // BLANCO SOBRE NEGRO
           if (numeroAnillo < 10) _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (paso / 2), Colors.white);
        }
     } else {
@@ -444,11 +514,12 @@ class DianaPainter extends CustomPainter {
             canvas.drawCircle(center, r, paintNegro);
             canvas.drawCircle(center, r, paintLineaBlanca);
             if (numeroAnillo < 10) {
-               // Ahora 'anchoZona' está definida y se puede usar
+               // BLANCO SOBRE NEGRO
                _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (anchoZona / 2), Colors.white);
             }
           } else {
             if (i > 0) canvas.drawCircle(center, r, esFondoNegro ? paintLineaBlanca : paintLineaClara);
+            // ALTO CONTRASTE: NEGRO SOBRE BLANCO (O BLANCO SOBRE NEGRO SI FONDO ES NEGRO)
             Color colorNum = esFondoNegro ? Colors.white : Colors.black;
             _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (anchoZona / 2), colorNum);
           }
@@ -496,7 +567,8 @@ class DianaPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: texto, 
-        style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold) 
+        // FUENTE DE TAMAÑO 12 Y NEGRITA PARA MAXIMA VISIBILIDAD
+        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold) 
       ),
       textDirection: TextDirection.ltr
     );

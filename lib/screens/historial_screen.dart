@@ -3,9 +3,7 @@ import '../models/sesion_model.dart';
 import '../services/entrenamiento_service.dart';
 import 'sesion_detalle_screen.dart';
 import 'competicion_historial_detalle_screen.dart';
-// Importamos la pantalla de estadísticas (asegúrate de que el nombre del archivo coincida)
-// Si tu archivo se llama '03_Pantalla_estadisticas_screen.dart', usa ese nombre.
-// Si lo renombraste a 'estadisticas_screen.dart', usa este:
+// Asegúrate de que el nombre del archivo de estadísticas coincida con el que tienes
 import 'estadisticas_screen.dart'; 
 
 class HistorialScreen extends StatefulWidget {
@@ -18,9 +16,11 @@ class HistorialScreen extends StatefulWidget {
 class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProviderStateMixin {
   final _service = EntrenamientoService();
   
+  // Listas completas (Datos brutos)
   List<SesionResumen> _entrenamientosRaw = [];
   List<SesionResumen> _competicionesRaw = [];
   
+  // Listas filtradas (Lo que se ve)
   List<SesionResumen> _entrenamientosFiltrados = [];
   List<SesionResumen> _competicionesFiltradas = [];
 
@@ -28,6 +28,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
   late TabController _tabController;
 
   // Control de Filtros
+  // 0: Todo, 1: Hoy, 2: Este Mes, 3: 3 Meses, 4: Este Año, 5: Custom
   int _filtroSeleccionado = 0;
   DateTimeRange? _rangoSeleccionado;
 
@@ -35,7 +36,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Añadimos un listener para refrescar la UI cuando cambie la pestaña (para el botón de estadísticas)
+    // Refrescar UI al cambiar pestaña para actualizar el botón de estadísticas
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) setState(() {});
     });
@@ -62,22 +63,26 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
     }
   }
 
+  // Lógica de filtrado
   void _aplicarFiltros() {
     final now = DateTime.now();
     bool Function(SesionResumen) filtroFecha;
 
     switch (_filtroSeleccionado) {
-      case 1: // Este Mes
+      case 1: // Hoy (¡NUEVO!)
+        filtroFecha = (s) => s.fecha.day == now.day && s.fecha.month == now.month && s.fecha.year == now.year;
+        break;
+      case 2: // Este Mes
         filtroFecha = (s) => s.fecha.month == now.month && s.fecha.year == now.year;
         break;
-      case 2: // Últimos 3 Meses
+      case 3: // Últimos 3 Meses
         final limite = now.subtract(const Duration(days: 90));
         filtroFecha = (s) => s.fecha.isAfter(limite);
         break;
-      case 3: // Este Año
+      case 4: // Este Año
         filtroFecha = (s) => s.fecha.year == now.year;
         break;
-      case 4: // Rango Personalizado
+      case 5: // Rango Personalizado
         if (_rangoSeleccionado != null) {
           final finAjustado = DateTime(_rangoSeleccionado!.end.year, _rangoSeleccionado!.end.month, _rangoSeleccionado!.end.day, 23, 59, 59);
           filtroFecha = (s) => s.fecha.isAfter(_rangoSeleccionado!.start.subtract(const Duration(seconds: 1))) && 
@@ -119,11 +124,11 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
     if (picked != null) {
       setState(() {
         _rangoSeleccionado = picked;
-        _filtroSeleccionado = 4;
+        _filtroSeleccionado = 5; // Modo Custom
         _aplicarFiltros();
       });
     } else {
-      if (_filtroSeleccionado == 4 && _rangoSeleccionado == null) {
+      if (_filtroSeleccionado == 5 && _rangoSeleccionado == null) {
         setState(() {
           _filtroSeleccionado = 0;
           _aplicarFiltros();
@@ -174,13 +179,12 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
       appBar: AppBar(
         title: const Text('Historial'),
         backgroundColor: Colors.indigo,
-        // --- AQUÍ ESTÁ EL BOTÓN DE ESTADÍSTICAS INTEGRADO ---
         actions: [
+          // Botón de Estadísticas contextual
           IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: _tabController.index == 0 ? "Estadísticas Entrenamientos" : "Estadísticas Competiciones",
             onPressed: () {
-              // Pasamos el modo: 1 si está en la pestaña 0 (Entrenos), 2 si está en la 1 (Compes)
               int modo = _tabController.index == 0 ? 1 : 2; 
               Navigator.push(
                 context, 
@@ -189,7 +193,6 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
             },
           ),
         ],
-        // ----------------------------------------------------
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
@@ -203,14 +206,14 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
       ),
       body: Column(
         children: [
-          // BARRA DE FILTROS
+          // --- BARRA DE FILTROS ---
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             child: Row(
               children: [
                 Icon(
-                  _filtroSeleccionado == 4 ? Icons.date_range : Icons.filter_list, 
+                  _filtroSeleccionado == 5 ? Icons.date_range : Icons.filter_list, 
                   color: Colors.indigo, 
                   size: 24
                 ),
@@ -224,7 +227,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                     style: const TextStyle(color: Colors.black87, fontSize: 16),
                     
                     onChanged: (int? newValue) {
-                      if (newValue == 4) {
+                      if (newValue == 5) {
                         _seleccionarRango();
                       } else if (newValue != null) {
                         setState(() {
@@ -236,13 +239,14 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                     },
                     items: [
                       const DropdownMenuItem(value: 0, child: Text('Mostrar Todo')),
-                      const DropdownMenuItem(value: 1, child: Text('Este Mes')),
-                      const DropdownMenuItem(value: 2, child: Text('Últimos 3 Meses')),
-                      const DropdownMenuItem(value: 3, child: Text('Este Año')),
+                      const DropdownMenuItem(value: 1, child: Text('Hoy')), // ¡NUEVO!
+                      const DropdownMenuItem(value: 2, child: Text('Este Mes')),
+                      const DropdownMenuItem(value: 3, child: Text('Últimos 3 Meses')),
+                      const DropdownMenuItem(value: 4, child: Text('Este Año')),
                       DropdownMenuItem(
-                        value: 4, 
+                        value: 5, 
                         child: Text(
-                          _filtroSeleccionado == 4 && _rangoSeleccionado != null
+                          _filtroSeleccionado == 5 && _rangoSeleccionado != null
                               ? '${_formatoCorto(_rangoSeleccionado!.start)} - ${_formatoCorto(_rangoSeleccionado!.end)}'
                               : 'Rango Personalizado...'
                         ),
@@ -255,7 +259,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
           ),
           const Divider(height: 1),
 
-          // LISTAS
+          // --- LISTAS ---
           Expanded(
             child: _cargando
               ? const Center(child: CircularProgressIndicator())
@@ -285,7 +289,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
             ),
             const SizedBox(height: 10),
             Text(
-              'No hay registros en este periodo', 
+              'No hay registros para este filtro', 
               style: TextStyle(color: Colors.grey[400])
             ),
           ],
