@@ -10,6 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # --- LIBRERÍA DE IDIOMAS ---
+  flutter_localizations:
+    sdk: flutter
+  # -------------------------------------
+  
   # --- BASE DE DATOS ---
   sqflite: ^2.3.0
   path: ^1.9.0
@@ -28,6 +33,10 @@ dependencies:
   share_plus: ^10.0.0
   file_picker: ^8.0.0
 
+  # --- TEXTO A VOZ ---
+  flutter_tts: ^3.8.3
+
+  # --- ICONOS ---
   cupertino_icons: ^1.0.2
 
 dev_dependencies:

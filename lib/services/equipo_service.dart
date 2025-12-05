@@ -6,12 +6,11 @@ class EquipoService {
   final dbProvider = DatabaseProvider.instance;
   final String _tabla = 'Equipos';
 
-  // 1. Obtener lista DETALLADA (con nombres de catálogos)
+  // 1. Lista Detallada
   Future<List<EquipoDetalle>> obtenerEquiposDetallados() async {
     final db = await dbProvider.database;
-    // Hacemos LEFT JOIN para unir las tablas
     final res = await db.rawQuery('''
-      SELECT e.id, e.nombre, e.marca, 
+      SELECT e.id, e.nombre, e.marca, e.correccion_click_mm, -- ¡NUEVO!
              t.nombre AS nombre_tipo, 
              c.nombre AS nombre_calibre
       FROM Equipos e
@@ -22,7 +21,7 @@ class EquipoService {
     return res.map((e) => EquipoDetalle.fromMap(e)).toList();
   }
 
-  // 2. Obtener uno por ID (Para editar)
+  // 2. Obtener uno
   Future<Equipo?> obtenerPorId(int id) async {
     final db = await dbProvider.database;
     final res = await db.query(_tabla, where: 'id = ?', whereArgs: [id]);

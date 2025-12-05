@@ -17,16 +17,13 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
   final _equipoService = EquipoService();
   final _catalogoService = CatalogoService();
 
-  // Controladores
   final _nombreController = TextEditingController();
   final _marcaController = TextEditingController();
   final _modeloController = TextEditingController();
+  final _clicController = TextEditingController(); // ¡NUEVO!
 
-  // Listas para los desplegables
   List<TipoArma> _tipos = [];
   List<Calibre> _calibres = [];
-
-  // Selecciones
   int? _selectedTipo;
   int? _selectedCalibre;
 
@@ -37,7 +34,6 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
   }
 
   void _cargarDatosIniciales() async {
-    // 1. Cargar catálogos
     final tipos = await _catalogoService.obtenerTiposArma();
     final calibres = await _catalogoService.obtenerCalibres();
 
@@ -46,7 +42,6 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
       _calibres = calibres;
     });
 
-    // 2. Si es editar, cargar el equipo
     if (widget.equipoId != null) {
       final equipo = await _equipoService.obtenerPorId(widget.equipoId!);
       if (equipo != null) {
@@ -54,6 +49,7 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
           _nombreController.text = equipo.nombre;
           _marcaController.text = equipo.marca ?? '';
           _modeloController.text = equipo.modelo ?? '';
+          _clicController.text = equipo.correccionClick > 0 ? equipo.correccionClick.toString() : '';
           _selectedTipo = equipo.idTipoArma;
           _selectedCalibre = equipo.idCalibre;
         });
@@ -63,6 +59,8 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
 
   void _guardar() async {
     if (_formKey.currentState!.validate()) {
+      double clics = double.tryParse(_clicController.text.replaceAll(',', '.')) ?? 0.0;
+
       final nuevoEquipo = Equipo(
         id: widget.equipoId,
         nombre: _nombreController.text,
@@ -70,6 +68,7 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
         idCalibre: _selectedCalibre!,
         marca: _marcaController.text,
         modelo: _modeloController.text,
+        correccionClick: clics,
       );
 
       if (widget.equipoId == null) {
@@ -94,15 +93,12 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
           key: _formKey,
           child: Column(
             children: [
-              // Nombre
               TextFormField(
                 controller: _nombreController,
-                decoration: const InputDecoration(labelText: 'Nombre Personal (Ej: Mi Pardini)', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Nombre (Ej: Mi Pardini)', border: OutlineInputBorder()),
                 validator: (v) => v!.isEmpty ? 'Requerido' : null,
               ),
               const SizedBox(height: 20),
-
-              // Desplegables en fila o columna
               DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: 'Tipo de Arma', border: OutlineInputBorder()),
                 value: _selectedTipo,
@@ -111,7 +107,6 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
                 validator: (v) => v == null ? 'Selecciona un tipo' : null,
               ),
               const SizedBox(height: 20),
-
               DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: 'Calibre', border: OutlineInputBorder()),
                 value: _selectedCalibre,
@@ -120,24 +115,41 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
                 validator: (v) => v == null ? 'Selecciona un calibre' : null,
               ),
               const SizedBox(height: 20),
-
-              // Marca y Modelo (Opcionales)
               Row(
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _marcaController,
-                      decoration: const InputDecoration(labelText: 'Marca', border: OutlineInputBorder()),
-                    ),
-                  ),
+                  Expanded(child: TextFormField(controller: _marcaController, decoration: const InputDecoration(labelText: 'Marca', border: OutlineInputBorder()))),
                   const SizedBox(width: 10),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _modeloController,
-                      decoration: const InputDecoration(labelText: 'Modelo', border: OutlineInputBorder()),
-                    ),
-                  ),
+                  Expanded(child: TextFormField(controller: _modeloController, decoration: const InputDecoration(labelText: 'Modelo', border: OutlineInputBorder()))),
                 ],
+              ),
+              const SizedBox(height: 20),
+              
+              // --- SECCIÓN TÉCNICA (CLICS) ---
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(color: Colors.teal[50], borderRadius: BorderRadius.circular(10)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Configuración de Miras", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _clicController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Corrección por Clic (mm)', 
+                        hintText: 'Ej: 5 (para 5mm a 25m)',
+                        border: OutlineInputBorder(),
+                        suffixText: 'mm/clic'
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      "Consulta el manual de tu arma. Valor típico a 25m: 5mm o 10mm.", 
+                      style: TextStyle(fontSize: 11, color: Colors.grey)
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 30),
@@ -145,12 +157,8 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.save),
-                  label: const Text('GUARDAR ARMA', style: TextStyle(fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.all(15),
-                  ),
+                  label: const Text('GUARDAR ARMA'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.all(15)),
                   onPressed: _guardar,
                 ),
               ),

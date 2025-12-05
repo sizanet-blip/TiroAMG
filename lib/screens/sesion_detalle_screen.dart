@@ -10,8 +10,8 @@ import '../services/plantilla_tiempos_service.dart';
 import '../services/catalogo_service.dart';
 import '../services/equipo_service.dart';
 import '../services/pdf_service.dart';
-import '../services/perfil_service.dart'; // Nuevo para el PDF
-import '../widgets/diana_painter.dart';
+import '../services/perfil_service.dart';
+import 'estadisticas_screen.dart'; // <--- IMPORTANTE: Para navegar a estadísticas
 
 class SesionDetalleScreen extends StatefulWidget {
   final int sesionId;
@@ -28,7 +28,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
   final _catalogoService = CatalogoService();
   final _equipoService = EquipoService();
   final _pdfService = PdfService();
-  final _perfilService = PerfilService(); // Nuevo
+  final _perfilService = PerfilService();
   
   final ScrollController _scrollController = ScrollController();
 
@@ -37,7 +37,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
   List<Disparo> _disparos = [];
   bool _cargando = true;
 
-  // Datos extra para PDF y Edición
+  // Datos extra
   EquipoDetalle? _equipoDetalle;
 
   // Configuración Diana
@@ -94,7 +94,6 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
     }
   }
 
-  // --- EDITAR DATOS SESIÓN ---
   void _editarDatosSesion() async {
     final equipos = await _equipoService.obtenerEquiposDetallados();
     
@@ -169,18 +168,14 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
       nuevoLugar: nuevoLugar
     );
 
-    // Recargamos para ver los cambios
     _cargarDatosCompletos();
-    
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sesión actualizada')));
   }
 
   void _generarPDF() async {
     if (_sesion == null) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generando PDF...'), duration: Duration(seconds: 1)));
-
     final perfil = await _perfilService.obtenerPerfil();
-    
     await _pdfService.generarYMostrarPdf(
       sesion: _sesion!,
       disparos: _disparos,
@@ -194,8 +189,8 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
       tieneGuias: _tieneGuias,
       esEstiloDuelo: _esEstiloDuelo,
       perfil: perfil,
-      lugar: _sesion!.lugar, // Usamos lo guardado
-      observaciones: _sesion!.nota, // Usamos lo guardado
+      lugar: _sesion!.lugar,
+      observaciones: _sesion!.nota,
     );
   }
 
@@ -213,23 +208,32 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
         backgroundColor: Colors.indigo,
         elevation: 0,
         actions: [
-          // BOTÓN EDITAR
+          // --- 1. BOTÓN ESTADÍSTICAS (NUEVO) ---
           IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: "Editar Datos",
-            onPressed: _editarDatosSesion,
+            icon: const Icon(Icons.bar_chart),
+            tooltip: "Analizar esta sesión",
+            onPressed: () {
+              Navigator.push(
+                context, 
+                MaterialPageRoute(
+                  builder: (_) => EstadisticasScreen(
+                    modo: 1, // Modo entrenamiento (o genérico)
+                    idsSesionFijos: [widget.sesionId] // Pasamos el ID específico
+                  )
+                )
+              );
+            },
           ),
-          // BOTÓN PDF
-          IconButton(
-            icon: const Icon(Icons.print),
-            onPressed: _generarPDF,
-            tooltip: 'Imprimir / PDF',
-          )
+          
+          // --- 2. BOTÓN EDITAR ---
+          IconButton(icon: const Icon(Icons.edit), tooltip: "Editar Datos", onPressed: _editarDatosSesion),
+          
+          // --- 3. BOTÓN IMPRIMIR ---
+          IconButton(icon: const Icon(Icons.print), onPressed: _generarPDF, tooltip: 'Imprimir / PDF')
         ],
       ),
       body: Column(
         children: [
-          // --- CABECERA ---
           Container(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
             decoration: const BoxDecoration(
@@ -244,81 +248,34 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _plantilla?.nombreDisciplina ?? 'Desconocido', 
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.indigo),
-                      ),
+                      Text(_plantilla?.nombreDisciplina ?? 'Desconocido', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.indigo)),
                       const SizedBox(height: 5),
-                      // Mostrar Arma
                       if (_equipoDetalle != null)
-                        Row(children: [
-                            const Icon(Icons.hardware, size: 14, color: Colors.grey),
-                            const SizedBox(width: 5),
-                            Text(_equipoDetalle!.nombre, style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w500)),
-                        ]),
-                      // Mostrar Lugar
+                        Row(children: [const Icon(Icons.hardware, size: 14, color: Colors.grey), const SizedBox(width: 5), Text(_equipoDetalle!.nombre, style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w500))]),
                       if (_sesion?.lugar != null && _sesion!.lugar!.isNotEmpty)
-                        Row(children: [
-                            const Icon(Icons.place, size: 14, color: Colors.grey),
-                            const SizedBox(width: 5),
-                            Text(_sesion!.lugar!, style: const TextStyle(color: Colors.black87, fontSize: 13)),
-                        ]),
-                      // Mostrar Nota
+                        Row(children: [const Icon(Icons.place, size: 14, color: Colors.grey), const SizedBox(width: 5), Text(_sesion!.lugar!, style: const TextStyle(color: Colors.black87, fontSize: 13))]),
                       if (_sesion?.nota != null && _sesion!.nota!.isNotEmpty) ...[
                         const SizedBox(height: 5),
-                        Text(
-                          _sesion!.nota!, 
-                          style: const TextStyle(color: Colors.blueGrey, fontSize: 12, fontStyle: FontStyle.italic),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(_sesion!.nota!, style: const TextStyle(color: Colors.blueGrey, fontSize: 12, fontStyle: FontStyle.italic), maxLines: 3, overflow: TextOverflow.ellipsis),
                       ],
                       const SizedBox(height: 8),
-                      Text(
-                        "${_sesion!.fecha.day}/${_sesion!.fecha.month}/${_sesion!.fecha.year} ${_sesion!.fecha.hour}:${_sesion!.fecha.minute.toString().padLeft(2,'0')}",
-                        style: TextStyle(color: Colors.grey[400], fontSize: 11),
-                      ),
+                      Text("${_sesion!.fecha.day}/${_sesion!.fecha.month}/${_sesion!.fecha.year} ${_sesion!.fecha.hour}:${_sesion!.fecha.minute.toString().padLeft(2,'0')}", style: TextStyle(color: Colors.grey[400], fontSize: 11)),
                     ],
                   ),
                 ),
-                const SizedBox(width: 15),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.indigo[50],
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.indigo.withOpacity(0.2))
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '$puntos', 
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 28, color: Colors.indigo)
-                          ),
-                          const Text("PUNTOS", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.indigoAccent)),
-                        ],
-                      ),
-                    ),
-                    if (moscas > 0) 
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6.0),
-                        child: Text(
-                          '$moscas moscas (x)', 
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 12)
-                        ),
-                      ),
+                    Text('$puntos', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 28, color: Colors.indigo)),
+                    const Text("PUNTOS", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.indigoAccent)),
+                    if (moscas > 0) Text('$moscas moscas (x)', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 12)),
                   ],
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 10),
 
-          // --- DIANA ---
           Expanded(
             child: Center(
               child: Padding(
@@ -327,27 +284,23 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                   builder: (context, constraints) {
                     double diametro = min(constraints.maxWidth, constraints.maxHeight);
                     Size size = Size(diametro, diametro);
-
                     List<Offset> impactosPixels = _disparos.map((d) {
                       double radio = size.width / 2;
-                      double centerX = size.width / 2;
-                      double centerY = size.height / 2;
-                      return Offset((d.x * radio) + centerX, (d.y * radio) + centerY);
+                      double cx = size.width / 2;
+                      double cy = size.height / 2;
+                      return Offset((d.x * radio) + cx, (d.y * radio) + cy);
                     }).toList();
 
-                    return Hero(
-                      tag: 'diana_${widget.sesionId}',
-                      child: CustomPaint(
-                        size: size,
-                        painter: DianaPainter(
-                          impactos: impactosPixels,
-                          valorMinimo: _valorMinimo,
-                          anilloNegroInicio: _anilloNegroInicio,
-                          esFondoNegro: _esFondoNegro,
-                          tieneMosca: _tieneMosca,
-                          tieneGuias: _tieneGuias,
-                          esEstiloDuelo: _esEstiloDuelo,
-                        ),
+                    return CustomPaint(
+                      size: size,
+                      painter: DianaPainter(
+                        impactos: impactosPixels,
+                        valorMinimo: _valorMinimo,
+                        anilloNegroInicio: _anilloNegroInicio,
+                        esFondoNegro: _esFondoNegro,
+                        tieneMosca: _tieneMosca,
+                        tieneGuias: _tieneGuias,
+                        esEstiloDuelo: _esEstiloDuelo,
                       ),
                     );
                   },
@@ -356,9 +309,8 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
             ),
           ),
           
-          // --- LISTA DE TIROS ---
           Container(
-            height: 140, 
+            height: 120, 
             color: Colors.white,
             child: SafeArea(
               top: false,
@@ -366,10 +318,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                 children: [
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      "Secuencia", 
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)
-                    ),
+                    child: Text("Secuencia", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
                   ),
                   const Divider(height: 1),
                   Expanded(
@@ -396,27 +345,10 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                FittedBox(
-                                  child: Text('#${tiro.numero}', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
-                                ),
+                                FittedBox(child: Text('#${tiro.numero}', style: TextStyle(fontSize: 10, color: Colors.grey[600]))),
                                 const SizedBox(height: 2),
-                                Expanded(
-                                  child: Center(
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        '${tiro.puntuacion.toInt()}', 
-                                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                if(tiro.esMosca) 
-                                  const FittedBox(
-                                    child: Text('X', style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold))
-                                  )
-                                else 
-                                  const SizedBox(height: 12), 
+                                Expanded(child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text('${tiro.puntuacion.toInt()}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87))))),
+                                if(tiro.esMosca) const FittedBox(child: Text('X', style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold))) else const SizedBox(height: 12), 
                               ],
                             ),
                           );
@@ -432,4 +364,123 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
       ),
     );
   }
+}
+
+class DianaPainter extends CustomPainter {
+  final List<Offset> impactos;
+  final int valorMinimo;
+  final int anilloNegroInicio;
+  final bool esFondoNegro;
+  final bool tieneMosca;
+  final bool tieneGuias;
+  final bool esEstiloDuelo;
+  final Offset? centroGravedad;
+
+  DianaPainter({
+    required this.impactos,
+    required this.valorMinimo,
+    required this.anilloNegroInicio,
+    required this.esFondoNegro,
+    required this.tieneMosca,
+    required this.tieneGuias,
+    required this.esEstiloDuelo,
+    this.centroGravedad,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    final paintFondo = Paint()..color = esFondoNegro ? const Color(0xFF1A1A1A) : Colors.white..style = PaintingStyle.fill;
+    canvas.drawCircle(center, radius, paintFondo);
+
+    int totalZonas = 11 - valorMinimo; 
+    if (totalZonas < 1) totalZonas = 1;
+    
+    // VARIABLE QUE FALTABA: Declaramos el ancho de cada zona
+    double anchoZona = radius / totalZonas; 
+
+    final paintNegro = Paint()..color = Colors.black..style = PaintingStyle.fill;
+    final paintLineaClara = Paint()..color = Colors.grey[400]!..style = PaintingStyle.stroke..strokeWidth = 1.0;
+    final paintLineaBlanca = Paint()..color = Colors.white70..style = PaintingStyle.stroke..strokeWidth = 1.0;
+
+    if (esEstiloDuelo) {
+       double paso = radius / 6;
+       for (int i = 0; i < 6; i++) {
+          double r = radius - (i * paso);
+          canvas.drawCircle(center, r, paintLineaBlanca);
+          int numeroAnillo = 5 + i;
+          if (numeroAnillo < 10) _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (paso / 2), Colors.white);
+       }
+    } else {
+       for (int i = 0; i < totalZonas; i++) {
+          int numeroAnillo = valorMinimo + i;
+          double r = radius - (i * (radius / totalZonas));
+          
+          if (numeroAnillo >= anilloNegroInicio) {
+            canvas.drawCircle(center, r, paintNegro);
+            canvas.drawCircle(center, r, paintLineaBlanca);
+            if (numeroAnillo < 10) {
+               _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (anchoZona / 2), Colors.white);
+            }
+          } else {
+            if (i > 0) canvas.drawCircle(center, r, esFondoNegro ? paintLineaBlanca : paintLineaClara);
+            Color colorNum = esFondoNegro ? Colors.white : Colors.black;
+            _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (anchoZona / 2), colorNum);
+          }
+       }
+    }
+
+    if (tieneMosca) {
+      double radioMosca = (radius / totalZonas) / 2;
+      canvas.drawCircle(center, radioMosca, paintLineaBlanca);
+    }
+    
+    if (tieneGuias) {
+      Paint guia = Paint()..color = Colors.white..strokeWidth = 2.0;
+      double largo = radius * 0.3;
+      canvas.drawLine(Offset(center.dx - radius, center.dy), Offset(center.dx - radius + largo, center.dy), guia);
+      canvas.drawLine(Offset(center.dx + radius, center.dy), Offset(center.dx + radius - largo, center.dy), guia);
+    }
+    
+    canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), Paint()..color = Colors.white..strokeWidth=1);
+    canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), Paint()..color = Colors.white..strokeWidth=1);
+
+    final paintImpacto = Paint()..color = Colors.greenAccent.withOpacity(0.6)..style = PaintingStyle.fill;
+    double tamano = (radius * 0.04) * (10 / totalZonas);
+    for(var p in impactos) {
+       canvas.drawCircle(p, tamano, paintImpacto);
+    }
+
+    if (centroGravedad != null) {
+      final paintMPI = Paint()..color = Colors.redAccent..style = PaintingStyle.stroke..strokeWidth = 3.0;
+      double sizeCruz = 10.0;
+      canvas.drawLine(Offset(centroGravedad!.dx - sizeCruz, centroGravedad!.dy), Offset(centroGravedad!.dx + sizeCruz, centroGravedad!.dy), paintMPI);
+      canvas.drawLine(Offset(centroGravedad!.dx, centroGravedad!.dy - sizeCruz), Offset(centroGravedad!.dx, centroGravedad!.dy + sizeCruz), paintMPI);
+      canvas.drawCircle(centroGravedad!, sizeCruz / 1.5, paintMPI);
+    }
+  }
+
+  void _dibujarNumeros4Ejes(Canvas canvas, String texto, Offset center, double dist, Color color) {
+    _texto(canvas, texto, Offset(center.dx, center.dy - dist), color);
+    _texto(canvas, texto, Offset(center.dx, center.dy + dist), color);
+    _texto(canvas, texto, Offset(center.dx + dist, center.dy), color);
+    _texto(canvas, texto, Offset(center.dx - dist, center.dy), color);
+  }
+
+  void _texto(Canvas canvas, String texto, Offset pos, Color color) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: texto, 
+        style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold) 
+      ),
+      textDirection: TextDirection.ltr
+    );
+    tp.layout();
+    tp.paint(canvas, Offset(pos.dx - tp.width / 2, pos.dy - tp.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(covariant DianaPainter oldDelegate) => true;
 }
