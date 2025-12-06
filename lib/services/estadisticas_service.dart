@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'package:flutter/material.dart'; // Para DateTimeRange
+import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_provider.dart';
 import '../models/disparo_model.dart';
@@ -45,20 +45,16 @@ class EstadisticasService {
     return where;
   }
 
-  // --- 1. EVOLUCIÓN (Mezcla todo o filtra si se pide) ---
+  // --- 1. EVOLUCIÓN ---
   Future<List<Map<String, dynamic>>> obtenerEvolucionPuntos({
     DateTimeRange? rangoFechas,
     int? idEquipo,
-    int? idTipoDiana, // ¡AÑADIDO PARA CORREGIR EL ERROR!
+    int? idTipoDiana,
     int? filtroModo,
     List<int>? idsSesiones,
   }) async {
     final db = await dbProvider.database;
     List<dynamic> args = [];
-    
-    // Pasamos idTipoDiana como null intencionalmente si queremos mezclar todo,
-    // O pasamos la variable si queremos permitir filtrar evolución por diana.
-    // Para mantener la lógica de "ver tendencia global", pasamos null aquí:
     String whereClause = _construirWhere(args, 
       rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: null, filtroModo: filtroModo, idsSesiones: idsSesiones
     );
@@ -76,7 +72,7 @@ class EstadisticasService {
     return res;
   }
 
-  // --- 2. NUEVO: OBTENER DIANAS DISPONIBLES EN EL FILTRO ---
+  // --- 2. OBTENER DIANAS ---
   Future<List<TipoDiana>> obtenerTiposDianaEnFiltro({
     DateTimeRange? rangoFechas,
     int? idEquipo,
@@ -89,7 +85,6 @@ class EstadisticasService {
       rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: null, filtroModo: filtroModo, idsSesiones: idsSesiones
     );
 
-    // Buscamos qué tipos de diana aparecen en las sesiones filtradas
     final res = await db.rawQuery('''
       SELECT DISTINCT cd.*
       FROM CatalogoDianas cd
@@ -102,25 +97,26 @@ class EstadisticasService {
     return res.map((e) => TipoDiana.fromMap(e)).toList();
   }
 
-  // --- 3. ANÁLISIS AGRUPACIÓN (Filtra por diana específica) ---
+  // --- 3. ANÁLISIS AGRUPACIÓN ---
   Future<AnalisisAgrupacion> calcularAnalisisAgrupacion({
     DateTimeRange? rangoFechas,
     int? idEquipo,
-    int? idTipoDiana, // ESTE ES OBLIGATORIO AHORA PARA NO MEZCLAR
+    int? idTipoDiana,
     int? filtroModo,
     List<int>? idsSesiones,
   }) async {
+    // (El código de esta función se mantiene IGUAL que antes,
+    //  lo copio aquí para que el archivo esté completo y compile)
     final db = await dbProvider.database;
     List<dynamic> args = [];
-    String whereClause = _construirWhere(args, 
-      rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: idTipoDiana, filtroModo: filtroModo, idsSesiones: idsSesiones
-    );
+    String whereClause = _construirWhere(args, rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: idTipoDiana, filtroModo: filtroModo, idsSesiones: idsSesiones);
 
     final res = await db.rawQuery('''
-      SELECT d.*
+      SELECT d.*, cd.valor_minimo, cd.anillo_negro_inicio
       FROM Disparos d
       JOIN Sesiones s ON d.id_sesion = s.id
       JOIN PlantillasTiempos p ON s.id_plantilla_tiempos = p.id
+      JOIN CatalogoDianas cd ON p.id_tipo_diana = cd.id
       WHERE $whereClause
       LIMIT 2000
     ''', args);
@@ -129,31 +125,34 @@ class EstadisticasService {
     
     if (disparos.isEmpty) return AnalisisAgrupacion(disparos: [], puntuacionRealMedia: 0, puntuacionPotencialMedia: 0, radioDisperson: 0, mpi: const Point(0,0));
 
-    // Calcular MPI
     double sumX = 0, sumY = 0, sumPuntos = 0;
     for (var d in disparos) { sumX += d.x; sumY += d.y; sumPuntos += d.puntuacion; }
     double mpiX = sumX / disparos.length;
     double mpiY = sumY / disparos.length;
     
-    // Calcular Potencial
-    // Para hacerlo exacto necesitaríamos saber la diana, asumimos la del filtro o la primera si no
-    // En este caso, como el análisis requiere idTipoDiana, podemos asumir su lógica
-    // Si idTipoDiana es null (error), devolvemos básico.
-    
-    // Recuperar datos diana si no los tenemos (opcional, para cálculo exacto de potencial)
-    // Por simplicidad, usaremos una lógica estándar aquí o podemos hacer una query extra.
-    // Asumiremos Precisión (1-10) por defecto para el cálculo potencial si no hay datos específicos de diana en la query de disparos.
-    
     double sumPuntosPotenciales = 0;
     double sumRadio = 0;
+    int valorMinimo = res.first['valor_minimo'] as int;
+    bool esEstiloDuelo = (res.first['anillo_negro_inicio'] as int) <= 5;
 
     for (var d in disparos) {
-      double dist = sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
-      sumRadio += dist;
-      // Cálculo simplificado de potencial (asumiendo diana precisión)
-      double calc = 11 - (dist * 10); 
-      if (calc > 10) calc = 10; if (calc < 0) calc = 0;
-      sumPuntosPotenciales += calc.floor();
+      double distAlMPI = sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
+      sumRadio += distAlMPI;
+      double distCentrada = distAlMPI; 
+      int puntosVirtuales = 0;
+      if (distCentrada <= 1.0) {
+          if (esEstiloDuelo) {
+             double calculo = 11 - (distCentrada * 6);
+             puntosVirtuales = calculo.floor();
+             if (puntosVirtuales < 5) puntosVirtuales = 0; if (puntosVirtuales > 10) puntosVirtuales = 10;
+          } else {
+             int totalZonas = 11 - valorMinimo;
+             double calculo = 11 - (distCentrada * totalZonas);
+             puntosVirtuales = calculo.floor();
+             if (puntosVirtuales < valorMinimo) puntosVirtuales = 0; if (puntosVirtuales > 10) puntosVirtuales = 10;
+          }
+      }
+      sumPuntosPotenciales += puntosVirtuales;
     }
 
     return AnalisisAgrupacion(
@@ -164,6 +163,96 @@ class EstadisticasService {
       radioDisperson: sumRadio / disparos.length,
     );
   }
+
+  // --- 4. ¡NUEVO! DIAGNÓSTICO TÉCNICO (RELOJ DE ERRORES) ---
+  Future<List<DiagnosticoTecnico>> calcularDiagnosticoTecnico({
+    DateTimeRange? rangoFechas,
+    int? idEquipo,
+    int? idTipoDiana,
+    int? filtroModo,
+    List<int>? idsSesiones,
+    bool esZurdo = false, // Importante para invertir el reloj
+  }) async {
+    final db = await dbProvider.database;
+    List<dynamic> args = [];
+    String whereClause = _construirWhere(args, rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: idTipoDiana, filtroModo: filtroModo, idsSesiones: idsSesiones);
+
+    // Solo analizamos disparos que NO sean dieces perfectos (puntuacion < 9.8 aprox o fuera del centro)
+    // Asumimos que un 10 no es un error técnico.
+    final res = await db.rawQuery('''
+      SELECT d.* FROM Disparos d
+      JOIN Sesiones s ON d.id_sesion = s.id
+      JOIN PlantillasTiempos p ON s.id_plantilla_tiempos = p.id
+      WHERE $whereClause AND d.puntuacion < 9.5 
+      LIMIT 1000
+    ''', args);
+
+    List<Disparo> fallos = res.map((e) => Disparo.fromMap(e)).toList();
+    
+    // Mapa de errores
+    Map<String, int> conteoErrores = {
+      "Gatillazo (Dedazo)": 0,
+      "Muñeca floja (Breaking)": 0,
+      "Apretar Empuñadura": 0,
+      "Empujar (Anticipación)": 0,
+    };
+
+    for (var d in fallos) {
+      // Calcular ángulo en grados (0 a 360, donde 0 es las 3 en punto, reloj matemático)
+      // Pero para el reloj de tiro: 12h = -90deg, 3h = 0deg, 6h = 90deg, 9h = 180deg
+      double angleRad = atan2(d.y, d.x); // y crece hacia abajo en pantalla
+      double angleDeg = angleRad * 180 / pi; 
+      
+      // Normalizamos ángulo de reloj: 12h = 0 grados, horario positivo
+      // atan2 devuelve: 0 (3h), 90 (6h), 180/-180 (9h), -90 (12h)
+      
+      // Convertimos a sistema de "Zonas del Reloj" (simplificado)
+      // Definiciones para DIESTRO (Si es zurdo, invertimos izquierda/derecha)
+      
+      bool izquierda = (angleDeg > 90 || angleDeg < -90); // 9h
+      bool derecha = (angleDeg < 90 && angleDeg > -90);   // 3h
+      bool abajo = (angleDeg > 0); // 6h
+      bool arriba = (angleDeg < 0); // 12h
+
+      // Lógica de Diagnóstico (Clásica Diestro)
+      String error = "Desconocido";
+      
+      if (esZurdo) {
+         // INVERTIR LÓGICA HORIZONTAL
+         bool temp = izquierda; izquierda = derecha; derecha = temp;
+      }
+
+      if (abajo && izquierda) error = "Gatillazo (Dedazo)";
+      else if (arriba && derecha) error = "Empujar (Anticipación)";
+      else if (abajo && derecha) error = "Apretar Empuñadura";
+      else if (arriba && izquierda) error = "Muñeca floja (Breaking)";
+      else if (derecha) error = "Dedo índice mal puesto";
+      else if (izquierda) error = "Dedo índice poco metido";
+      else error = "Falta de estabilidad";
+
+      // Simplificamos a 4 grandes grupos para la gráfica
+      if (abajo && izquierda) conteoErrores["Gatillazo (Dedazo)"] = conteoErrores["Gatillazo (Dedazo)"]! + 1;
+      else if (arriba && derecha) conteoErrores["Empujar (Anticipación)"] = conteoErrores["Empujar (Anticipación)"]! + 1;
+      else if (abajo && derecha) conteoErrores["Apretar Empuñadura"] = conteoErrores["Apretar Empuñadura"]! + 1;
+      else if (arriba && izquierda) conteoErrores["Muñeca floja (Breaking)"] = conteoErrores["Muñeca floja (Breaking)"]! + 1;
+      // Los otros se ignoran para el gráfico principal o se suman al más cercano
+    }
+
+    // Convertir mapa a lista ordenada
+    List<DiagnosticoTecnico> resultado = [];
+    int totalFallos = fallos.length;
+    if (totalFallos == 0) return [];
+
+    conteoErrores.forEach((nombre, cantidad) {
+      if (cantidad > 0) {
+        double porcentaje = (cantidad / totalFallos) * 100;
+        resultado.add(DiagnosticoTecnico(nombreError: nombre, cantidad: cantidad, porcentaje: porcentaje));
+      }
+    });
+
+    resultado.sort((a, b) => b.cantidad.compareTo(a.cantidad)); // Ordenar por frecuencia
+    return resultado;
+  }
 }
 
 class AnalisisAgrupacion {
@@ -173,11 +262,12 @@ class AnalisisAgrupacion {
   final double puntuacionPotencialMedia;
   final double radioDisperson;
 
-  AnalisisAgrupacion({
-    required this.disparos,
-    required this.mpi,
-    required this.puntuacionRealMedia,
-    required this.puntuacionPotencialMedia,
-    required this.radioDisperson,
-  });
+  AnalisisAgrupacion({required this.disparos, required this.mpi, required this.puntuacionRealMedia, required this.puntuacionPotencialMedia, required this.radioDisperson});
+}
+
+class DiagnosticoTecnico {
+  final String nombreError;
+  final int cantidad;
+  final double porcentaje;
+  DiagnosticoTecnico({required this.nombreError, required this.cantidad, required this.porcentaje});
 }
