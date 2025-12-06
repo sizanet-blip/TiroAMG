@@ -1,9 +1,9 @@
 import 'dart:math';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; 
 import 'package:sqflite/sqflite.dart';
 import '../database/database_provider.dart';
 import '../models/disparo_model.dart';
-import '../models/tipo_diana_model.dart'; // Necesario para devolver la lista de dianas
+import '../models/tipo_diana_model.dart';
 
 class EstadisticasService {
   final dbProvider = DatabaseProvider.instance;
@@ -55,9 +55,7 @@ class EstadisticasService {
   }) async {
     final db = await dbProvider.database;
     List<dynamic> args = [];
-    String whereClause = _construirWhere(args, 
-      rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: null, filtroModo: filtroModo, idsSesiones: idsSesiones
-    );
+    String whereClause = _construirWhere(args, rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: idTipoDiana, filtroModo: filtroModo, idsSesiones: idsSesiones);
 
     final res = await db.rawQuery('''
       SELECT s.fecha, COALESCE(SUM(d.puntuacion), 0) as total
@@ -81,9 +79,7 @@ class EstadisticasService {
   }) async {
     final db = await dbProvider.database;
     List<dynamic> args = [];
-    String whereClause = _construirWhere(args, 
-      rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: null, filtroModo: filtroModo, idsSesiones: idsSesiones
-    );
+    String whereClause = _construirWhere(args, rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: null, filtroModo: filtroModo, idsSesiones: idsSesiones);
 
     final res = await db.rawQuery('''
       SELECT DISTINCT cd.*
@@ -105,8 +101,6 @@ class EstadisticasService {
     int? filtroModo,
     List<int>? idsSesiones,
   }) async {
-    // (El código de esta función se mantiene IGUAL que antes,
-    //  lo copio aquí para que el archivo esté completo y compile)
     final db = await dbProvider.database;
     List<dynamic> args = [];
     String whereClause = _construirWhere(args, rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: idTipoDiana, filtroModo: filtroModo, idsSesiones: idsSesiones);
@@ -123,19 +117,53 @@ class EstadisticasService {
 
     List<Disparo> disparos = res.map((e) => Disparo.fromMap(e)).toList();
     
-    if (disparos.isEmpty) return AnalisisAgrupacion(disparos: [], puntuacionRealMedia: 0, puntuacionPotencialMedia: 0, radioDisperson: 0, mpi: const Point(0,0));
+    if (disparos.isEmpty) return AnalisisAgrupacion(disparosValidos: [], disparosDescartados: [], puntuacionRealMedia: 0, puntuacionPotencialMedia: 0, mpi: const Point(0,0), radioDisperson: 0);
 
+    // 1. MPI Inicial
     double sumX = 0, sumY = 0, sumPuntos = 0;
     for (var d in disparos) { sumX += d.x; sumY += d.y; sumPuntos += d.puntuacion; }
     double mpiX = sumX / disparos.length;
     double mpiY = sumY / disparos.length;
     
+    // 2. FILTRO DE FLYERS
+    List<Disparo> validos = [];
+    List<Disparo> descartados = [];
+    
+    if (disparos.length < 5) {
+      validos = List.from(disparos);
+    } else {
+      double sumaDistancias = 0;
+      for (var d in disparos) {
+        sumaDistancias += sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
+      }
+      double distanciaMedia = sumaDistancias / disparos.length;
+      double umbral = distanciaMedia * 2.5; 
+      
+      for (var d in disparos) {
+        double dist = sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
+        if (dist > umbral && dist > 0.15) {
+           descartados.add(d);
+        } else {
+           validos.add(d);
+        }
+      }
+    }
+
+    // 3. RE-CALCULAR MPI FINO
+    if (validos.isNotEmpty) {
+       sumX = 0; sumY = 0;
+       for (var d in validos) { sumX += d.x; sumY += d.y; }
+       mpiX = sumX / validos.length;
+       mpiY = sumY / validos.length;
+    }
+
+    // 4. Calcular Potencial
     double sumPuntosPotenciales = 0;
     double sumRadio = 0;
     int valorMinimo = res.first['valor_minimo'] as int;
     bool esEstiloDuelo = (res.first['anillo_negro_inicio'] as int) <= 5;
 
-    for (var d in disparos) {
+    for (var d in validos) {
       double distAlMPI = sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
       sumRadio += distAlMPI;
       double distCentrada = distAlMPI; 
@@ -144,130 +172,144 @@ class EstadisticasService {
           if (esEstiloDuelo) {
              double calculo = 11 - (distCentrada * 6);
              puntosVirtuales = calculo.floor();
-             if (puntosVirtuales < 5) puntosVirtuales = 0; if (puntosVirtuales > 10) puntosVirtuales = 10;
+             if (puntosVirtuales < 5) puntosVirtuales = 0; 
+             if (puntosVirtuales > 10) puntosVirtuales = 10;
           } else {
              int totalZonas = 11 - valorMinimo;
              double calculo = 11 - (distCentrada * totalZonas);
              puntosVirtuales = calculo.floor();
-             if (puntosVirtuales < valorMinimo) puntosVirtuales = 0; if (puntosVirtuales > 10) puntosVirtuales = 10;
+             if (puntosVirtuales < valorMinimo) puntosVirtuales = 0; 
+             if (puntosVirtuales > 10) puntosVirtuales = 10;
           }
       }
       sumPuntosPotenciales += puntosVirtuales;
     }
 
     return AnalisisAgrupacion(
-      disparos: disparos,
+      disparosValidos: validos,
+      disparosDescartados: descartados,
       mpi: Point(mpiX, mpiY),
       puntuacionRealMedia: sumPuntos / disparos.length,
-      puntuacionPotencialMedia: sumPuntosPotenciales / disparos.length,
-      radioDisperson: sumRadio / disparos.length,
+      puntuacionPotencialMedia: validos.isEmpty ? 0 : sumPuntosPotenciales / validos.length,
+      radioDisperson: validos.isEmpty ? 0 : sumRadio / validos.length,
     );
   }
 
-  // --- 4. ¡NUEVO! DIAGNÓSTICO TÉCNICO (RELOJ DE ERRORES) ---
+  // --- 4. DIAGNÓSTICO TÉCNICO (RESTAURADO) ---
   Future<List<DiagnosticoTecnico>> calcularDiagnosticoTecnico({
     DateTimeRange? rangoFechas,
     int? idEquipo,
     int? idTipoDiana,
     int? filtroModo,
     List<int>? idsSesiones,
-    bool esZurdo = false, // Importante para invertir el reloj
+    bool esZurdo = false, 
+    bool generarEtiquetas = false,
   }) async {
     final db = await dbProvider.database;
     List<dynamic> args = [];
     String whereClause = _construirWhere(args, rangoFechas: rangoFechas, idEquipo: idEquipo, idTipoDiana: idTipoDiana, filtroModo: filtroModo, idsSesiones: idsSesiones);
 
-    // Solo analizamos disparos que NO sean dieces perfectos (puntuacion < 9.8 aprox o fuera del centro)
-    // Asumimos que un 10 no es un error técnico.
     final res = await db.rawQuery('''
-      SELECT d.* FROM Disparos d
+      SELECT d.*, s.nota 
+      FROM Disparos d
       JOIN Sesiones s ON d.id_sesion = s.id
       JOIN PlantillasTiempos p ON s.id_plantilla_tiempos = p.id
       WHERE $whereClause AND d.puntuacion < 9.5 
       LIMIT 1000
     ''', args);
 
-    List<Disparo> fallos = res.map((e) => Disparo.fromMap(e)).toList();
-    
-    // Mapa de errores
-    Map<String, int> conteoErrores = {
-      "Gatillazo (Dedazo)": 0,
-      "Muñeca floja (Breaking)": 0,
-      "Apretar Empuñadura": 0,
-      "Empujar (Anticipación)": 0,
+    Map<String, List<String>> mapaErrores = {
+      "Gatillazo (Dedazo)": [],
+      "Muñeca floja (Breaking)": [],
+      "Apretar Empuñadura": [],
+      "Empujar (Anticipación)": [],
     };
 
-    for (var d in fallos) {
-      // Calcular ángulo en grados (0 a 360, donde 0 es las 3 en punto, reloj matemático)
-      // Pero para el reloj de tiro: 12h = -90deg, 3h = 0deg, 6h = 90deg, 9h = 180deg
-      double angleRad = atan2(d.y, d.x); // y crece hacia abajo en pantalla
-      double angleDeg = angleRad * 180 / pi; 
+    for (var row in res) {
+      Disparo d = Disparo.fromMap(row);
+      String notaSesion = row['nota'] as String? ?? "";
       
-      // Normalizamos ángulo de reloj: 12h = 0 grados, horario positivo
-      // atan2 devuelve: 0 (3h), 90 (6h), 180/-180 (9h), -90 (12h)
-      
-      // Convertimos a sistema de "Zonas del Reloj" (simplificado)
-      // Definiciones para DIESTRO (Si es zurdo, invertimos izquierda/derecha)
-      
-      bool izquierda = (angleDeg > 90 || angleDeg < -90); // 9h
-      bool derecha = (angleDeg < 90 && angleDeg > -90);   // 3h
-      bool abajo = (angleDeg > 0); // 6h
-      bool arriba = (angleDeg < 0); // 12h
-
-      // Lógica de Diagnóstico (Clásica Diestro)
-      String error = "Desconocido";
-      
-      if (esZurdo) {
-         // INVERTIR LÓGICA HORIZONTAL
-         bool temp = izquierda; izquierda = derecha; derecha = temp;
+      String etiqueta = "#${d.numero}";
+      if (generarEtiquetas) {
+          if (notaSesion.contains("Serie")) {
+             final regex = RegExp(r'Serie (\d+)');
+             final match = regex.firstMatch(notaSesion);
+             if (match != null) {
+                etiqueta = "#S${match.group(1)}-${d.numero}";
+             }
+          }
       }
 
-      if (abajo && izquierda) error = "Gatillazo (Dedazo)";
-      else if (arriba && derecha) error = "Empujar (Anticipación)";
-      else if (abajo && derecha) error = "Apretar Empuñadura";
-      else if (arriba && izquierda) error = "Muñeca floja (Breaking)";
-      else if (derecha) error = "Dedo índice mal puesto";
-      else if (izquierda) error = "Dedo índice poco metido";
-      else error = "Falta de estabilidad";
+      double angleRad = atan2(d.y, d.x); 
+      double angleDeg = angleRad * 180 / pi; 
+      bool izquierda = (angleDeg > 90 || angleDeg < -90); 
+      bool derecha = (angleDeg < 90 && angleDeg > -90);   
+      bool abajo = (angleDeg > 0); 
+      bool arriba = (angleDeg < 0); 
 
-      // Simplificamos a 4 grandes grupos para la gráfica
-      if (abajo && izquierda) conteoErrores["Gatillazo (Dedazo)"] = conteoErrores["Gatillazo (Dedazo)"]! + 1;
-      else if (arriba && derecha) conteoErrores["Empujar (Anticipación)"] = conteoErrores["Empujar (Anticipación)"]! + 1;
-      else if (abajo && derecha) conteoErrores["Apretar Empuñadura"] = conteoErrores["Apretar Empuñadura"]! + 1;
-      else if (arriba && izquierda) conteoErrores["Muñeca floja (Breaking)"] = conteoErrores["Muñeca floja (Breaking)"]! + 1;
-      // Los otros se ignoran para el gráfico principal o se suman al más cercano
+      if (esZurdo) { bool temp = izquierda; izquierda = derecha; derecha = temp; }
+
+      String errorKey = "";
+      if (abajo && izquierda) errorKey = "Gatillazo (Dedazo)";
+      else if (arriba && derecha) errorKey = "Empujar (Anticipación)";
+      else if (abajo && derecha) errorKey = "Apretar Empuñadura";
+      else if (arriba && izquierda) errorKey = "Muñeca floja (Breaking)";
+
+      if (errorKey.isNotEmpty && mapaErrores.containsKey(errorKey)) {
+         mapaErrores[errorKey]!.add(etiqueta);
+      }
     }
 
-    // Convertir mapa a lista ordenada
     List<DiagnosticoTecnico> resultado = [];
-    int totalFallos = fallos.length;
+    int totalFallos = res.length;
     if (totalFallos == 0) return [];
 
-    conteoErrores.forEach((nombre, cantidad) {
-      if (cantidad > 0) {
-        double porcentaje = (cantidad / totalFallos) * 100;
-        resultado.add(DiagnosticoTecnico(nombreError: nombre, cantidad: cantidad, porcentaje: porcentaje));
+    mapaErrores.forEach((nombre, etiquetas) {
+      if (etiquetas.isNotEmpty) {
+        double porcentaje = (etiquetas.length / totalFallos) * 100;
+        resultado.add(DiagnosticoTecnico(
+            nombreError: nombre, 
+            cantidad: etiquetas.length, 
+            porcentaje: porcentaje,
+            etiquetas: generarEtiquetas ? etiquetas : [] 
+        ));
       }
     });
 
-    resultado.sort((a, b) => b.cantidad.compareTo(a.cantidad)); // Ordenar por frecuencia
+    resultado.sort((a, b) => b.cantidad.compareTo(a.cantidad)); 
     return resultado;
   }
 }
 
+// MODELOS INTERNOS
 class AnalisisAgrupacion {
-  final List<Disparo> disparos;
+  final List<Disparo> disparosValidos;
+  final List<Disparo> disparosDescartados;
   final Point<double> mpi;
   final double puntuacionRealMedia;
   final double puntuacionPotencialMedia;
   final double radioDisperson;
 
-  AnalisisAgrupacion({required this.disparos, required this.mpi, required this.puntuacionRealMedia, required this.puntuacionPotencialMedia, required this.radioDisperson});
+  AnalisisAgrupacion({
+    required this.disparosValidos,
+    required this.disparosDescartados,
+    required this.mpi,
+    required this.puntuacionRealMedia,
+    required this.puntuacionPotencialMedia,
+    required this.radioDisperson,
+  });
 }
 
 class DiagnosticoTecnico {
   final String nombreError;
   final int cantidad;
   final double porcentaje;
-  DiagnosticoTecnico({required this.nombreError, required this.cantidad, required this.porcentaje});
+  final List<String> etiquetas;
+
+  DiagnosticoTecnico({
+    required this.nombreError, 
+    required this.cantidad, 
+    required this.porcentaje,
+    this.etiquetas = const [],
+  });
 }
