@@ -1,11 +1,10 @@
 import 'dart:math'; 
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-// Ocultamos DateTimeRange del servicio para evitar conflictos
 import '../services/estadisticas_service.dart' hide DateTimeRange;
 import '../services/equipo_service.dart';
 import '../services/catalogo_service.dart';
-import '../services/pdf_service.dart'; 
+import '../services/pdf_service.dart';
 import '../models/equipo_model.dart';
 import '../models/tipo_diana_model.dart';
 import '../models/disparo_model.dart';
@@ -35,21 +34,17 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 
   int _filtroFechaSeleccionado = 0; 
   DateTimeRange? _rangoFechasManual; 
-  
   EquipoDetalle? _equipoSel;
-  TipoDiana? _dianaSel;
-  
-  // ESTA ES LA VARIABLE CLAVE QUE CONTIENE LAS PESTAÑAS VISIBLES
-  List<TipoDiana> _dianasEnContexto = [];
-  TipoDiana? _dianaPestanaSeleccionada;
-
+  TipoDiana? _dianaSel; 
+  List<TipoDiana> _dianasEnContexto = []; 
+  TipoDiana? _dianaPestanaSeleccionada;  
   bool _filtrosAbiertos = true; 
   bool _cargando = true;
   bool _soyZurdo = false;
 
   List<Map<String, dynamic>> _datosProgreso = [];
   AnalisisAgrupacion? _analisis;
-  List<DiagnosticoTecnico> _diagnostico = [];
+  List<DiagnosticoTecnico> _diagnostico = []; 
 
   bool get _esModoDetalle => widget.idsSesionFijos != null && widget.idsSesionFijos!.isNotEmpty;
 
@@ -88,11 +83,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 
   void _refrescarDatos() async {
     setState(() => _cargando = true);
-
     DateTimeRange? rangoCalculado;
-    if (!_esModoDetalle) {
-        rangoCalculado = _obtenerRangoActual();
-    }
+    if (!_esModoDetalle) rangoCalculado = _obtenerRangoActual();
 
     final dianasDetectadas = await _statsService.obtenerTiposDianaEnFiltro(
       rangoFechas: rangoCalculado,
@@ -158,84 +150,69 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     }
   }
 
-  // --- FUNCIÓN DE IMPRESIÓN (ARREGLADA: USA LO QUE VES EN PANTALLA) ---
   void _imprimirInforme() async {
-    // 1. Mostrar carga
     showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator()));
 
     try {
       List<DatosInformeDiana> resultados = [];
-      
-      // CAMBIO CLAVE: Usamos DIRECTAMENTE la lista '_dianasEnContexto' que ya tiene las pestañas cargadas.
-      // Si la pantalla muestra pestañas, esto NO está vacío.
       List<TipoDiana> dianasAProcesar = [];
-      
-      if (_dianasEnContexto.isNotEmpty) {
-         dianasAProcesar = _dianasEnContexto;
-      } else if (_dianaSel != null) {
-         // Fallback por si acaso: la seleccionada en el combo
-         dianasAProcesar = [_dianaSel!];
+
+      // LÓGICA BLINDADA: Si es detalle, FORZAMOS anular filtros
+      if (_esModoDetalle) {
+         dianasAProcesar = await _statsService.obtenerTiposDianaEnFiltro(
+            idsSesiones: widget.idsSesionFijos, 
+            rangoFechas: null, idEquipo: null, filtroModo: null   
+         );
+      } else {
+         if (_dianasEnContexto.isNotEmpty) dianasAProcesar = _dianasEnContexto;
+         else if (_dianaSel != null) dianasAProcesar = [_dianaSel!];
       }
 
-      // Preparar filtros idénticos a los que usa la pantalla (_refrescarDatos)
-      // Si funciona en pantalla, funcionará aquí porque usamos LOS MISMOS parámetros.
-      DateTimeRange? rango = !_esModoDetalle ? _obtenerRangoActual() : null;
-      int? filtroEquipo = _equipoSel?.id;
-      int? filtroModo = _esModoDetalle ? null : widget.modo; // En detalle anulamos modo
+      DateTimeRange? rangoPdf = _esModoDetalle ? null : _obtenerRangoActual();
+      int? equipoPdf = _esModoDetalle ? null : _equipoSel?.id;
+      int? modoPdf = _esModoDetalle ? null : widget.modo;
+      List<int>? sesionesPdf = _esModoDetalle ? widget.idsSesionFijos : null;
 
       for (var diana in dianasAProcesar) {
          var analisis = await _statsService.calcularAnalisisAgrupacion(
-            rangoFechas: rango,
-            idEquipo: filtroEquipo,
             idTipoDiana: diana.id,
-            filtroModo: filtroModo,
-            idsSesiones: widget.idsSesionFijos, // Esto es vital en modo detalle
+            rangoFechas: rangoPdf, idEquipo: equipoPdf, filtroModo: modoPdf, idsSesiones: sesionesPdf,
          );
 
-         // Validamos que haya datos
+         // CORRECCIÓN: Usamos disparosValidos
          if (analisis != null && (analisis.disparosValidos.isNotEmpty || analisis.disparosDescartados.isNotEmpty)) {
            var diag = await _statsService.calcularDiagnosticoTecnico(
-              rangoFechas: rango,
-              idEquipo: filtroEquipo,
               idTipoDiana: diana.id,
-              filtroModo: filtroModo,
-              idsSesiones: widget.idsSesionFijos,
-              esZurdo: _soyZurdo,
-              generarEtiquetas: _esModoDetalle, 
+              rangoFechas: rangoPdf, idEquipo: equipoPdf, filtroModo: modoPdf, idsSesiones: sesionesPdf,
+              esZurdo: _soyZurdo, generarEtiquetas: _esModoDetalle, 
            );
 
            resultados.add(DatosInformeDiana(
              diana: diana,
              analisis: analisis,
              diagnostico: diag,
-             equipo: _equipoSel
+             equipo: _esModoDetalle ? null : _equipoSel
            ));
          }
       }
 
-      // Cerrar carga
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context); 
 
       if (resultados.isEmpty) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No hay datos visibles para imprimir.")));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No hay datos para imprimir.")));
         return;
       }
 
-      // Texto Periodo
       String textoPeriodo = "Histórico";
-      if (_esModoDetalle) {
-         textoPeriodo = "Detalle de Sesión";
-      } else if (rango != null) {
-         textoPeriodo = "${rango.start.day}/${rango.start.month} - ${rango.end.day}/${rango.end.month}";
-      }
+      if (_esModoDetalle) textoPeriodo = "Detalle de Sesión";
+      else if (rangoPdf != null) textoPeriodo = "${rangoPdf.start.day}/${rangoPdf.start.month} - ${rangoPdf.end.day}/${rangoPdf.end.month}";
 
-      // Generar PDF
       await _pdfService.generarInformeAnalisisCompleto(
         perfil: null, 
         periodoTexto: textoPeriodo,
         datosDianas: resultados,
         datosProgreso: _datosProgreso,
-        observaciones: _esModoDetalle ? "Informe de sesión individual." : "Estadísticas generales."
+        observaciones: _esModoDetalle ? "Informe detallado de sesión." : "Informe de evolución."
       );
 
     } catch (e) {
@@ -267,11 +244,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
         title: Text(titulo), 
         backgroundColor: Colors.purple,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.print),
-            tooltip: "Imprimir PDF",
-            onPressed: !_cargando ? _imprimirInforme : null,
-          )
+          IconButton(icon: const Icon(Icons.print), tooltip: "Imprimir PDF", onPressed: !_cargando ? _imprimirInforme : null)
         ],
       ),
       body: Column(
@@ -299,10 +272,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Periodo', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
                           value: _filtroFechaSeleccionado,
-                          items: [
-                            const DropdownMenuItem(value: 0, child: Text('Todo')), const DropdownMenuItem(value: 1, child: Text('Hoy')), const DropdownMenuItem(value: 2, child: Text('Este Mes')), const DropdownMenuItem(value: 3, child: Text('Últimos 3 Meses')), const DropdownMenuItem(value: 4, child: Text('Este Año')),
-                            DropdownMenuItem(value: 5, child: Text(_filtroFechaSeleccionado == 5 && _rangoFechasManual != null ? '${_formatoCorto(_rangoFechasManual!.start)} - ${_formatoCorto(_rangoFechasManual!.end)}' : 'Personalizado...', overflow: TextOverflow.ellipsis)),
-                          ],
+                          items: [const DropdownMenuItem(value: 0, child: Text('Todo')), const DropdownMenuItem(value: 1, child: Text('Hoy')), const DropdownMenuItem(value: 2, child: Text('Este Mes')), const DropdownMenuItem(value: 3, child: Text('Últimos 3 Meses')), const DropdownMenuItem(value: 4, child: Text('Este Año')), DropdownMenuItem(value: 5, child: Text(_filtroFechaSeleccionado == 5 && _rangoFechasManual != null ? '${_formatoCorto(_rangoFechasManual!.start)} - ${_formatoCorto(_rangoFechasManual!.end)}' : 'Personalizado...', overflow: TextOverflow.ellipsis))],
                           onChanged: (v) { if (v == 5) { _seleccionarFechasManuales(); } else { setState(() { _filtroFechaSeleccionado = v!; _refrescarDatos(); }); } },
                         ),
                         const SizedBox(height: 10),
@@ -362,24 +332,21 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     );
   }
 
+  // WIDGETS DE PESTAÑAS (Ahora completos)
   Widget _buildDiagnosticoTecnico() {
-    if (_diagnostico.isEmpty) return const Center(child: Text("No hay errores suficientes para analizar.", style: TextStyle(color: Colors.grey)));
+    if (_diagnostico.isEmpty) return const Center(child: Text("No hay errores suficientes.", style: TextStyle(color: Colors.grey)));
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text("Diestro"), Switch(value: _soyZurdo, onChanged: (v) { setState(() => _soyZurdo = v); _refrescarDatos(); }, activeColor: Colors.purple), const Text("Zurdo")]),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 200,
-            child: PieChart(PieChartData(sections: _generarSeccionesPastel(), centerSpaceRadius: 40, sectionsSpace: 2)),
-          ),
+          SizedBox(height: 200, child: PieChart(PieChartData(sections: _generarSeccionesPastel(), centerSpaceRadius: 40, sectionsSpace: 2))),
           const SizedBox(height: 20),
           const Text("Errores más frecuentes", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 10),
           ..._diagnostico.map((diag) => Card(margin: const EdgeInsets.only(bottom: 8), child: Padding(padding: const EdgeInsets.all(12.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [CircleAvatar(backgroundColor: Colors.purple[100], radius: 18, child: Text("${diag.porcentaje.round()}%", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(diag.nombreError, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), Text("${diag.cantidad} disparos detectados", style: const TextStyle(color: Colors.grey, fontSize: 12))]))]),
-                  if (diag.etiquetas.isNotEmpty) ...[const SizedBox(height: 10), const Divider(height: 1), const SizedBox(height: 8), Wrap(spacing: 6, runSpacing: 6, children: diag.etiquetas.map((tag) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.purple.withOpacity(0.05), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.purple.withOpacity(0.2))), child: Text(tag, style: TextStyle(fontSize: 11, color: Colors.purple[900], fontWeight: FontWeight.w500)))).toList())]
           ])))).toList(),
         ],
       ),
@@ -390,8 +357,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     List<Color> colores = [Colors.redAccent, Colors.orangeAccent, Colors.blueAccent, Colors.greenAccent];
     return List.generate(_diagnostico.length, (i) {
       final diag = _diagnostico[i];
-      final isLarge = i == 0;
-      return PieChartSectionData(color: colores[i % colores.length], value: diag.cantidad.toDouble(), title: "${diag.porcentaje.round()}%", radius: isLarge ? 60 : 50, titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white));
+      return PieChartSectionData(color: colores[i % colores.length], value: diag.cantidad.toDouble(), title: "${diag.porcentaje.round()}%", radius: i == 0 ? 60 : 50, titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white));
     });
   }
 
@@ -406,7 +372,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   Widget _buildMapaCalorContent() {
     TipoDiana? dianaActiva = _dianaPestanaSeleccionada ?? _dianaSel;
     if (dianaActiva == null) return const Center(child: Text("Selecciona Diana"));
-    if (_analisis == null || (_analisis!.disparosValidos.isEmpty && _analisis!.disparosDescartados.isEmpty)) return const Center(child: Text("No hay impactos."));
+    // CORREGIDO: disparosValidos
+    if (_analisis == null || _analisis!.disparosValidos.isEmpty) return const Center(child: Text("No hay impactos."));
 
     String consejo = "Agrupación Centrada";
     IconData iconoConsejo = Icons.check_circle;
@@ -436,7 +403,15 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 
     return SingleChildScrollView(child: Column(children: [
           Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: colorConsejo.withOpacity(0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: colorConsejo)), child: Column(children: [Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(iconoConsejo, color: colorConsejo), const SizedBox(width: 10), Expanded(child: Text(consejo, style: TextStyle(fontWeight: FontWeight.bold, color: colorConsejo, fontSize: 16)))]), if (detalleClics.isNotEmpty) ...[const SizedBox(height: 8), Text(detalleClics, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), textAlign: TextAlign.center)], const SizedBox(height: 10), Text(puntosPerdidos > 0.5 ? "Pierdes ${puntosPerdidos.toStringAsFixed(1)} puntos de media." : "Ajuste correcto.", style: const TextStyle(fontStyle: FontStyle.italic), textAlign: TextAlign.center), const Divider(), Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_datoEstadistico("Media Real", _analisis!.puntuacionRealMedia.toStringAsFixed(2)), const Icon(Icons.arrow_forward, color: Colors.grey), _datoEstadistico("Media Potencial", _analisis!.puntuacionPotencialMedia.toStringAsFixed(2), esVerde: true)]), if (numDescartes > 0) ...[const Divider(), Text("⚠️ Se han ignorado $numDescartes disparos extremos.", style: TextStyle(fontSize: 11, color: Colors.red[800], fontWeight: FontWeight.bold))]])),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 40), child: AspectRatio(aspectRatio: 1, child: LayoutBuilder(builder: (context, constraints) { double diametro = constraints.maxWidth; return CustomPaint(painter: DianaPainter(validos: _convertirImpactosAPixeles(_analisis!.disparosValidos, diametro/2), descartados: _convertirImpactosAPixeles(_analisis!.disparosDescartados, diametro/2), valorMinimo: vm, anilloNegroInicio: an, esFondoNegro: fn, tieneMosca: tm, tieneGuias: tg, esEstiloDuelo: ed, centroGravedad: Offset((_analisis!.mpi.x * (diametro/2)) + (diametro/2), (_analisis!.mpi.y * (diametro/2)) + (diametro/2)))); }))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 40), child: AspectRatio(aspectRatio: 1, child: LayoutBuilder(builder: (context, constraints) { 
+            double diametro = constraints.maxWidth; 
+            // CORRECCIÓN: Usamos disparosValidos y Descartados
+            return CustomPaint(painter: DianaPainter(
+              validos: _convertirImpactosAPixeles(_analisis!.disparosValidos, diametro/2), 
+              descartados: _convertirImpactosAPixeles(_analisis!.disparosDescartados, diametro/2), 
+              valorMinimo: vm, anilloNegroInicio: an, esFondoNegro: fn, tieneMosca: tm, tieneGuias: tg, esEstiloDuelo: ed, 
+              centroGravedad: Offset((_analisis!.mpi.x * (diametro/2)) + (diametro/2), (_analisis!.mpi.y * (diametro/2)) + (diametro/2)))); 
+          }))),
           const SizedBox(height: 10), Text("${_analisis!.disparosValidos.length} impactos válidos", style: const TextStyle(color: Colors.grey)), const SizedBox(height: 20),
     ]));
   }
@@ -449,6 +424,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   }
   
   Widget _datoEstadistico(String label, String valor, {bool esVerde = false}) { return Column(children: [Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)), Text(valor, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: esVerde ? Colors.green[700] : Colors.black87))]); }
+  
   List<Offset> _convertirImpactosAPixeles(List<Disparo> disparos, double radius) { return disparos.map((d) => Offset((d.x * radius) + radius, (d.y * radius) + radius)).toList(); }
 }
 
@@ -457,7 +433,7 @@ class DianaPainter extends CustomPainter {
   final List<Offset> descartados;
   final int valorMinimo;
   final int anilloNegroInicio;
-  final bool esFondoNegro;
+  final bool esFondoNegro; 
   final bool tieneMosca;
   final bool tieneGuias;
   final bool esEstiloDuelo;
