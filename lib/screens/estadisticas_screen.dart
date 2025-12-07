@@ -1,10 +1,11 @@
 import 'dart:math'; 
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-// Ocultamos DateTimeRange del servicio
+// Ocultamos DateTimeRange del servicio para evitar conflictos
 import '../services/estadisticas_service.dart' hide DateTimeRange;
 import '../services/equipo_service.dart';
 import '../services/catalogo_service.dart';
+import '../services/pdf_service.dart'; 
 import '../models/equipo_model.dart';
 import '../models/tipo_diana_model.dart';
 import '../models/disparo_model.dart';
@@ -27,6 +28,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   final _statsService = EstadisticasService();
   final _equipoService = EquipoService();
   final _catalogoService = CatalogoService();
+  final _pdfService = PdfService(); 
 
   List<EquipoDetalle> _equipos = [];
   List<TipoDiana> _dianas = [];
@@ -36,6 +38,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   
   EquipoDetalle? _equipoSel;
   TipoDiana? _dianaSel;
+  
+  // ESTA ES LA VARIABLE CLAVE QUE CONTIENE LAS PESTAÑAS VISIBLES
   List<TipoDiana> _dianasEnContexto = [];
   TipoDiana? _dianaPestanaSeleccionada;
 
@@ -70,21 +74,24 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     }
   }
 
+  DateTimeRange? _obtenerRangoActual() {
+    final now = DateTime.now();
+    switch (_filtroFechaSeleccionado) {
+      case 1: return DateTimeRange(start: DateTime(now.year, now.month, now.day), end: now);
+      case 2: return DateTimeRange(start: DateTime(now.year, now.month, 1), end: now);
+      case 3: return DateTimeRange(start: now.subtract(const Duration(days: 90)), end: now);
+      case 4: return DateTimeRange(start: DateTime(now.year, 1, 1), end: now);
+      case 5: return _rangoFechasManual;
+      default: return null;
+    }
+  }
+
   void _refrescarDatos() async {
     setState(() => _cargando = true);
 
     DateTimeRange? rangoCalculado;
-    final now = DateTime.now();
-
     if (!_esModoDetalle) {
-        switch (_filtroFechaSeleccionado) {
-          case 1: rangoCalculado = DateTimeRange(start: DateTime(now.year, now.month, now.day), end: now); break;
-          case 2: rangoCalculado = DateTimeRange(start: DateTime(now.year, now.month, 1), end: now); break;
-          case 3: rangoCalculado = DateTimeRange(start: now.subtract(const Duration(days: 90)), end: now); break;
-          case 4: rangoCalculado = DateTimeRange(start: DateTime(now.year, 1, 1), end: now); break;
-          case 5: rangoCalculado = _rangoFechasManual; break;
-          default: rangoCalculado = null; break;
-        }
+        rangoCalculado = _obtenerRangoActual();
     }
 
     final dianasDetectadas = await _statsService.obtenerTiposDianaEnFiltro(
@@ -117,6 +124,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     );
 
     AnalisisAgrupacion? analisis;
+    List<DiagnosticoTecnico> diagnostico = [];
+
     if (dianaParaAnalisis != null) {
       analisis = await _statsService.calcularAnalisisAgrupacion(
         rangoFechas: rangoCalculado,
@@ -125,17 +134,17 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
         filtroModo: _esModoDetalle ? null : widget.modo,
         idsSesiones: widget.idsSesionFijos,
       );
+      
+      diagnostico = await _statsService.calcularDiagnosticoTecnico(
+        rangoFechas: rangoCalculado,
+        idEquipo: _equipoSel?.id,
+        idTipoDiana: dianaParaAnalisis.id,
+        filtroModo: _esModoDetalle ? null : widget.modo,
+        idsSesiones: widget.idsSesionFijos,
+        esZurdo: _soyZurdo,
+        generarEtiquetas: _esModoDetalle, 
+      );
     }
-
-    final diagnostico = await _statsService.calcularDiagnosticoTecnico(
-      rangoFechas: rangoCalculado,
-      idEquipo: _equipoSel?.id,
-      idTipoDiana: dianaParaAnalisis?.id,
-      filtroModo: _esModoDetalle ? null : widget.modo,
-      idsSesiones: widget.idsSesionFijos,
-      esZurdo: _soyZurdo,
-      generarEtiquetas: _esModoDetalle, 
-    );
 
     if (mounted) {
       setState(() {
@@ -146,6 +155,93 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
         _diagnostico = diagnostico;
         _cargando = false;
       });
+    }
+  }
+
+  // --- FUNCIÓN DE IMPRESIÓN (ARREGLADA: USA LO QUE VES EN PANTALLA) ---
+  void _imprimirInforme() async {
+    // 1. Mostrar carga
+    showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator()));
+
+    try {
+      List<DatosInformeDiana> resultados = [];
+      
+      // CAMBIO CLAVE: Usamos DIRECTAMENTE la lista '_dianasEnContexto' que ya tiene las pestañas cargadas.
+      // Si la pantalla muestra pestañas, esto NO está vacío.
+      List<TipoDiana> dianasAProcesar = [];
+      
+      if (_dianasEnContexto.isNotEmpty) {
+         dianasAProcesar = _dianasEnContexto;
+      } else if (_dianaSel != null) {
+         // Fallback por si acaso: la seleccionada en el combo
+         dianasAProcesar = [_dianaSel!];
+      }
+
+      // Preparar filtros idénticos a los que usa la pantalla (_refrescarDatos)
+      // Si funciona en pantalla, funcionará aquí porque usamos LOS MISMOS parámetros.
+      DateTimeRange? rango = !_esModoDetalle ? _obtenerRangoActual() : null;
+      int? filtroEquipo = _equipoSel?.id;
+      int? filtroModo = _esModoDetalle ? null : widget.modo; // En detalle anulamos modo
+
+      for (var diana in dianasAProcesar) {
+         var analisis = await _statsService.calcularAnalisisAgrupacion(
+            rangoFechas: rango,
+            idEquipo: filtroEquipo,
+            idTipoDiana: diana.id,
+            filtroModo: filtroModo,
+            idsSesiones: widget.idsSesionFijos, // Esto es vital en modo detalle
+         );
+
+         // Validamos que haya datos
+         if (analisis != null && (analisis.disparosValidos.isNotEmpty || analisis.disparosDescartados.isNotEmpty)) {
+           var diag = await _statsService.calcularDiagnosticoTecnico(
+              rangoFechas: rango,
+              idEquipo: filtroEquipo,
+              idTipoDiana: diana.id,
+              filtroModo: filtroModo,
+              idsSesiones: widget.idsSesionFijos,
+              esZurdo: _soyZurdo,
+              generarEtiquetas: _esModoDetalle, 
+           );
+
+           resultados.add(DatosInformeDiana(
+             diana: diana,
+             analisis: analisis,
+             diagnostico: diag,
+             equipo: _equipoSel
+           ));
+         }
+      }
+
+      // Cerrar carga
+      if (mounted) Navigator.pop(context);
+
+      if (resultados.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No hay datos visibles para imprimir.")));
+        return;
+      }
+
+      // Texto Periodo
+      String textoPeriodo = "Histórico";
+      if (_esModoDetalle) {
+         textoPeriodo = "Detalle de Sesión";
+      } else if (rango != null) {
+         textoPeriodo = "${rango.start.day}/${rango.start.month} - ${rango.end.day}/${rango.end.month}";
+      }
+
+      // Generar PDF
+      await _pdfService.generarInformeAnalisisCompleto(
+        perfil: null, 
+        periodoTexto: textoPeriodo,
+        datosDianas: resultados,
+        datosProgreso: _datosProgreso,
+        observaciones: _esModoDetalle ? "Informe de sesión individual." : "Estadísticas generales."
+      );
+
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+      debugPrint("Error PDF: $e");
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
   
@@ -167,7 +263,17 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     String titulo = _esModoDetalle ? 'Análisis de Sesión' : (widget.modo == 2 ? 'Análisis Competiciones' : 'Análisis Entrenamientos');
 
     return Scaffold(
-      appBar: AppBar(title: Text(titulo), backgroundColor: Colors.purple),
+      appBar: AppBar(
+        title: Text(titulo), 
+        backgroundColor: Colors.purple,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print),
+            tooltip: "Imprimir PDF",
+            onPressed: !_cargando ? _imprimirInforme : null,
+          )
+        ],
+      ),
       body: Column(
         children: [
           if (!_esModoDetalle)
@@ -292,7 +398,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   Widget _buildVistaAgrupacion() {
     if (_dianasEnContexto.isEmpty && _dianaSel == null && !_esModoDetalle) return const Center(child: Text("No hay datos para mostrar."));
     return Column(children: [
-        if (_dianasEnContexto.length > 1) Container(height: 50, margin: const EdgeInsets.symmetric(vertical: 10), child: ListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), itemCount: _dianasEnContexto.length, itemBuilder: (ctx, i) { final d = _dianasEnContexto[i]; bool isSel = d.id == _dianaPestanaSeleccionada?.id; return Padding(padding: const EdgeInsets.only(right: 8.0), child: ChoiceChip(label: Text(d.nombre), selected: isSel, selectedColor: Colors.purple[100], onSelected: (val) { if (val) { setState(() => _dianaPestanaSeleccionada = d); _refrescarDatos(); } })); })),
+        if (_dianasEnContexto.length > 1) Container(height: 50, margin: const EdgeInsets.symmetric(vertical: 10), child: ListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), itemCount: _dianasEnContexto.length, itemBuilder: (ctx, i) { final d = _dianasEnContexto[i]; bool isSel = d.id == _dianaPestanaSeleccionada?.id; return Padding(padding: const EdgeInsets.only(right: 8.0), child: ChoiceChip(label: Text(d.nombre), selected: isSel, selectedColor: Colors.purple[100], onSelected: (val) { if (val) { _cambiarDianaVisualizada(d); } })); })),
         Expanded(child: _buildMapaCalorContent()),
     ]);
   }
@@ -341,6 +447,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     for (int i = 0; i < _datosProgreso.length; i++) { puntos.add(FlSpot(i.toDouble(), (_datosProgreso[i]['total'] as num).toDouble())); }
     return Padding(padding: const EdgeInsets.all(24.0), child: LineChart(LineChartData(gridData: FlGridData(show: true, drawVerticalLine: false), titlesData: FlTitlesData(leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40, getTitlesWidget: (val, meta) => Text(val.toInt().toString(), style: const TextStyle(fontSize: 10)))), bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false))), borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey[300]!)), lineBarsData: [LineChartBarData(spots: puntos, isCurved: true, color: Colors.purple, barWidth: 3, dotData: FlDotData(show: true), belowBarData: BarAreaData(show: true, color: Colors.purple.withOpacity(0.1)))])));
   }
+  
   Widget _datoEstadistico(String label, String valor, {bool esVerde = false}) { return Column(children: [Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)), Text(valor, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: esVerde ? Colors.green[700] : Colors.black87))]); }
   List<Offset> _convertirImpactosAPixeles(List<Disparo> disparos, double radius) { return disparos.map((d) => Offset((d.x * radius) + radius, (d.y * radius) + radius)).toList(); }
 }
@@ -376,14 +483,9 @@ class DianaPainter extends CustomPainter {
     final paintFondo = Paint()..color = esFondoNegro ? const Color(0xFF1A1A1A) : Colors.white..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, paintFondo);
 
-    int totalZonas = 11 - valorMinimo; 
-    if (totalZonas < 1) totalZonas = 1;
-    
-    double anchoZona = radius / totalZonas; 
-
     final paintNegro = Paint()..color = Colors.black..style = PaintingStyle.fill;
-    final paintLineaClara = Paint()..color = Colors.grey[400]!..style = PaintingStyle.stroke..strokeWidth = 1.0;
-    final paintLineaBlanca = Paint()..color = Colors.white70..style = PaintingStyle.stroke..strokeWidth = 1.0;
+    final paintLineaBlanca = Paint()..color = Colors.white.withOpacity(0.9)..style = PaintingStyle.stroke..strokeWidth = 1.2;
+    final paintLineaGris = Paint()..color = Colors.grey[400]!..style = PaintingStyle.stroke..strokeWidth = 1.0;
 
     if (esEstiloDuelo) {
        double paso = radius / 6;
@@ -394,9 +496,13 @@ class DianaPainter extends CustomPainter {
           if (numeroAnillo < 10) _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (paso / 2), Colors.white);
        }
     } else {
+       int totalZonas = 11 - valorMinimo; 
+       if (totalZonas < 1) totalZonas = 1;
+       double anchoZona = radius / totalZonas;
+
        for (int i = 0; i < totalZonas; i++) {
           int numeroAnillo = valorMinimo + i;
-          double r = radius - (i * (radius / totalZonas));
+          double r = radius - (i * anchoZona);
           
           if (numeroAnillo >= anilloNegroInicio) {
             canvas.drawCircle(center, r, paintNegro);
@@ -405,7 +511,7 @@ class DianaPainter extends CustomPainter {
                _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (anchoZona / 2), Colors.white);
             }
           } else {
-            if (i > 0) canvas.drawCircle(center, r, esFondoNegro ? paintLineaBlanca : paintLineaClara);
+            if (i > 0) canvas.drawCircle(center, r, esFondoNegro ? paintLineaBlanca : paintLineaGris);
             Color colorNum = esFondoNegro ? Colors.white : Colors.black;
             _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (anchoZona / 2), colorNum);
           }
@@ -413,29 +519,34 @@ class DianaPainter extends CustomPainter {
     }
 
     if (tieneMosca) {
-      double radioMosca = (radius / totalZonas) / 2;
+      double radioMosca = (esEstiloDuelo ? (radius/6) : (radius/(11-valorMinimo))) / 2;
       canvas.drawCircle(center, radioMosca, paintLineaBlanca);
     }
     
     if (tieneGuias) {
-      Paint guia = Paint()..color = Colors.white..strokeWidth = 2.0;
+      Paint guia = Paint()..color = esFondoNegro ? Colors.white54 : Colors.grey..strokeWidth = 2.0;
       double largo = radius * 0.3;
       canvas.drawLine(Offset(center.dx - radius, center.dy), Offset(center.dx - radius + largo, center.dy), guia);
       canvas.drawLine(Offset(center.dx + radius, center.dy), Offset(center.dx + radius - largo, center.dy), guia);
+      canvas.drawLine(Offset(center.dx, center.dy - radius), Offset(center.dx, center.dy - radius + largo), guia); 
+      canvas.drawLine(Offset(center.dx, center.dy + radius), Offset(center.dx, center.dy + radius - largo), guia);
     }
     
-    canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), Paint()..color = Colors.white..strokeWidth=1);
-    canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), Paint()..color = Colors.white..strokeWidth=1);
+    canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), Paint()..color = esFondoNegro?Colors.white:Colors.black..strokeWidth=1);
+    canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), Paint()..color = esFondoNegro?Colors.white:Colors.black..strokeWidth=1);
 
-    final paintDescartado = Paint()..color = Colors.grey[700]!..style = PaintingStyle.fill;
-    final paintValido = Paint()..color = Colors.greenAccent.withOpacity(0.7)..style = PaintingStyle.fill;
-    double tamano = (radius * 0.04) * (10 / totalZonas);
+    final paintDescartado = Paint()..color = Colors.grey.withOpacity(0.5)..style = PaintingStyle.fill;
+    final paintValido = Paint()..color = const Color(0xFF00C853).withOpacity(0.8)..style = PaintingStyle.fill;
+    final paintBordeImpacto = Paint()..color = Colors.white.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth=1;
+
+    double tamano = radius * 0.04; 
 
     for(var p in descartados) {
        canvas.drawCircle(p, tamano, paintDescartado);
     }
     for(var p in validos) {
        canvas.drawCircle(p, tamano, paintValido);
+       canvas.drawCircle(p, tamano, paintBordeImpacto);
     }
 
     if (centroGravedad != null) {
@@ -458,7 +569,7 @@ class DianaPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: texto, 
-        style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold) 
+        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold) 
       ),
       textDirection: TextDirection.ltr
     );
