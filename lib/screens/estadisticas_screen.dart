@@ -29,6 +29,11 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   final _catalogoService = CatalogoService();
   final _pdfService = PdfService(); 
 
+  // COLOR TEMÁTICO: AZUL
+  final Color _colorTema = Colors.blue;
+  final Color _colorTemaClaro = Colors.blue.shade100;
+  final Color _colorTemaOscuro = Colors.blue.shade900;
+
   List<EquipoDetalle> _equipos = [];
   List<TipoDiana> _dianas = [];
 
@@ -157,7 +162,6 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       List<DatosInformeDiana> resultados = [];
       List<TipoDiana> dianasAProcesar = [];
 
-      // LÓGICA BLINDADA: Si es detalle, FORZAMOS anular filtros
       if (_esModoDetalle) {
          dianasAProcesar = await _statsService.obtenerTiposDianaEnFiltro(
             idsSesiones: widget.idsSesionFijos, 
@@ -179,7 +183,6 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             rangoFechas: rangoPdf, idEquipo: equipoPdf, filtroModo: modoPdf, idsSesiones: sesionesPdf,
          );
 
-         // CORRECCIÓN: Usamos disparosValidos
          if (analisis != null && (analisis.disparosValidos.isNotEmpty || analisis.disparosDescartados.isNotEmpty)) {
            var diag = await _statsService.calcularDiagnosticoTecnico(
               idTipoDiana: diana.id,
@@ -230,7 +233,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   }
 
   void _seleccionarFechasManuales() async {
-    final picked = await showDateRangePicker(context: context, locale: const Locale('es', 'ES'), firstDate: DateTime(2020), lastDate: DateTime.now(), initialDateRange: _rangoFechasManual, saveText: 'ACEPTAR', helpText: 'RANGO', cancelText: 'CANCELAR', confirmText: 'ACEPTAR', builder: (context, child) => Theme(data: ThemeData.light().copyWith(primaryColor: Colors.purple, colorScheme: const ColorScheme.light(primary: Colors.purple)), child: child!));
+    final picked = await showDateRangePicker(context: context, locale: const Locale('es', 'ES'), firstDate: DateTime(2020), lastDate: DateTime.now(), initialDateRange: _rangoFechasManual, saveText: 'ACEPTAR', helpText: 'RANGO', cancelText: 'CANCELAR', confirmText: 'ACEPTAR', builder: (context, child) => Theme(data: ThemeData.light().copyWith(primaryColor: _colorTema, colorScheme: ColorScheme.light(primary: _colorTema)), child: child!));
     if(picked!=null){ setState(() { _rangoFechasManual = picked; _filtroFechaSeleccionado = 5; }); _refrescarDatos(); } else { if (_filtroFechaSeleccionado==5 && _rangoFechasManual==null) { setState(()=>_filtroFechaSeleccionado=0); _refrescarDatos(); } }
   }
   String _formatoCorto(DateTime fecha) => "${fecha.day}/${fecha.month}";
@@ -242,7 +245,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(titulo), 
-        backgroundColor: Colors.purple,
+        backgroundColor: _colorTema,
         actions: [
           IconButton(icon: const Icon(Icons.print), tooltip: "Imprimir PDF", onPressed: !_cargando ? _imprimirInforme : null)
         ],
@@ -257,10 +260,10 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.filter_alt, color: Colors.purple),
+                  leading: Icon(Icons.filter_alt, color: _colorTema),
                   title: const Text("Filtros de Análisis", style: TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(_filtroFechaSeleccionado == 0 ? "Todo el historial" : "Filtros activos...", style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  trailing: Icon(_filtrosAbiertos ? Icons.expand_less : Icons.expand_more, color: Colors.purple),
+                  trailing: Icon(_filtrosAbiertos ? Icons.expand_less : Icons.expand_more, color: _colorTema),
                   onTap: () => setState(() => _filtrosAbiertos = !_filtrosAbiertos),
                 ),
                 if (_filtrosAbiertos)
@@ -303,10 +306,10 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
               length: 3, 
               child: Column(
                 children: [
-                  const TabBar(
-                    labelColor: Colors.purple,
-                    indicatorColor: Colors.purple,
-                    tabs: [
+                  TabBar(
+                    labelColor: _colorTema,
+                    indicatorColor: _colorTema,
+                    tabs: const [
                       Tab(text: 'AGRUPACIÓN', icon: Icon(Icons.gps_fixed)),
                       Tab(text: 'TÉCNICA', icon: Icon(Icons.psychology)),
                       Tab(text: 'EVOLUCIÓN', icon: Icon(Icons.show_chart)),
@@ -332,21 +335,42 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     );
   }
 
-  // WIDGETS DE PESTAÑAS (Ahora completos)
   Widget _buildDiagnosticoTecnico() {
     if (_diagnostico.isEmpty) return const Center(child: Text("No hay errores suficientes.", style: TextStyle(color: Colors.grey)));
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text("Diestro"), Switch(value: _soyZurdo, onChanged: (v) { setState(() => _soyZurdo = v); _refrescarDatos(); }, activeColor: Colors.purple), const Text("Zurdo")]),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text("Diestro"), Switch(value: _soyZurdo, onChanged: (v) { setState(() => _soyZurdo = v); _refrescarDatos(); }, activeColor: _colorTema), const Text("Zurdo")]),
           const SizedBox(height: 10),
           SizedBox(height: 200, child: PieChart(PieChartData(sections: _generarSeccionesPastel(), centerSpaceRadius: 40, sectionsSpace: 2))),
           const SizedBox(height: 20),
           const Text("Errores más frecuentes", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 10),
           ..._diagnostico.map((diag) => Card(margin: const EdgeInsets.only(bottom: 8), child: Padding(padding: const EdgeInsets.all(12.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [CircleAvatar(backgroundColor: Colors.purple[100], radius: 18, child: Text("${diag.porcentaje.round()}%", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.purple))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(diag.nombreError, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), Text("${diag.cantidad} disparos detectados", style: const TextStyle(color: Colors.grey, fontSize: 12))]))]),
+                  Row(children: [CircleAvatar(backgroundColor: _colorTemaClaro, radius: 18, child: Text("${diag.porcentaje.round()}%", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _colorTemaOscuro))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(diag.nombreError, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), Text("${diag.cantidad} disparos detectados", style: const TextStyle(color: Colors.grey, fontSize: 12))]))]),
+                  if (diag.detalles.isNotEmpty) ...[
+                    const SizedBox(height: 10), 
+                    const Divider(height: 1), 
+                    const SizedBox(height: 8), 
+                    Wrap(
+                      spacing: 6, 
+                      runSpacing: 6, 
+                      children: diag.detalles.map((detalle) {
+                        Color colorBg;
+                        Color colorTxt;
+                        if (detalle.puntuacion < 7) { colorBg = Colors.red[50]!; colorTxt = Colors.red[900]!; } 
+                        else if (detalle.puntuacion < 9) { colorBg = Colors.orange[50]!; colorTxt = Colors.orange[900]!; } 
+                        else { colorBg = Colors.blueGrey[50]!; colorTxt = Colors.blueGrey[900]!; } 
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
+                          decoration: BoxDecoration(color: colorBg, borderRadius: BorderRadius.circular(10), border: Border.all(color: colorTxt.withOpacity(0.3))), 
+                          child: Text(detalle.etiqueta, style: TextStyle(fontSize: 11, color: colorTxt, fontWeight: FontWeight.bold))
+                        );
+                      }).toList()
+                    )
+                  ]
           ])))).toList(),
         ],
       ),
@@ -364,7 +388,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   Widget _buildVistaAgrupacion() {
     if (_dianasEnContexto.isEmpty && _dianaSel == null && !_esModoDetalle) return const Center(child: Text("No hay datos para mostrar."));
     return Column(children: [
-        if (_dianasEnContexto.length > 1) Container(height: 50, margin: const EdgeInsets.symmetric(vertical: 10), child: ListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), itemCount: _dianasEnContexto.length, itemBuilder: (ctx, i) { final d = _dianasEnContexto[i]; bool isSel = d.id == _dianaPestanaSeleccionada?.id; return Padding(padding: const EdgeInsets.only(right: 8.0), child: ChoiceChip(label: Text(d.nombre), selected: isSel, selectedColor: Colors.purple[100], onSelected: (val) { if (val) { _cambiarDianaVisualizada(d); } })); })),
+        if (_dianasEnContexto.length > 1) Container(height: 50, margin: const EdgeInsets.symmetric(vertical: 10), child: ListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), itemCount: _dianasEnContexto.length, itemBuilder: (ctx, i) { final d = _dianasEnContexto[i]; bool isSel = d.id == _dianaPestanaSeleccionada?.id; return Padding(padding: const EdgeInsets.only(right: 8.0), child: ChoiceChip(label: Text(d.nombre), selected: isSel, selectedColor: _colorTemaClaro, onSelected: (val) { if (val) { _cambiarDianaVisualizada(d); } })); })),
         Expanded(child: _buildMapaCalorContent()),
     ]);
   }
@@ -372,7 +396,6 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   Widget _buildMapaCalorContent() {
     TipoDiana? dianaActiva = _dianaPestanaSeleccionada ?? _dianaSel;
     if (dianaActiva == null) return const Center(child: Text("Selecciona Diana"));
-    // CORREGIDO: disparosValidos
     if (_analisis == null || _analisis!.disparosValidos.isEmpty) return const Center(child: Text("No hay impactos."));
 
     String consejo = "Agrupación Centrada";
@@ -395,17 +418,28 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       if (correcciones.isNotEmpty) { consejo = "CORREGIR MIRAS"; iconoConsejo = Icons.build_circle; colorConsejo = Colors.orange[800]!; detalleClics = correcciones.join("  y  "); }
     } else {
       String horiz = devX > 0.05 ? "IZQUIERDA" : (devX < -0.05 ? "DERECHA" : ""); String vert = devY > 0.05 ? "ARRIBA" : (devY < -0.05 ? "ABAJO" : "");
-      if (horiz != "" || vert != "") { consejo = "Mover miras: $horiz $vert"; detalleClics = "Configura los mm/clic de tu arma."; iconoConsejo = Icons.info; colorConsejo = Colors.blue; }
+      if (horiz != "" || vert != "") { consejo = "Mover miras: $horiz $vert"; detalleClics = "Configura los mm/clic de tu arma."; iconoConsejo = Icons.info; colorConsejo = _colorTema; }
     }
     double puntosPerdidos = _analisis!.puntuacionPotencialMedia - _analisis!.puntuacionRealMedia;
     int vm = dianaActiva.valorMinimo; int an = dianaActiva.anilloNegroInicio; bool fn = dianaActiva.esFondoNegro; bool tm = dianaActiva.tieneMosca; bool tg = dianaActiva.tieneGuias; bool ed = an <= 5;
     int numDescartes = _analisis!.disparosDescartados.length;
 
     return SingleChildScrollView(child: Column(children: [
-          Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: colorConsejo.withOpacity(0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: colorConsejo)), child: Column(children: [Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(iconoConsejo, color: colorConsejo), const SizedBox(width: 10), Expanded(child: Text(consejo, style: TextStyle(fontWeight: FontWeight.bold, color: colorConsejo, fontSize: 16)))]), if (detalleClics.isNotEmpty) ...[const SizedBox(height: 8), Text(detalleClics, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), textAlign: TextAlign.center)], const SizedBox(height: 10), Text(puntosPerdidos > 0.5 ? "Pierdes ${puntosPerdidos.toStringAsFixed(1)} puntos de media." : "Ajuste correcto.", style: const TextStyle(fontStyle: FontStyle.italic), textAlign: TextAlign.center), const Divider(), Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_datoEstadistico("Media Real", _analisis!.puntuacionRealMedia.toStringAsFixed(2)), const Icon(Icons.arrow_forward, color: Colors.grey), _datoEstadistico("Media Potencial", _analisis!.puntuacionPotencialMedia.toStringAsFixed(2), esVerde: true)]), if (numDescartes > 0) ...[const Divider(), Text("⚠️ Se han ignorado $numDescartes disparos extremos.", style: TextStyle(fontSize: 11, color: Colors.red[800], fontWeight: FontWeight.bold))]])),
+          Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: colorConsejo.withOpacity(0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: colorConsejo)), child: Column(children: [
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(iconoConsejo, color: colorConsejo), const SizedBox(width: 10), Expanded(child: Text(consejo, style: TextStyle(fontWeight: FontWeight.bold, color: colorConsejo, fontSize: 16)))]), 
+            
+            // --- AQUI ESTA EL CAMBIO DE "TENDENCIA" EN PANTALLA ---
+            if (_analisis?.consejoTendencia != null && _analisis!.consejoTendencia.isNotEmpty && _analisis!.consejoTendencia != "Agrupación Circular (Equilibrada)")
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(_analisis!.consejoTendencia, style: TextStyle(fontWeight: FontWeight.bold, color: _colorTemaOscuro, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
+              ),
+            // -----------------------------------------------------
+
+            if (detalleClics.isNotEmpty) ...[const SizedBox(height: 8), Text(detalleClics, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), textAlign: TextAlign.center)], 
+            const SizedBox(height: 10), Text(puntosPerdidos > 0.5 ? "Pierdes ${puntosPerdidos.toStringAsFixed(1)} puntos de media." : "Ajuste correcto.", style: const TextStyle(fontStyle: FontStyle.italic), textAlign: TextAlign.center), const Divider(), Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_datoEstadistico("Media Real", _analisis!.puntuacionRealMedia.toStringAsFixed(2)), const Icon(Icons.arrow_forward, color: Colors.grey), _datoEstadistico("Media Potencial", _analisis!.puntuacionPotencialMedia.toStringAsFixed(2), esVerde: true)]), if (numDescartes > 0) ...[const Divider(), Text("⚠️ Se han ignorado $numDescartes disparos extremos.", style: TextStyle(fontSize: 11, color: Colors.red[800], fontWeight: FontWeight.bold))]])),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 40), child: AspectRatio(aspectRatio: 1, child: LayoutBuilder(builder: (context, constraints) { 
             double diametro = constraints.maxWidth; 
-            // CORRECCIÓN: Usamos disparosValidos y Descartados
             return CustomPaint(painter: DianaPainter(
               validos: _convertirImpactosAPixeles(_analisis!.disparosValidos, diametro/2), 
               descartados: _convertirImpactosAPixeles(_analisis!.disparosDescartados, diametro/2), 
@@ -420,7 +454,42 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     if (_datosProgreso.isEmpty) return const Center(child: Text("No hay datos", style: TextStyle(color: Colors.grey)));
     List<FlSpot> puntos = [];
     for (int i = 0; i < _datosProgreso.length; i++) { puntos.add(FlSpot(i.toDouble(), (_datosProgreso[i]['total'] as num).toDouble())); }
-    return Padding(padding: const EdgeInsets.all(24.0), child: LineChart(LineChartData(gridData: FlGridData(show: true, drawVerticalLine: false), titlesData: FlTitlesData(leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40, getTitlesWidget: (val, meta) => Text(val.toInt().toString(), style: const TextStyle(fontSize: 10)))), bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false))), borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey[300]!)), lineBarsData: [LineChartBarData(spots: puntos, isCurved: true, color: Colors.purple, barWidth: 3, dotData: FlDotData(show: true), belowBarData: BarAreaData(show: true, color: Colors.purple.withOpacity(0.1)))])));
+    
+    // DEGRADADO AZUL PARA LA GRÁFICA EN PANTALLA
+    final List<Color> gradientColors = [
+      _colorTema,
+      _colorTema.withOpacity(0.0),
+    ];
+
+    return Padding(padding: const EdgeInsets.all(24.0), child: LineChart(LineChartData(
+      gridData: FlGridData(
+        show: true, 
+        drawVerticalLine: false,
+        getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.withOpacity(0.2), strokeWidth: 1),
+      ), 
+      titlesData: FlTitlesData(leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40, getTitlesWidget: (val, meta) => Text(val.toInt().toString(), style: const TextStyle(fontSize: 10, color: Colors.grey)))), bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false))), 
+      borderData: FlBorderData(show: false), 
+      lineBarsData: [
+        LineChartBarData(
+          spots: puntos, 
+          isCurved: true, 
+          color: _colorTema, 
+          barWidth: 4, 
+          dotData: FlDotData(
+            show: true,
+            getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 4, color: Colors.white, strokeWidth: 2, strokeColor: _colorTema)
+          ), 
+          belowBarData: BarAreaData(
+            show: true, 
+            gradient: LinearGradient(
+              colors: gradientColors.map((color) => color.withOpacity(0.3)).toList(),
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            )
+          )
+        )
+      ]
+    )));
   }
   
   Widget _datoEstadistico(String label, String valor, {bool esVerde = false}) { return Column(children: [Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)), Text(valor, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: esVerde ? Colors.green[700] : Colors.black87))]); }
