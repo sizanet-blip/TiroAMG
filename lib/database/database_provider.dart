@@ -33,7 +33,9 @@ class DatabaseProvider {
         valor_minimo INTEGER,
         es_fondo_negro INTEGER,
         tiene_mosca INTEGER,
-        tiene_guias INTEGER
+        tiene_guias INTEGER,
+        ancho_exterior_mm REAL,
+        alto_exterior_mm REAL
       )
     ''');
 
@@ -148,13 +150,13 @@ class DatabaseProvider {
     
     // C. Dianas Oficiales
     int idDianaPrec = await db.insert('CatalogoDianas', {
-      'nombre': 'ISSF 25m/50m Precisión', 'valor_minimo': 1, 'anillo_negro_inicio': 7, 'es_fondo_negro': 0, 'tiene_mosca': 1, 'tiene_guias': 0
+      'nombre': 'ISSF 25m/50m Precisión', 'valor_minimo': 1, 'anillo_negro_inicio': 7, 'es_fondo_negro': 0, 'tiene_mosca': 1, 'tiene_guias': 0, 'ancho_exterior_mm': 500.0, 'alto_exterior_mm': 500.0
     });
     int idDianaDuelo = await db.insert('CatalogoDianas', {
-      'nombre': 'ISSF 25m Duelo/Rápido', 'valor_minimo': 5, 'anillo_negro_inicio': 5, 'es_fondo_negro': 1, 'tiene_mosca': 1, 'tiene_guias': 1
+      'nombre': 'ISSF 25m Duelo/Rápido', 'valor_minimo': 5, 'anillo_negro_inicio': 5, 'es_fondo_negro': 1, 'tiene_mosca': 1, 'tiene_guias': 1, 'ancho_exterior_mm': 500.0, 'alto_exterior_mm': 500.0
     });
     int idDianaAire = await db.insert('CatalogoDianas', {
-      'nombre': 'ISSF 10m Aire', 'valor_minimo': 1, 'anillo_negro_inicio': 7, 'es_fondo_negro': 0, 'tiene_mosca': 1, 'tiene_guias': 0
+      'nombre': 'ISSF 10m Aire', 'valor_minimo': 1, 'anillo_negro_inicio': 7, 'es_fondo_negro': 0, 'tiene_mosca': 1, 'tiene_guias': 0, 'ancho_exterior_mm': 170.0, 'alto_exterior_mm': 170.0
     });
 
     // D. PLANTILLAS DE TIEMPOS

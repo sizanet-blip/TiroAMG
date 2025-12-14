@@ -15,11 +15,14 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
   final _service = CatalogoService();
 
   final _nombreController = TextEditingController();
+  // Controladores para las nuevas dimensiones físicas
+  final _anchoMmController = TextEditingController(); 
+  final _altoMmController = TextEditingController();   
   
   // Valores por defecto
-  int _valorMinimo = 1;       // Anillo exterior
-  int _anilloNegro = 7;       // Inicio del negro
-  bool _esFondoNegro = false; // Papel crema por defecto
+  int _valorMinimo = 1;       
+  int _anilloNegro = 7;       
+  bool _esFondoNegro = false; 
   bool _tieneMosca = true;
   bool _tieneGuias = false;
 
@@ -33,11 +36,31 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
       _esFondoNegro = widget.diana!.esFondoNegro;
       _tieneMosca = widget.diana!.tieneMosca;
       _tieneGuias = widget.diana!.tieneGuias;
+      
+      // Cargar dimensiones físicas (Corrección aplicada)
+      _anchoMmController.text = widget.diana!.anchoExteriorMm?.toString() ?? ''; 
+      _altoMmController.text = widget.diana!.altoExteriorMm?.toString() ?? '';   
+    } else {
+      // Inicializar controladores a vacío si es una nueva diana
+      _anchoMmController.text = '';
+      _altoMmController.text = '';
     }
+  }
+
+  @override
+  void dispose() {
+    _nombreController.dispose();
+    _anchoMmController.dispose();
+    _altoMmController.dispose();
+    super.dispose();
   }
 
   void _guardar() async {
     if (_formKey.currentState!.validate()) {
+      // Intentar parsear las dimensiones a double
+      final ancho = double.tryParse(_anchoMmController.text);
+      final alto = double.tryParse(_altoMmController.text);
+      
       final nuevaDiana = TipoDiana(
         id: widget.diana?.id,
         nombre: _nombreController.text,
@@ -46,6 +69,9 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
         esFondoNegro: _esFondoNegro,
         tieneMosca: _tieneMosca,
         tieneGuias: _tieneGuias,
+        // Asignar nuevas dimensiones
+        anchoExteriorMm: ancho, 
+        altoExteriorMm: alto,   
       );
 
       if (widget.diana == null) {
@@ -81,6 +107,48 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
               
               const Text('Geometría y Puntuación', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal)),
               const Divider(),
+              
+              // ** CAMPOS DE DIMENSIONES FÍSICAS (NUEVOS) **
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _anchoMmController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Ancho Exterior (mm)', 
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) {
+                        if (v!.isEmpty) return 'Requerido';
+                        if (double.tryParse(v) == null) return 'Número inválido';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _altoMmController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Alto Exterior (mm)', 
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) {
+                        if (v!.isEmpty) return 'Requerido';
+                        if (double.tryParse(v) == null) return 'Número inválido';
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 4, bottom: 20, left: 2),
+                child: Text('   • Dimensión física total del papel (ej: 170mm).', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ),
+              // ** FIN CAMPOS DE DIMENSIONES FÍSICAS **
 
               // 1. VALOR MÍNIMO (Tamaño visible)
               ListTile(

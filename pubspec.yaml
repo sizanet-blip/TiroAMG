@@ -39,6 +39,10 @@ dependencies:
   # --- ICONOS ---
   cupertino_icons: ^1.0.2
 
+  # --- Imagenes ---
+  image_picker: ^1.0.4
+  image: ^4.1.7
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

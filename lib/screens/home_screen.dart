@@ -5,6 +5,8 @@ import 'entrenamiento_screen.dart';
 import 'historial_screen.dart';
 import 'backup_screen.dart'; 
 import 'config_screen.dart';
+// Importamos la nueva pantalla (necesitas crear este archivo)
+import 'marcado_diana_screen.dart'; 
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -51,24 +53,29 @@ class HomeScreen extends StatelessWidget {
               ),
 
               // --- BOTONES DEL MENÚ ---
-              // Nota: No usamos 'const' aquí para evitar errores de instanciación
-              _buildMenuItem(context, '1. Competición', Icons.emoji_events, Colors.amber[700]!, 
+              
+              // ** NUEVA OPCIÓN DE PRUEBAS (PRIMERA) **
+              _buildMenuItem(context, 'Marcado de Diana (Pruebas)', Icons.camera_alt, Colors.deepOrange, 
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => MarcadoDianaScreen()))
+              ),
+
+              _buildMenuItem(context, 'Competición', Icons.emoji_events, Colors.amber[700]!, 
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CompeticionScreen()))
               ),
 
-              _buildMenuItem(context, '2. Entrenamiento', Icons.sports_baseball, Colors.teal, 
+              _buildMenuItem(context, 'Entrenamiento', Icons.sports_baseball, Colors.teal, 
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => EntrenamientoScreen()))
               ),
 
-              _buildMenuItem(context, '3. Historial y Análisis', Icons.analytics, Colors.indigo, 
+              _buildMenuItem(context, 'Historial y Análisis', Icons.analytics, Colors.indigo, 
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistorialScreen()))
               ),
 
-              _buildMenuItem(context, '4. Copia de Seguridad', Icons.cloud_sync, Colors.blueGrey, 
+              _buildMenuItem(context, 'Copia de Seguridad', Icons.cloud_sync, Colors.blueGrey, 
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => BackupScreen()))
               ),
 
-              _buildMenuItem(context, '5. Configuración', Icons.settings, Colors.grey[700]!, 
+              _buildMenuItem(context, 'Configuración', Icons.settings, Colors.grey[700]!, 
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConfigScreen()))
               ),
             ],
@@ -98,6 +105,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(width: 20),
               Expanded(
+                // Aquí quitamos la necesidad de que el título contenga la numeración
                 child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
               ),
               const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
