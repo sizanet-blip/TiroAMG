@@ -5,8 +5,7 @@ import 'entrenamiento_screen.dart';
 import 'historial_screen.dart';
 import 'backup_screen.dart'; 
 import 'config_screen.dart';
-// Importamos la nueva pantalla (necesitas crear este archivo)
-import 'marcado_diana_screen.dart'; 
+import 'recorte_diana_screen.dart'; 
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -55,8 +54,8 @@ class HomeScreen extends StatelessWidget {
               // --- BOTONES DEL MENÚ ---
               
               // ** NUEVA OPCIÓN DE PRUEBAS (PRIMERA) **
-              _buildMenuItem(context, 'Marcado de Diana (Pruebas)', Icons.camera_alt, Colors.deepOrange, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => MarcadoDianaScreen()))
+              _buildMenuItem(context, 'Recorte Diana (Pruebas)', Icons.camera_alt, Colors.deepOrange, 
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecorteDianaScreen()))
               ),
 
               _buildMenuItem(context, 'Competición', Icons.emoji_events, Colors.amber[700]!, 

@@ -40,7 +40,7 @@ dependencies:
   cupertino_icons: ^1.0.2
 
   # --- Imagenes ---
-  image_picker: ^1.0.4
+  image_picker: ^1.2.1
   image: ^4.1.7
 
 dev_dependencies:
