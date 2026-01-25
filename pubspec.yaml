@@ -34,7 +34,6 @@ dependencies:
   file_picker: ^8.0.0
 
   # --- TEXTO A VOZ ---
-  flutter_tts: ^3.8.3
 
   # --- ICONOS ---
   cupertino_icons: ^1.0.2
@@ -42,6 +41,7 @@ dependencies:
   # --- Imagenes ---
   image_picker: ^1.2.1
   image: ^4.1.7
+  flutter_tts: ^3.2.2
 
 dev_dependencies:
   flutter_test:

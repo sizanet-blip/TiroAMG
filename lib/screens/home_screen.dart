@@ -6,6 +6,7 @@ import 'historial_screen.dart';
 import 'backup_screen.dart'; 
 import 'config_screen.dart';
 import 'recorte_diana_screen.dart'; 
+import 'package:flutter/foundation.dart'; // <--- Agrega esto para usar kDebugMode
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -52,12 +53,12 @@ class HomeScreen extends StatelessWidget {
               ),
 
               // --- BOTONES DEL MENÚ ---
-              
-              // ** NUEVA OPCIÓN DE PRUEBAS (PRIMERA) **
-              _buildMenuItem(context, 'Recorte Diana (Pruebas)', Icons.camera_alt, Colors.deepOrange, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecorteDianaScreen()))
-              ),
-
+              if (kDebugMode) ...[
+                // ** NUEVA OPCIÓN DE PRUEBAS (PRIMERA) **
+                _buildMenuItem(context, 'Recorte Diana (Pruebas)', Icons.camera_alt, Colors.deepOrange, 
+                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecorteDianaScreen()))
+                ),
+              ],
               _buildMenuItem(context, 'Competición', Icons.emoji_events, Colors.amber[700]!, 
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CompeticionScreen()))
               ),

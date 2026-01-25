@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/data_seeder_service.dart';
 import '../services/backup_service.dart'; // Importar el nuevo servicio
+import 'package:flutter/foundation.dart'; // <--- Agrega esto para usar kDebugMode
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -129,67 +130,73 @@ class _BackupScreenState extends State<BackupScreen> {
             const SizedBox(height: 40),
             
             // --- SECCIÓN DESARROLLADOR ---
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.withOpacity(0.5)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.build, color: Colors.grey),
-                      SizedBox(width: 10),
-                      Text('Zona de Pruebas (Developer)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  
-                  if (_procesando)
-                    const Center(child: CircularProgressIndicator())
-                  else
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+            if (kDebugMode) ...[ 
+              const SizedBox(height: 40),
+              
+              // --- SECCIÓN DESARROLLADOR ---
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.withOpacity(0.5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
                       children: [
-                        ElevatedButton(
-                          onPressed: _generarDatos,
-                          child: const Text('GENERAR DATOS DE PRUEBA'),
-                        ),
-                        const SizedBox(height: 10),
-                        OutlinedButton(
-                          onPressed: _borrarSoloPruebas,
-                          child: const Text('BORRAR SOLO DATOS DE PRUEBA'),
-                        ),
-                        const SizedBox(height: 10),
-                        OutlinedButton(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('⚠️ ¿BORRAR TODO?'),
-                                content: const Text('Se eliminarán tus entrenamientos REALES. No se puede deshacer.'),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                    onPressed: () { Navigator.pop(ctx); _borrarTodo(); }, 
-                                    child: const Text('Borrar Todo')
-                                  ),
-                                ],
-                              )
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                          child: const Text('BORRAR ABSOLUTAMENTE TODO'),
-                        ),
+                        Icon(Icons.build, color: Colors.grey),
+                        SizedBox(width: 10),
+                        Text('Zona de Pruebas (Developer)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
                       ],
                     ),
-                ],
+                    const SizedBox(height: 15),
+                    
+                    if (_procesando)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ElevatedButton(
+                            onPressed: _generarDatos,
+                            child: const Text('GENERAR DATOS DE PRUEBA'),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton(
+                            onPressed: _borrarSoloPruebas,
+                            child: const Text('BORRAR SOLO DATOS DE PRUEBA'),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('⚠️ ¿BORRAR TODO?'),
+                                  content: const Text('Se eliminarán tus entrenamientos REALES. No se puede deshacer.'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                      onPressed: () { Navigator.pop(ctx); _borrarTodo(); }, 
+                                      child: const Text('Borrar Todo')
+                                    ),
+                                  ],
+                                )
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                            child: const Text('BORRAR ABSOLUTAMENTE TODO'),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
-            ),
+            ], // Fin del bloque if (kDebugMode)
+
           ],
         ),
       ),
