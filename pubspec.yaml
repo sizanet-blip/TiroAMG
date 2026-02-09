@@ -43,6 +43,9 @@ dependencies:
   image: ^4.1.7
   flutter_tts: ^3.2.2
 
+  # --- OpenCV ---
+  opencv_dart: ^2.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
