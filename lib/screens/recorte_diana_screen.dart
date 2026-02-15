@@ -30,6 +30,14 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
   File? _croppedImage;
   bool _isCropping = false;
 
+  // Detección del centro de la diana
+  Offset? _dianaCenter;
+  List<Map<String, double>>? _detectedCircles;
+  List<List<Map<String, dynamic>>>? _ringContours; // Contornos reales de anillos
+  bool _isDetectingCenter = false;
+  String? _centerMessage;
+  Size? _croppedImageSize;
+
   /// Selecciona una imagen desde cámara o galería
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -42,6 +50,11 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
           _detectionMessage = null;
           _imageSize = null;
           _croppedImage = null;
+          _dianaCenter = null;
+          _detectedCircles = null;
+          _ringContours = null;
+          _centerMessage = null;
+          _croppedImageSize = null;
         });
         
         // Obtener tamaño real de la imagen
@@ -153,6 +166,58 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );
+      }
+    }
+  }
+
+  /// Detecta el centro de la diana en la imagen recortada usando HoughCircles
+  Future<void> _detectCenter() async {
+    if (_croppedImage == null) return;
+
+    setState(() {
+      _isDetectingCenter = true;
+      _centerMessage = 'Detectando centro y anillos...';
+      _dianaCenter = null;
+      _detectedCircles = null;
+      _ringContours = null;
+    });
+
+    try {
+      // Cargar tamaño de la imagen recortada si no lo tenemos
+      if (_croppedImageSize == null) {
+        final bytes = await _croppedImage!.readAsBytes();
+        final decoded = img.decodeImage(bytes);
+        if (decoded != null) {
+          _croppedImageSize = Size(decoded.width.toDouble(), decoded.height.toDouble());
+        }
+      }
+
+      final bytes = await _croppedImage!.readAsBytes();
+      final result = await OpenCVService.detectTargetCenter(bytes);
+
+      if (mounted) {
+        setState(() {
+          _isDetectingCenter = false;
+          if (result != null && result['center'] != null) {
+            _dianaCenter = result['center'] as Offset;
+            _detectedCircles = (result['circles'] as List).cast<Map<String, double>>();
+            _ringContours = (result['ringContours'] as List?)
+                ?.map((contour) => (contour as List)
+                    .map((p) => p as Map<String, dynamic>)
+                    .toList())
+                .toList();
+            _centerMessage = result['message'] as String;
+          } else {
+            _centerMessage = result?['message'] as String? ?? 'No se detectó el centro';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isDetectingCenter = false;
+          _centerMessage = 'Error: $e';
+        });
       }
     }
   }
@@ -285,14 +350,28 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                               ],
                             ),
                           ),
-                          // Imagen recortada (grande)
+                          // Imagen recortada con círculos detectados
                           Expanded(
                             flex: 3,
                             child: Padding(
                               padding: const EdgeInsets.all(8.0),
-                              child: Image.file(
-                                _croppedImage!,
-                                fit: BoxFit.contain,
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Image.file(
+                                        _croppedImage!,
+                                        fit: BoxFit.contain,
+                                        width: constraints.maxWidth,
+                                        height: constraints.maxHeight,
+                                      ),
+                                      // Dibujar centro y contornos de anillos detectados
+                                      if (_dianaCenter != null && _croppedImageSize != null && _ringContours != null)
+                                        _buildCirclesOverlay(constraints),
+                                    ],
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -340,28 +419,109 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                     style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
                   ),
                   const SizedBox(height: 8),
-                  // Botón de recortar
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isCropping ? null : _cropImage,
-                      icon: _isCropping
-                          ? const SizedBox(width: 18, height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.crop),
-                      label: Text(_isCropping ? 'Recortando...' : 
-                          (_croppedImage != null ? 'Recortar de nuevo' : 'Recortar con OpenCV')),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade700,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                  // Botones de acción
+                  Row(
+                    children: [
+                      // Botón de recortar
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _isCropping ? null : _cropImage,
+                          icon: _isCropping
+                              ? const SizedBox(width: 16, height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.crop, size: 18),
+                          label: Text(_croppedImage != null ? 'Re-recortar' : 'Recortar',
+                            style: const TextStyle(fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                        ),
+                      ),
+                      // Botón de detectar centro (solo si hay imagen recortada)
+                      if (_croppedImage != null) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _isDetectingCenter ? null : _detectCenter,
+                            icon: _isDetectingCenter
+                                ? const SizedBox(width: 16, height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.my_location, size: 18),
+                            label: Text(_dianaCenter != null ? 'Re-detectar' : 'Detectar centro',
+                              style: const TextStyle(fontSize: 13)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.deepPurple,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  // Info del centro detectado
+                  if (_centerMessage != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _dianaCenter != null
+                          ? 'Centro: (${_dianaCenter!.dx.toStringAsFixed(1)}, ${_dianaCenter!.dy.toStringAsFixed(1)})  |  $_centerMessage'
+                          : _centerMessage!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                        color: _dianaCenter != null ? Colors.deepPurple : Colors.orange,
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Construye el overlay con los contornos reales y el centro de la diana
+  Widget _buildCirclesOverlay(BoxConstraints constraints) {
+    final imgW = _croppedImageSize!.width;
+    final imgH = _croppedImageSize!.height;
+
+    // Calcular cómo se ajusta la imagen recortada (BoxFit.contain)
+    final double ratioX = constraints.maxWidth / imgW;
+    final double ratioY = constraints.maxHeight / imgH;
+    final double scale = min(ratioX, ratioY);
+
+    final double displayedW = imgW * scale;
+    final double displayedH = imgH * scale;
+    final double offsetX = (constraints.maxWidth - displayedW) / 2;
+    final double offsetY = (constraints.maxHeight - displayedH) / 2;
+
+    // Convertir coordenadas de imagen a pantalla
+    Offset toScreen(double x, double y) => Offset(
+      offsetX + x * scale,
+      offsetY + y * scale,
+    );
+
+    // Convertir contornos reales a coordenadas de pantalla
+    final screenContours = _ringContours?.map((contour) {
+      return contour.map((p) {
+        final x = (p['x'] as num).toDouble();
+        final y = (p['y'] as num).toDouble();
+        return toScreen(x, y);
+      }).toList();
+    }).toList();
+
+    return SizedBox(
+      width: constraints.maxWidth,
+      height: constraints.maxHeight,
+      child: CustomPaint(
+        painter: _CirclesPainter(
+          center: toScreen(_dianaCenter!.dx, _dianaCenter!.dy),
+          ringContours: screenContours ?? [],
+          numRings: _detectedCircles?.length ?? 0,
+        ),
       ),
     );
   }
@@ -396,6 +556,95 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
         painter: _CornersPainter(screenCorners),
       ),
     );
+  }
+}
+
+/// Pinta los contornos reales de los anillos y el centro de la diana
+class _CirclesPainter extends CustomPainter {
+  final Offset center;
+  final List<List<Offset>> ringContours; // Polígonos reales de cada anillo
+  final int numRings;
+
+  _CirclesPainter({
+    required this.center,
+    required this.ringContours,
+    required this.numRings,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Dibujar cada contorno de anillo como un polígono cerrado
+    final ringPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    for (int i = 0; i < ringContours.length; i++) {
+      final points = ringContours[i];
+      if (points.length < 3) continue;
+
+      // Color variado para distinguir cada anillo
+      ringPaint.color = HSLColor.fromAHSL(
+        0.85, (i * 37.0) % 360, 0.9, 0.5,
+      ).toColor();
+
+      // Dibujar como path cerrado (sigue la forma real del anillo)
+      final path = Path()..moveTo(points.first.dx, points.first.dy);
+      for (int j = 1; j < points.length; j++) {
+        path.lineTo(points[j].dx, points[j].dy);
+      }
+      path.close();
+
+      canvas.drawPath(path, ringPaint);
+    }
+
+    // Dibujar el centro (cruz + punto)
+    final centerPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 6, centerPaint);
+
+    final centerBorder = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawCircle(center, 6, centerBorder);
+
+    // Cruz
+    final crossPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawLine(
+      Offset(center.dx - 20, center.dy),
+      Offset(center.dx + 20, center.dy),
+      crossPaint,
+    );
+    canvas.drawLine(
+      Offset(center.dx, center.dy - 20),
+      Offset(center.dx, center.dy + 20),
+      crossPaint,
+    );
+
+    // Etiqueta
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: '$numRings anillos',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          backgroundColor: Colors.red.withValues(alpha: 0.7),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    textPainter.paint(canvas, center + const Offset(10, 10));
+  }
+
+  @override
+  bool shouldRepaint(covariant _CirclesPainter oldDelegate) {
+    return oldDelegate.center != center ||
+        oldDelegate.ringContours != ringContours;
   }
 }
 
