@@ -37,6 +37,12 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
   bool _isDetectingCenter = false;
   String? _centerMessage;
   Size? _croppedImageSize;
+  double? _spacingPx; // Espaciado ISSF en píxeles
+
+  // Detección de impactos
+  List<Map<String, double>>? _impacts;
+  bool _isDetectingImpacts = false;
+  String? _impactsMessage;
 
   /// Selecciona una imagen desde cámara o galería
   Future<void> _pickImage(ImageSource source) async {
@@ -55,6 +61,9 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
           _ringContours = null;
           _centerMessage = null;
           _croppedImageSize = null;
+          _spacingPx = null;
+          _impacts = null;
+          _impactsMessage = null;
         });
         
         // Obtener tamaño real de la imagen
@@ -206,6 +215,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                     .map((p) => p as Map<String, dynamic>)
                     .toList())
                 .toList();
+            _spacingPx = (result['spacing'] as num?)?.toDouble();
             _centerMessage = result['message'] as String;
           } else {
             _centerMessage = result?['message'] as String? ?? 'No se detectó el centro';
@@ -217,6 +227,47 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
         setState(() {
           _isDetectingCenter = false;
           _centerMessage = 'Error: $e';
+        });
+      }
+    }
+  }
+
+  /// Detecta impactos (agujeros de bala) en la imagen recortada
+  Future<void> _detectImpacts() async {
+    if (_croppedImage == null || _dianaCenter == null ||
+        _detectedCircles == null || _spacingPx == null) return;
+
+    setState(() {
+      _isDetectingImpacts = true;
+      _impactsMessage = 'Detectando impactos...';
+      _impacts = null;
+    });
+
+    try {
+      final bytes = await _croppedImage!.readAsBytes();
+
+      // Extraer radios de los anillos
+      final ringRadii = _detectedCircles!.map((c) => c['r']!).toList();
+
+      final result = await OpenCVService.detectImpacts(
+        bytes,
+        center: _dianaCenter!,
+        ringRadii: ringRadii,
+        spacingPx: _spacingPx!,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isDetectingImpacts = false;
+          _impacts = (result['impacts'] as List).cast<Map<String, double>>();
+          _impactsMessage = result['message'] as String;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isDetectingImpacts = false;
+          _impactsMessage = 'Error: $e';
         });
       }
     }
@@ -366,9 +417,9 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                                         width: constraints.maxWidth,
                                         height: constraints.maxHeight,
                                       ),
-                                      // Dibujar centro y contornos de anillos detectados
-                                      if (_dianaCenter != null && _croppedImageSize != null && _ringContours != null)
-                                        _buildCirclesOverlay(constraints),
+                                      // Dibujar centro, anillos e impactos
+                                      if (_dianaCenter != null && _croppedImageSize != null)
+                                        _buildCroppedOverlay(constraints),
                                     ],
                                   );
                                 },
@@ -461,6 +512,29 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                       ],
                     ],
                   ),
+                  // Botón de detectar impactos (solo si tenemos centro y spacing)
+                  if (_dianaCenter != null && _spacingPx != null) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isDetectingImpacts ? null : _detectImpacts,
+                        icon: _isDetectingImpacts
+                            ? const SizedBox(width: 16, height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.gps_fixed, size: 18),
+                        label: Text(
+                          _isDetectingImpacts ? 'Detectando...' :
+                            (_impacts != null ? 'Re-detectar impactos' : 'Detectar impactos'),
+                          style: const TextStyle(fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
                   // Info del centro detectado
                   if (_centerMessage != null) ...[
                     const SizedBox(height: 6),
@@ -475,6 +549,19 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                       ),
                     ),
                   ],
+                  // Info de impactos
+                  if (_impactsMessage != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _impactsMessage!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                        color: _impacts != null && _impacts!.isNotEmpty
+                            ? Colors.red.shade700 : Colors.orange,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -483,7 +570,58 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
     );
   }
 
-  /// Construye el overlay con los contornos reales y el centro de la diana
+  /// Construye el overlay combinado: anillos + impactos
+  Widget _buildCroppedOverlay(BoxConstraints constraints) {
+    final imgW = _croppedImageSize!.width;
+    final imgH = _croppedImageSize!.height;
+
+    final double ratioX = constraints.maxWidth / imgW;
+    final double ratioY = constraints.maxHeight / imgH;
+    final double displayScale = min(ratioX, ratioY);
+
+    final double displayedW = imgW * displayScale;
+    final double displayedH = imgH * displayScale;
+    final double offsetX = (constraints.maxWidth - displayedW) / 2;
+    final double offsetY = (constraints.maxHeight - displayedH) / 2;
+
+    Offset toScreen(double x, double y) => Offset(
+      offsetX + x * displayScale,
+      offsetY + y * displayScale,
+    );
+
+    // Contornos de anillos
+    final screenContours = _ringContours?.map((contour) {
+      return contour.map((p) {
+        final x = (p['x'] as num).toDouble();
+        final y = (p['y'] as num).toDouble();
+        return toScreen(x, y);
+      }).toList();
+    }).toList();
+
+    // Impactos
+    final screenImpacts = _impacts?.map((imp) {
+      return {
+        'center': toScreen(imp['x']!, imp['y']!),
+        'radius': imp['r']! * displayScale,
+        'groupCount': imp['groupCount'] ?? 1.0,
+      };
+    }).toList();
+
+    return SizedBox(
+      width: constraints.maxWidth,
+      height: constraints.maxHeight,
+      child: CustomPaint(
+        painter: _DianaOverlayPainter(
+          center: toScreen(_dianaCenter!.dx, _dianaCenter!.dy),
+          ringContours: screenContours ?? [],
+          numRings: _detectedCircles?.length ?? 0,
+          impacts: screenImpacts ?? [],
+        ),
+      ),
+    );
+  }
+
+  /// Construye el overlay con los contornos reales y el centro de la diana (legacy)
   Widget _buildCirclesOverlay(BoxConstraints constraints) {
     final imgW = _croppedImageSize!.width;
     final imgH = _croppedImageSize!.height;
@@ -556,6 +694,128 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
         painter: _CornersPainter(screenCorners),
       ),
     );
+  }
+}
+
+/// Pinta anillos, centro e impactos sobre la imagen recortada
+class _DianaOverlayPainter extends CustomPainter {
+  final Offset center;
+  final List<List<Offset>> ringContours;
+  final int numRings;
+  final List<Map<String, dynamic>> impacts; // {center: Offset, radius: double}
+
+  _DianaOverlayPainter({
+    required this.center,
+    required this.ringContours,
+    required this.numRings,
+    required this.impacts,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // --- Anillos ---
+    final ringPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    for (int i = 0; i < ringContours.length; i++) {
+      final points = ringContours[i];
+      if (points.length < 3) continue;
+
+      ringPaint.color = HSLColor.fromAHSL(
+        0.85, (i * 37.0) % 360, 0.9, 0.5,
+      ).toColor();
+
+      final path = Path()..moveTo(points.first.dx, points.first.dy);
+      for (int j = 1; j < points.length; j++) {
+        path.lineTo(points[j].dx, points[j].dy);
+      }
+      path.close();
+      canvas.drawPath(path, ringPaint);
+    }
+
+    // --- Centro ---
+    canvas.drawCircle(center, 6, Paint()..color = Colors.red..style = PaintingStyle.fill);
+    canvas.drawCircle(center, 6, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 2);
+
+    final crossPaint = Paint()..color = Colors.red..style = PaintingStyle.stroke..strokeWidth = 1.5;
+    canvas.drawLine(Offset(center.dx - 20, center.dy), Offset(center.dx + 20, center.dy), crossPaint);
+    canvas.drawLine(Offset(center.dx, center.dy - 20), Offset(center.dx, center.dy + 20), crossPaint);
+
+    // Etiqueta anillos
+    final ringLabel = TextPainter(
+      text: TextSpan(
+        text: '$numRings anillos',
+        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold,
+          backgroundColor: Colors.red.withValues(alpha: 0.7)),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    ringLabel.paint(canvas, center + const Offset(10, 10));
+
+    // --- Impactos ---
+    if (impacts.isEmpty) return;
+
+    for (int i = 0; i < impacts.length; i++) {
+      final imp = impacts[i];
+      final c = imp['center'] as Offset;
+      final r = imp['radius'] as double;
+
+      // Círculo exterior (marcador amarillo)
+      final markerPaint = Paint()
+        ..color = Colors.yellow
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5;
+      canvas.drawCircle(c, r + 4, markerPaint);
+
+      // Círculo interior (rojo)
+      final fillPaint = Paint()
+        ..color = Colors.red.withValues(alpha: 0.5)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(c, r, fillPaint);
+
+      // Borde del impacto
+      final borderPaint = Paint()
+        ..color = Colors.red
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(c, r, borderPaint);
+
+      // Número del impacto (y grupo si aplica)
+      final groupCount = (imp['groupCount'] as num?)?.toInt() ?? 1;
+      final label = groupCount > 1 ? '${i + 1} (x$groupCount)' : '${i + 1}';
+      final numLabel = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: groupCount > 1 ? Colors.orange : Colors.yellow,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            backgroundColor: Colors.black.withValues(alpha: 0.7),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      numLabel.paint(canvas, c + Offset(r + 6, -6));
+    }
+
+    // Etiqueta total de impactos
+    final impLabel = TextPainter(
+      text: TextSpan(
+        text: '${impacts.length} impactos',
+        style: TextStyle(color: Colors.yellow, fontSize: 10, fontWeight: FontWeight.bold,
+          backgroundColor: Colors.black.withValues(alpha: 0.7)),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    impLabel.paint(canvas, center + const Offset(10, 24));
+  }
+
+  @override
+  bool shouldRepaint(covariant _DianaOverlayPainter oldDelegate) {
+    return oldDelegate.center != center ||
+        oldDelegate.ringContours != ringContours ||
+        oldDelegate.impacts != impacts;
   }
 }
 

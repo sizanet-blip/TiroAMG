@@ -339,8 +339,9 @@ class OpenCVService {
       final generatedRadii = <double>[];
 
       // Hacia el interior (desde referencia hacia el centro)
+      // Aceptar anillos con radio > spacing * 0.2 para incluir la "mouche"
       double r = referenceRadius;
-      while (r > spacing * 0.5) {
+      while (r > spacing * 0.2) {
         generatedRadii.add(r);
         r -= spacing;
       }
@@ -503,6 +504,444 @@ class OpenCVService {
       binary?.dispose();
       morphKernel?.dispose();
       cleaned?.dispose();
+    }
+  }
+
+  // =========================================================================
+  // DETECCIÓN DE IMPACTOS (AGUJEROS DE BALA)
+  // =========================================================================
+
+  /// Detecta impactos (agujeros) en la imagen recortada de la diana.
+  ///
+  /// Parámetros de prueba hardcoded para diana 10m aire comprimido:
+  ///   spacingMm = 8.0 mm (espaciado entre anillos ISSF 10m)
+  ///   caliberMm = 4.5 mm (perdigón)
+  ///
+  /// [imageBytes]: imagen recortada de la diana
+  /// [center]: centro de la diana (en coordenadas de imagen)
+  /// [ringRadii]: radios de los anillos detectados (ordenados menor→mayor)
+  /// [spacingPx]: espaciado entre anillos en píxeles (del detectTargetCenter)
+  ///
+  /// Retorna lista de impactos: [{x, y, radius}]
+  static Future<Map<String, dynamic>> detectImpacts(
+    Uint8List imageBytes, {
+    required Offset center,
+    required List<double> ringRadii,
+    required double spacingPx,
+    double spacingMm = 8.0,   // Diana 10m aire comprimido ISSF
+    double caliberMm = 4.5,   // Perdigón
+  }) async {
+    cv.Mat? src, gray, blurred, morphK;
+
+    try {
+      src = cv.imdecode(imageBytes, cv.IMREAD_COLOR);
+      if (src.isEmpty) {
+        return {'impacts': <Map<String, double>>[], 'message': 'Error al cargar imagen'};
+      }
+
+      final int rows = src.rows;
+      final int cols = src.cols;
+
+      gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY);
+      blurred = cv.medianBlur(gray, 5);
+
+      // ================================================================
+      // Calcular escala y tamaño esperado del agujero
+      // ================================================================
+      final double scale = spacingMm / spacingPx; // mm por pixel
+      final double holeRadiusPx = (caliberMm / 2.0) / scale;
+      final double holeAreaExpected = math.pi * holeRadiusPx * holeRadiusPx;
+
+      // Rango de área:
+      //   Individual: 0.3x - 1.5x del área esperada
+      //   Grupo (solapados): 1.5x - 7.0x (hasta ~7 impactos agrupados)
+      final double minArea = holeAreaExpected * 0.3;
+      final double maxAreaSingle = holeAreaExpected * 1.5;
+      final double maxAreaGroup = holeAreaExpected * 7.0;
+
+      debugPrint('Escala: ${scale.toStringAsFixed(4)} mm/px');
+      debugPrint('Radio esperado agujero: ${holeRadiusPx.toStringAsFixed(1)} px');
+      debugPrint('Área esperada: ${holeAreaExpected.toStringAsFixed(0)} px² '
+          '(individual: ${minArea.toStringAsFixed(0)} - ${maxAreaSingle.toStringAsFixed(0)}, '
+          'grupo: hasta ${maxAreaGroup.toStringAsFixed(0)})');
+
+      // ================================================================
+      // DOBLE UMBRALIZACIÓN:
+      // Pass 0: Adaptativo estándar (impactos en zona clara)
+      // Pass 1: Adaptativo con blockSize grande (impactos en zona oscura)
+      // ================================================================
+      final impacts = <Map<String, double>>[];
+      final foundPositions = <List<double>>[]; // Para evitar duplicados
+
+      final maxDianaRadius = ringRadii.isNotEmpty
+          ? ringRadii.last + spacingPx
+          : (rows < cols ? rows : cols) * 0.48;
+
+      morphK = cv.getStructuringElement(cv.MORPH_ELLIPSE, (3, 3));
+
+      // Configuración de las dos pasadas
+      final passConfigs = [
+        {'name': 'Estándar', 'blockSize': 21, 'C': 10.0},
+        {'name': 'Amplio', 'blockSize': 51, 'C': 12.0},  // blockSize grande para zonas oscuras
+      ];
+
+      // Almacenar candidatos cercanos para debug
+      final nearMisses = <Map<String, dynamic>>[];
+
+      for (int pass = 0; pass < passConfigs.length; pass++) {
+        final config = passConfigs[pass];
+        final passName = config['name'] as String;
+        final blockSize = config['blockSize'] as int;
+        final cValue = config['C'] as double;
+
+        cv.Mat? passThresh, passCleaned;
+        try {
+          passThresh = cv.adaptiveThreshold(
+            blurred, 255.0,
+            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv.THRESH_BINARY_INV,
+            blockSize,
+            cValue,
+          );
+
+          passCleaned = cv.morphologyEx(passThresh, cv.MORPH_CLOSE, morphK);
+
+          final contResult = cv.findContours(
+            passCleaned, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE,
+          );
+          final contours = contResult.$1;
+          final hierarchy = contResult.$2;
+
+          debugPrint('Pass $pass ($passName, block=$blockSize, C=$cValue): '
+              '${contours.length} contornos');
+
+          int rejected_area = 0, rejected_pos = 0;
+          int rejected_circ = 0, rejected_border = 0, rejected_dup = 0;
+
+          for (int i = 0; i < contours.length; i++) {
+            final contour = contours[i];
+            final area = cv.contourArea(contour);
+
+            // Filtro 1: Tamaño
+            if (area < minArea || area > maxAreaGroup) {
+              // Contornos "casi" válidos para debug
+              if (area >= minArea * 0.3 && area <= maxAreaGroup * 2.0) {
+                rejected_area++;
+              }
+              continue;
+            }
+
+            // Centroide
+            double sumX = 0, sumY = 0;
+            for (int j = 0; j < contour.length; j++) {
+              sumX += contour[j].x;
+              sumY += contour[j].y;
+            }
+            final cx = sumX / contour.length;
+            final cy = sumY / contour.length;
+
+            // Filtro 2: Dentro de la diana
+            final distToCenter = _distance(cx, cy, center.dx, center.dy);
+            if (distToCenter > maxDianaRadius) {
+              rejected_pos++;
+              continue;
+            }
+
+            // Filtro 3: Circularidad
+            final perimeter = cv.arcLength(contour, true);
+            if (perimeter <= 0) continue;
+            final circularity = (4.0 * math.pi * area) / (perimeter * perimeter);
+
+            final isGroup = area > maxAreaSingle;
+            if (!isGroup && circularity < 0.3) {
+              rejected_circ++;
+              // Guardar near-miss para debug
+              if (circularity >= 0.15 && nearMisses.length < 5) {
+                nearMisses.add({
+                  'pass': passName,
+                  'reason': 'circ',
+                  'x': cx, 'y': cy,
+                  'area': area,
+                  'circ': circularity,
+                  'dist': distToCenter,
+                });
+              }
+              continue;
+            }
+            if (isGroup && circularity < 0.15) {
+              rejected_circ++;
+              continue;
+            }
+
+            // Filtro 4: Borde imagen
+            if (cx < 5 || cx > cols - 5 || cy < 5 || cy > rows - 5) {
+              rejected_border++;
+              continue;
+            }
+
+            // Filtro 5: No duplicar
+            bool isDuplicate = false;
+            for (final pos in foundPositions) {
+              if (_distance(cx, cy, pos[0], pos[1]) < holeRadiusPx * 2) {
+                isDuplicate = true;
+                break;
+              }
+            }
+            if (isDuplicate) {
+              rejected_dup++;
+              continue;
+            }
+
+            if (!isGroup) {
+              final radius = math.sqrt(area / math.pi);
+              impacts.add({
+                'x': cx,
+                'y': cy,
+                'r': radius,
+                'circularity': circularity,
+                'distToCenter': distToCenter,
+              });
+              foundPositions.add([cx, cy]);
+              debugPrint('  [$passName] Impacto: '
+                  '(${cx.toStringAsFixed(0)}, ${cy.toStringAsFixed(0)}) '
+                  'r=${radius.toStringAsFixed(1)} area=${area.toStringAsFixed(0)} '
+                  'circ=${circularity.toStringAsFixed(2)} '
+                  'dist=${distToCenter.toStringAsFixed(0)}');
+            } else {
+              debugPrint('  [$passName] Grupo: area=${area.toStringAsFixed(0)} '
+                  '(${(area / holeAreaExpected).toStringAsFixed(1)}x esperada) '
+                  'circ=${circularity.toStringAsFixed(2)}');
+
+              final separated = _separateGroupedImpacts(
+                passCleaned, contour, contours, i,
+                holeRadiusPx, holeAreaExpected,
+                center, maxDianaRadius,
+                rows, cols,
+              );
+
+              // Verificar que el GRUPO (como bloque) no es duplicado de otro pass.
+              // Usamos el centroide del grupo, no los impactos individuales.
+              bool groupDup = false;
+              for (final pos in foundPositions) {
+                if (_distance(cx, cy, pos[0], pos[1]) < holeRadiusPx * 2) {
+                  groupDup = true;
+                  break;
+                }
+              }
+              if (!groupDup) {
+                // Añadir TODOS los impactos del grupo sin deduplicar entre ellos
+                impacts.addAll(separated);
+                // Registrar solo el centroide del grupo para deduplicación entre passes
+                foundPositions.add([cx, cy]);
+                debugPrint('    → ${separated.length} impactos del grupo');
+              } else {
+                rejected_dup++;
+                debugPrint('    → Grupo duplicado (ya detectado en pass anterior)');
+              }
+            }
+          }
+
+          hierarchy.dispose();
+
+          debugPrint('  [$passName] Rechazados → area: $rejected_area, '
+              'pos: $rejected_pos, circ: $rejected_circ, '
+              'borde: $rejected_border, dup: $rejected_dup');
+
+        } finally {
+          passThresh?.dispose();
+          passCleaned?.dispose();
+        }
+      }
+
+      // Mostrar near-misses para debug
+      if (nearMisses.isNotEmpty) {
+        debugPrint('Near-misses (casi válidos):');
+        for (final nm in nearMisses) {
+          debugPrint('  [${nm['pass']}] (${(nm['x'] as double).toStringAsFixed(0)}, '
+              '${(nm['y'] as double).toStringAsFixed(0)}) '
+              'area=${(nm['area'] as double).toStringAsFixed(0)} '
+              'circ=${(nm['circ'] as double).toStringAsFixed(2)} '
+              'razón: ${nm['reason']}');
+        }
+      }
+
+      // Ordenar por distancia al centro (más cercano primero = mejor puntuación)
+      impacts.sort((a, b) => a['distToCenter']!.compareTo(b['distToCenter']!));
+
+      return {
+        'impacts': impacts,
+        'scale': scale,
+        'holeRadiusPx': holeRadiusPx,
+        'message': '${impacts.length} impactos detectados',
+      };
+    } catch (e) {
+      debugPrint('OpenCV detectImpacts error: $e');
+      return {
+        'impacts': <Map<String, double>>[],
+        'message': 'Error: $e',
+      };
+    } finally {
+      src?.dispose();
+      gray?.dispose();
+      blurred?.dispose();
+      morphK?.dispose();
+    }
+  }
+
+  /// Separa un contorno grande (grupo de impactos solapados) en impactos
+  /// individuales usando distanceTransform.
+  ///
+  /// Crea una máscara con el contorno, aplica distanceTransform,
+  /// umbraliza para encontrar los "picos" (centros de cada agujero)
+  /// y devuelve las posiciones individuales.
+  static List<Map<String, double>> _separateGroupedImpacts(
+    cv.Mat binaryImage,
+    cv.VecPoint contour,
+    cv.VecVecPoint allContours,
+    int contourIdx,
+    double holeRadiusPx,
+    double holeAreaExpected,
+    Offset dianaCenter,
+    double maxDianaRadius,
+    int rows,
+    int cols,
+  ) {
+    cv.Mat? mask, distMap, distLabels, distThresh;
+
+    try {
+      // 1. Crear máscara con solo este contorno (relleno)
+      mask = cv.Mat.zeros(rows, cols, cv.MatType.CV_8UC1);
+      cv.drawContours(
+        mask, allContours, contourIdx,
+        cv.Scalar(255, 255, 255),
+        thickness: -1, // Relleno
+      );
+
+      // 2. Aplicar distanceTransform
+      // Cada píxel obtiene su distancia al borde más cercano
+      // Los centros de los agujeros tendrán valores altos
+      final dtResult = cv.distanceTransform(
+        mask,
+        cv.DIST_L2,   // Distancia euclidiana
+        5,             // Máscara 5x5
+        0,             // DIST_LABEL_CCOMP
+      );
+      distMap = dtResult.$1;
+      distLabels = dtResult.$2;
+
+      // Estimar N por área.
+      // Cuando los impactos se solapan mucho, el área combinada es menor
+      // que N * áreaEsperada. Con 50% de solapamiento típico entre 2 agujeros,
+      // el área combinada es ~1.5x en vez de 2.0x. Usamos factor de corrección.
+      final contourArea = cv.contourArea(contour);
+      final areaRatio = contourArea / holeAreaExpected;
+      // Factor de solapamiento: asumir ~40% solapamiento entre impactos adyacentes
+      // Para N impactos con 40% solapamiento: área ≈ esperada * (1 + 0.6*(N-1))
+      // Despejando N: N ≈ 1 + (areaRatio - 1) / 0.6
+      final expectedN = (1 + (areaRatio - 1) / 0.6).ceil().clamp(2, 7);
+      debugPrint('    Grupo: areaRatio=${areaRatio.toStringAsFixed(2)} '
+          '→ estimado $expectedN impactos (con corrección solapamiento)');
+
+      // 3. Intentar separar con umbrales decrecientes
+      // Empezar con umbral bajo para poder separar impactos muy solapados
+      final results = <Map<String, double>>[];
+
+      for (final threshFactor in [0.30, 0.25, 0.20]) {
+        results.clear();
+        final peakThreshold = holeRadiusPx * threshFactor;
+
+        distThresh?.dispose();
+        distThresh = cv.threshold(distMap, peakThreshold, 255, cv.THRESH_BINARY).$2;
+
+        final distThresh8 = distThresh!.convertTo(cv.MatType.CV_8UC1);
+
+        // Erosionar ligeramente para separar picos pegados
+        final erodeK = cv.getStructuringElement(cv.MORPH_ELLIPSE, (3, 3));
+        final eroded = cv.erode(distThresh8, erodeK);
+
+        final peakResult = cv.findContours(
+          eroded, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE,
+        );
+        final peaks = peakResult.$1;
+        final peakHierarchy = peakResult.$2;
+
+        for (int p = 0; p < peaks.length; p++) {
+          final peak = peaks[p];
+          final peakArea = cv.contourArea(peak);
+          if (peakArea < 1) continue;
+
+          double px = 0, py = 0;
+          for (int k = 0; k < peak.length; k++) {
+            px += peak[k].x;
+            py += peak[k].y;
+          }
+          px /= peak.length;
+          py /= peak.length;
+
+          final dist = _distance(px, py, dianaCenter.dx, dianaCenter.dy);
+          if (dist > maxDianaRadius) continue;
+
+          results.add({
+            'x': px,
+            'y': py,
+            'r': holeRadiusPx,
+            'circularity': 1.0,
+            'distToCenter': dist,
+          });
+        }
+
+        peakHierarchy.dispose();
+        erodeK.dispose();
+        eroded.dispose();
+        distThresh8.dispose();
+
+        debugPrint('    distTransform umbral=${threshFactor}: ${results.length} picos '
+            '(esperados ~$expectedN)');
+
+        // Si encontramos al menos 2 picos, aceptar
+        if (results.length >= 2) break;
+      }
+
+      // Si distanceTransform no separó bien, generar posiciones por área
+      if (results.length < 2) {
+        results.clear();
+        // Calcular centroide del grupo
+        double cx = 0, cy = 0;
+        for (int k = 0; k < contour.length; k++) {
+          cx += contour[k].x;
+          cy += contour[k].y;
+        }
+        cx /= contour.length;
+        cy /= contour.length;
+
+        // Distribuir N impactos alrededor del centroide en un patrón circular
+        final spreadRadius = holeRadiusPx * 0.3; // Ligero offset entre impactos
+        for (int n = 0; n < expectedN; n++) {
+          final angle = (n * 2 * math.pi) / expectedN;
+          final px = cx + spreadRadius * math.cos(angle);
+          final py = cy + spreadRadius * math.sin(angle);
+          final dist = _distance(px, py, dianaCenter.dx, dianaCenter.dy);
+
+          results.add({
+            'x': px,
+            'y': py,
+            'r': holeRadiusPx,
+            'circularity': 1.0,
+            'distToCenter': dist,
+          });
+        }
+        debugPrint('    Fallback: $expectedN impactos distribuidos en centroide');
+      }
+
+      return results;
+    } catch (e) {
+      debugPrint('Error separando grupo: $e');
+      return [];
+    } finally {
+      mask?.dispose();
+      distMap?.dispose();
+      distLabels?.dispose();
+      distThresh?.dispose();
     }
   }
 
