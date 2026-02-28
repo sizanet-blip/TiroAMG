@@ -17,6 +17,38 @@ class EntrenamientoService {
         mapaDisparo['id_sesion'] = idSesionGenerado;
         await txn.insert('Disparos', mapaDisparo);
       }
+
+      if (sesion.idMunicion != null && disparos.isNotEmpty) {
+        final uso = disparos.length;
+        final res = await txn.query(
+          'Municion',
+          columns: ['cantidad_actual'],
+          where: 'id = ?',
+          whereArgs: [sesion.idMunicion],
+          limit: 1,
+        );
+        if (res.isNotEmpty) {
+          final actual = (res.first['cantidad_actual'] as num?)?.toInt() ?? 0;
+          final usoReal = uso > actual ? actual : uso;
+          if (usoReal > 0) {
+            await txn.rawUpdate('''
+              UPDATE Municion
+              SET
+                cantidad_actual = cantidad_actual - ?,
+                total_disparada = total_disparada + ?
+              WHERE id = ?
+            ''', [usoReal, usoReal, sesion.idMunicion]);
+
+            await txn.insert('MovimientosMunicion', {
+              'id_municion': sesion.idMunicion,
+              'tipo': 'uso',
+              'cantidad': usoReal,
+              'fecha': DateTime.now().toIso8601String(),
+              'nota': 'Sesion $idSesionGenerado',
+            });
+          }
+        }
+      }
     });
   }
   
@@ -26,6 +58,15 @@ class EntrenamientoService {
     required int nuevoIdEquipo,
     required String nuevasNotas,
     required String nuevoLugar,
+    int? distanciaMetros,
+    String? posicionTiro,
+    bool? esInterior,
+    double? temperaturaC,
+    double? humedadPct,
+    double? presionHpa,
+    double? vientoMs,
+    String? vientoDireccion,
+    String? iluminacion,
   }) async {
     final db = await dbProvider.database;
     await db.update(
@@ -33,7 +74,16 @@ class EntrenamientoService {
       {
         'id_equipo': nuevoIdEquipo,
         'nota': nuevasNotas,
-        'lugar': nuevoLugar
+        'lugar': nuevoLugar,
+        'distancia_m': distanciaMetros,
+        'posicion_tiro': posicionTiro,
+        'es_interior': esInterior == null ? null : (esInterior ? 1 : 0),
+        'temperatura_c': temperaturaC,
+        'humedad_pct': humedadPct,
+        'presion_hpa': presionHpa,
+        'viento_ms': vientoMs,
+        'viento_direccion': vientoDireccion,
+        'iluminacion': iluminacion,
       },
       where: 'id = ?',
       whereArgs: [idSesion]
@@ -47,6 +97,15 @@ class EntrenamientoService {
     required int nuevoIdEquipo,
     required String nuevasNotas,
     required String nuevoLugar,
+    int? distanciaMetros,
+    String? posicionTiro,
+    bool? esInterior,
+    double? temperaturaC,
+    double? humedadPct,
+    double? presionHpa,
+    double? vientoMs,
+    String? vientoDireccion,
+    String? iluminacion,
   }) async {
     final db = await dbProvider.database;
     String fechaStr = fecha.toIso8601String().substring(0, 10);
@@ -56,7 +115,16 @@ class EntrenamientoService {
       {
         'id_equipo': nuevoIdEquipo,
         'nota': nuevasNotas,
-        'lugar': nuevoLugar
+        'lugar': nuevoLugar,
+        'distancia_m': distanciaMetros,
+        'posicion_tiro': posicionTiro,
+        'es_interior': esInterior == null ? null : (esInterior ? 1 : 0),
+        'temperatura_c': temperaturaC,
+        'humedad_pct': humedadPct,
+        'presion_hpa': presionHpa,
+        'viento_ms': vientoMs,
+        'viento_direccion': vientoDireccion,
+        'iluminacion': iluminacion,
       },
       where: 'id_modalidad = ? AND fecha LIKE ?',
       whereArgs: [idModalidad, '$fechaStr%']
@@ -68,12 +136,15 @@ class EntrenamientoService {
     final db = await dbProvider.database;
     final res = await db.rawQuery('''
       SELECT 
-        s.id, s.fecha, s.nota, s.lugar,
+        s.id, s.fecha, s.nota, s.lugar, s.id_municion,
+        m.marca AS marca_municion,
+        m.lote AS lote_municion,
         e.nombre AS nombre_equipo, p.nombre_disciplina AS titulo,
         COALESCE(SUM(d.puntuacion), 0) as total_puntos,
         COALESCE(SUM(CASE WHEN d.es_mosca = 1 THEN 1 ELSE 0 END), 0) as total_moscas
       FROM Sesiones s
       LEFT JOIN Equipos e ON s.id_equipo = e.id
+      LEFT JOIN Municion m ON s.id_municion = m.id
       LEFT JOIN PlantillasTiempos p ON s.id_plantilla_tiempos = p.id
       LEFT JOIN Disparos d ON s.id = d.id_sesion
       WHERE s.id_modalidad IS NULL
@@ -92,6 +163,9 @@ class EntrenamientoService {
         MAX(s.fecha) as fecha_completa,
         e.nombre AS nombre_equipo,
         m.nombre AS titulo_torneo,
+        MAX(s.id_municion) as id_municion,
+        MAX(mu.marca) as marca_municion,
+        MAX(mu.lote) as lote_municion,
         MAX(s.lugar) as lugar,
         MAX(s.nota) as nota,
         COALESCE(SUM(CASE WHEN s.nota NOT LIKE '%Ensayo%' THEN d.puntuacion ELSE 0 END), 0) as total_puntos,
@@ -100,6 +174,7 @@ class EntrenamientoService {
       FROM Sesiones s
       JOIN Modalidades m ON s.id_modalidad = m.id
       LEFT JOIN Equipos e ON s.id_equipo = e.id
+      LEFT JOIN Municion mu ON s.id_municion = mu.id
       LEFT JOIN Disparos d ON s.id = d.id_sesion
       WHERE s.id_modalidad IS NOT NULL
       GROUP BY m.id, fecha_dia
@@ -123,13 +198,16 @@ class EntrenamientoService {
 
     final res = await db.rawQuery('''
       SELECT 
-        s.id, s.fecha, s.nota, s.lugar,
+        s.id, s.fecha, s.nota, s.lugar, s.id_municion,
+        m.marca AS marca_municion,
+        m.lote AS lote_municion,
         e.nombre AS nombre_equipo,
         p.nombre_disciplina AS titulo,
         COALESCE(SUM(d.puntuacion), 0) as total_puntos,
         COALESCE(SUM(CASE WHEN d.es_mosca = 1 THEN 1 ELSE 0 END), 0) as total_moscas
       FROM Sesiones s
       LEFT JOIN Equipos e ON s.id_equipo = e.id
+      LEFT JOIN Municion m ON s.id_municion = m.id
       LEFT JOIN PlantillasTiempos p ON s.id_plantilla_tiempos = p.id
       LEFT JOIN Disparos d ON s.id = d.id_sesion
       WHERE s.id_modalidad = ? AND s.fecha LIKE ?

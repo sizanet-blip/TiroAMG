@@ -11,6 +11,7 @@ import '../services/catalogo_service.dart';
 import '../services/equipo_service.dart';
 import '../services/pdf_service.dart';
 import '../services/perfil_service.dart';
+import '../services/municion_service.dart';
 import 'estadisticas_screen.dart'; // <--- IMPORTANTE: Para navegar a estadísticas
 
 class SesionDetalleScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
   final _equipoService = EquipoService();
   final _pdfService = PdfService();
   final _perfilService = PerfilService();
+  final _municionService = MunicionService();
   
   final ScrollController _scrollController = ScrollController();
 
@@ -39,6 +41,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
 
   // Datos extra
   EquipoDetalle? _equipoDetalle;
+  MunicionDetalle? _municionDetalle;
 
   // Configuración Diana
   int _valorMinimo = 1;
@@ -69,6 +72,12 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
       _equipoDetalle = listEquipos.firstWhere((e) => e.id == sesion.idEquipo);
     } catch(e) {}
 
+    if (sesion.idMunicion != null) {
+      _municionDetalle = await _municionService.obtenerDetallePorId(sesion.idMunicion!);
+    } else {
+      _municionDetalle = null;
+    }
+
     if (plantilla != null && plantilla.idTipoDiana != null) {
       final dianas = await _catalogoService.obtenerTiposDiana();
       try {
@@ -94,6 +103,36 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
     }
   }
 
+  int? _parseInt(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return null;
+    return int.tryParse(v);
+  }
+
+  double? _parseDouble(String value) {
+    final v = value.trim().replaceAll(',', '.');
+    if (v.isEmpty) return null;
+    return double.tryParse(v);
+  }
+
+  String _buildCondicionesTexto() {
+    if (_sesion == null) return '';
+    final s = _sesion!;
+    final parts = <String>[];
+    if (s.distanciaMetros != null) parts.add('${s.distanciaMetros}m');
+    if (s.posicionTiro != null && s.posicionTiro!.isNotEmpty) parts.add('Posición: ${s.posicionTiro}');
+    if (s.esInterior != null) parts.add(s.esInterior! ? 'Interior' : 'Exterior');
+    if (s.iluminacion != null && s.iluminacion!.isNotEmpty) parts.add('Luz: ${s.iluminacion}');
+    if (s.temperaturaC != null) parts.add('T: ${s.temperaturaC!.toStringAsFixed(1)}°C');
+    if (s.humedadPct != null) parts.add('H: ${s.humedadPct!.toStringAsFixed(0)}%');
+    if (s.presionHpa != null) parts.add('P: ${s.presionHpa!.toStringAsFixed(0)} hPa');
+    if (s.vientoMs != null) {
+      final dir = (s.vientoDireccion == null || s.vientoDireccion!.isEmpty) ? '' : ' ${s.vientoDireccion}';
+      parts.add('V: ${s.vientoMs!.toStringAsFixed(1)} m/s$dir');
+    }
+    return parts.join(' | ');
+  }
+
   void _editarDatosSesion() async {
     final equipos = await _equipoService.obtenerEquiposDetallados();
     
@@ -105,6 +144,15 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
 
     final lugarCtrl = TextEditingController(text: _sesion?.lugar ?? "");
     final notasCtrl = TextEditingController(text: _sesion?.nota ?? "");
+    final distanciaCtrl = TextEditingController(text: _sesion?.distanciaMetros?.toString() ?? "");
+    final tempCtrl = TextEditingController(text: _sesion?.temperaturaC?.toString() ?? "");
+    final humedadCtrl = TextEditingController(text: _sesion?.humedadPct?.toString() ?? "");
+    final presionCtrl = TextEditingController(text: _sesion?.presionHpa?.toString() ?? "");
+    final vientoCtrl = TextEditingController(text: _sesion?.vientoMs?.toString() ?? "");
+    final vientoDirCtrl = TextEditingController(text: _sesion?.vientoDireccion ?? "");
+    String? posicionTemp = _sesion?.posicionTiro;
+    String? iluminacionTemp = _sesion?.iluminacion;
+    bool interiorTemp = _sesion?.esInterior ?? true;
 
     if (!mounted) return;
 
@@ -132,6 +180,75 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                   ),
                   const SizedBox(height: 15),
                   TextField(
+                    controller: distanciaCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Distancia (m)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      const Text('Interior'),
+                      Switch(
+                        value: interiorTemp,
+                        onChanged: (v) => setStateDialog(() => interiorTemp = v),
+                      ),
+                      Text(interiorTemp ? 'Si' : 'No'),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  DropdownButtonFormField<String>(
+                    value: posicionTemp,
+                    decoration: const InputDecoration(labelText: 'Posicion de tiro', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'Pie', child: Text('Pie')),
+                      DropdownMenuItem(value: 'Rodilla', child: Text('Rodilla')),
+                      DropdownMenuItem(value: 'Tendido', child: Text('Tendido')),
+                      DropdownMenuItem(value: 'Banco', child: Text('Banco')),
+                    ],
+                    onChanged: (v) => setStateDialog(() => posicionTemp = v),
+                  ),
+                  const SizedBox(height: 15),
+                  DropdownButtonFormField<String>(
+                    value: iluminacionTemp,
+                    decoration: const InputDecoration(labelText: 'Iluminacion', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'Artificial', child: Text('Artificial')),
+                      DropdownMenuItem(value: 'Natural', child: Text('Natural')),
+                      DropdownMenuItem(value: 'Mixta', child: Text('Mixta')),
+                    ],
+                    onChanged: (v) => setStateDialog(() => iluminacionTemp = v),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: tempCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Temperatura (°C)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: humedadCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Humedad (%)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: presionCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Presion (hPa)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: vientoCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Viento (m/s)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: vientoDirCtrl,
+                    decoration: const InputDecoration(labelText: 'Direccion del viento', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
                     controller: notasCtrl,
                     decoration: const InputDecoration(labelText: 'Observaciones', border: OutlineInputBorder()),
                     maxLines: 2,
@@ -147,7 +264,20 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                 onPressed: () async {
                   Navigator.pop(ctx);
-                  await _guardarCambiosEnBD(equipoTemp, notasCtrl.text, lugarCtrl.text);
+                  await _guardarCambiosEnBD(
+                    equipoTemp,
+                    notasCtrl.text,
+                    lugarCtrl.text,
+                    distanciaMetros: _parseInt(distanciaCtrl.text),
+                    posicionTiro: posicionTemp,
+                    esInterior: interiorTemp,
+                    temperaturaC: _parseDouble(tempCtrl.text),
+                    humedadPct: _parseDouble(humedadCtrl.text),
+                    presionHpa: _parseDouble(presionCtrl.text),
+                    vientoMs: _parseDouble(vientoCtrl.text),
+                    vientoDireccion: vientoDirCtrl.text.trim().isEmpty ? null : vientoDirCtrl.text.trim(),
+                    iluminacion: iluminacionTemp,
+                  );
                 },
               )
             ],
@@ -157,7 +287,20 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
     );
   }
 
-  Future<void> _guardarCambiosEnBD(EquipoDetalle? nuevoEquipo, String nuevasNotas, String nuevoLugar) async {
+  Future<void> _guardarCambiosEnBD(
+    EquipoDetalle? nuevoEquipo,
+    String nuevasNotas,
+    String nuevoLugar, {
+    int? distanciaMetros,
+    String? posicionTiro,
+    bool? esInterior,
+    double? temperaturaC,
+    double? humedadPct,
+    double? presionHpa,
+    double? vientoMs,
+    String? vientoDireccion,
+    String? iluminacion,
+  }) async {
     if (nuevoEquipo == null || _sesion == null) return;
     setState(() => _cargando = true);
 
@@ -165,7 +308,16 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
       idSesion: _sesion!.id!,
       nuevoIdEquipo: nuevoEquipo.id,
       nuevasNotas: nuevasNotas,
-      nuevoLugar: nuevoLugar
+      nuevoLugar: nuevoLugar,
+      distanciaMetros: distanciaMetros,
+      posicionTiro: posicionTiro,
+      esInterior: esInterior,
+      temperaturaC: temperaturaC,
+      humedadPct: humedadPct,
+      presionHpa: presionHpa,
+      vientoMs: vientoMs,
+      vientoDireccion: vientoDireccion,
+      iluminacion: iluminacion,
     );
 
     _cargarDatosCompletos();
@@ -181,7 +333,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
       disparos: _disparos,
       plantilla: _plantilla!,
       equipo: _equipoDetalle,
-      municion: null, 
+      municion: _municionDetalle,
       valorMinimo: _valorMinimo,
       anilloNegro: _anilloNegroInicio,
       esFondoNegro: _esFondoNegro,
@@ -191,6 +343,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
       perfil: perfil,
       lugar: _sesion!.lugar,
       observaciones: _sesion!.nota,
+      condicionesTexto: _buildCondicionesTexto(),
     );
   }
 
@@ -252,8 +405,21 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                       const SizedBox(height: 5),
                       if (_equipoDetalle != null)
                         Row(children: [const Icon(Icons.hardware, size: 14, color: Colors.grey), const SizedBox(width: 5), Text(_equipoDetalle!.nombre, style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w500))]),
+                      if (_municionDetalle != null)
+                        Row(children: [const Icon(Icons.local_fire_department, size: 14, color: Colors.grey), const SizedBox(width: 5), Text('${_municionDetalle!.marca} (${_municionDetalle!.lote})', style: const TextStyle(color: Colors.black87, fontSize: 13))]),
                       if (_sesion?.lugar != null && _sesion!.lugar!.isNotEmpty)
                         Row(children: [const Icon(Icons.place, size: 14, color: Colors.grey), const SizedBox(width: 5), Text(_sesion!.lugar!, style: const TextStyle(color: Colors.black87, fontSize: 13))]),
+                      if (_sesion?.distanciaMetros != null)
+                        Row(children: [const Icon(Icons.straighten, size: 14, color: Colors.grey), const SizedBox(width: 5), Text('${_sesion!.distanciaMetros} m', style: const TextStyle(color: Colors.black87, fontSize: 13))]),
+                      if (_sesion?.temperaturaC != null || _sesion?.humedadPct != null || _sesion?.vientoMs != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Met: ${_sesion?.temperaturaC?.toStringAsFixed(1) ?? '-'}°C | '
+                          'Hum: ${_sesion?.humedadPct?.toStringAsFixed(0) ?? '-'}% | '
+                          'Viento: ${_sesion?.vientoMs?.toStringAsFixed(1) ?? '-'} m/s ${_sesion?.vientoDireccion ?? ''}',
+                          style: const TextStyle(color: Colors.black54, fontSize: 12),
+                        ),
+                      ],
                       if (_sesion?.nota != null && _sesion!.nota!.isNotEmpty) ...[
                         const SizedBox(height: 5),
                         Text(_sesion!.nota!, style: const TextStyle(color: Colors.blueGrey, fontSize: 12, fontStyle: FontStyle.italic), maxLines: 3, overflow: TextOverflow.ellipsis),

@@ -16,6 +16,16 @@ class SesionDisparoScreen extends StatefulWidget {
   final EquipoDetalle equipo;
   final PlantillaTiempos plantilla;
   final MunicionDetalle? municion;
+  final String? lugar;
+  final int? distanciaMetros;
+  final String? posicionTiro;
+  final bool? esInterior;
+  final double? temperaturaC;
+  final double? humedadPct;
+  final double? presionHpa;
+  final double? vientoMs;
+  final String? vientoDireccion;
+  final String? iluminacion;
   
   final String? tituloSerie;
   final int? numeroSerie;
@@ -27,6 +37,16 @@ class SesionDisparoScreen extends StatefulWidget {
     required this.equipo,
     required this.plantilla,
     this.municion,
+    this.lugar,
+    this.distanciaMetros,
+    this.posicionTiro,
+    this.esInterior,
+    this.temperaturaC,
+    this.humedadPct,
+    this.presionHpa,
+    this.vientoMs,
+    this.vientoDireccion,
+    this.iluminacion,
     this.tituloSerie,
     this.numeroSerie,
     this.totalSeries,
@@ -297,7 +317,18 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         fecha: DateTime.now(),
         idEquipo: widget.equipo.id,
         idPlantilla: widget.plantilla.id!,
-        nota: widget.municion != null ? "${widget.municion!.marca}" : null
+        idMunicion: widget.municion?.id,
+        nota: widget.municion != null ? "${widget.municion!.marca} (${widget.municion!.lote})" : null,
+        lugar: widget.lugar,
+        distanciaMetros: widget.distanciaMetros,
+        posicionTiro: widget.posicionTiro,
+        esInterior: widget.esInterior,
+        temperaturaC: widget.temperaturaC,
+        humedadPct: widget.humedadPct,
+        presionHpa: widget.presionHpa,
+        vientoMs: widget.vientoMs,
+        vientoDireccion: widget.vientoDireccion,
+        iluminacion: widget.iluminacion,
      );
      
      await _entrenamientoService.guardarSesionCompleta(sesion, _listaDisparos);

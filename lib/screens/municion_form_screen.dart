@@ -19,9 +19,11 @@ class _MunicionFormScreenState extends State<MunicionFormScreen> {
 
   final _marcaController = TextEditingController();
   final _loteController = TextEditingController();
+  final _cantidadController = TextEditingController(text: '0');
 
   List<Calibre> _calibres = [];
   int? _selectedCalibre;
+  Municion? _municionOriginal;
 
   @override
   void initState() {
@@ -39,8 +41,10 @@ class _MunicionFormScreenState extends State<MunicionFormScreen> {
       final item = await _municionService.obtenerPorId(widget.municionId!);
       if (item != null) {
         setState(() {
+          _municionOriginal = item;
           _marcaController.text = item.marca;
           _loteController.text = item.lote;
+          _cantidadController.text = item.cantidadActual.toString();
           _selectedCalibre = item.idCalibre;
         });
       }
@@ -49,11 +53,15 @@ class _MunicionFormScreenState extends State<MunicionFormScreen> {
 
   void _guardar() async {
     if (_formKey.currentState!.validate()) {
+      final cantidad = int.tryParse(_cantidadController.text) ?? 0;
       final nuevaMunicion = Municion(
         id: widget.municionId,
         marca: _marcaController.text,
         lote: _loteController.text,
         idCalibre: _selectedCalibre,
+        cantidadInicial: widget.municionId == null ? cantidad : (_municionOriginal?.cantidadInicial ?? 0),
+        cantidadActual: cantidad,
+        totalDisparada: _municionOriginal?.totalDisparada ?? 0,
       );
 
       if (widget.municionId == null) {
@@ -91,6 +99,21 @@ class _MunicionFormScreenState extends State<MunicionFormScreen> {
                 controller: _loteController,
                 decoration: const InputDecoration(labelText: 'Número de Lote', border: OutlineInputBorder()),
                 validator: (v) => v!.isEmpty ? 'Requerido' : null,
+              ),
+              const SizedBox(height: 20),
+
+              TextFormField(
+                controller: _cantidadController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Cantidad de cartuchos (stock actual)',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) {
+                  final n = int.tryParse(v ?? '');
+                  if (n == null || n < 0) return 'Introduce un numero valido';
+                  return null;
+                },
               ),
               const SizedBox(height: 20),
 

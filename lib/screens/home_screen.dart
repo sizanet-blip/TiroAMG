@@ -1,15 +1,223 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 // Importamos las pantallas de destino
 import 'competicion_screen.dart';
 import 'entrenamiento_screen.dart';
 import 'historial_screen.dart';
-import 'backup_screen.dart'; 
+import 'backup_screen.dart';
 import 'config_screen.dart';
-import 'recorte_diana_screen.dart'; 
+import 'recorte_diana_screen.dart';
 import 'package:flutter/foundation.dart'; // <--- Agrega esto para usar kDebugMode
+import 'package:package_info_plus/package_info_plus.dart';
+import '../services/app_update_service.dart';
+import '../services/license_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final AppUpdateService _updateService = const AppUpdateService();
+  final LicenseService _licenseService = const LicenseService();
+  final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+  bool _updateDialogShown = false;
+  bool _licenseDialogShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runStartupChecks());
+  }
+
+  Future<void> _runStartupChecks() async {
+    final ok = await _checkLicenseOnStart();
+    if (!ok || !mounted) return;
+    await _checkUpdatesOnStart();
+  }
+
+  Future<bool> _checkLicenseOnStart() async {
+    if (!mounted) return false;
+
+    final initialResult = await _licenseService.revisarLicencia();
+    if (!mounted) return false;
+
+    if (initialResult.esValida) {
+      if (initialResult.enGraciaOffline) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(initialResult.mensaje)),
+        );
+      }
+      return true;
+    }
+
+    if (_licenseDialogShown) return false;
+    _licenseDialogShown = true;
+    await _showLicenseDialog(initialResult.mensaje);
+    _licenseDialogShown = false;
+
+    final retryResult = await _licenseService.revisarLicencia(forzarServidor: true);
+    if (!mounted) return false;
+    if (retryResult.esValida) return true;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(retryResult.mensaje)),
+      );
+    }
+    return false;
+  }
+
+  Future<void> _checkUpdatesOnStart() async {
+    if (_updateDialogShown || !mounted) return;
+
+    final result = await _updateService.checkForUpdates();
+    if (!mounted) return;
+
+    if (result.hasUpdate && result.info != null) {
+      _updateDialogShown = true;
+      await _showUpdateDialog(result.info!, force: result.forceUpdate);
+    }
+  }
+
+  Future<void> _showUpdateDialog(AppUpdateInfo info,
+      {required bool force}) async {
+    final pkg = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !force,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(force
+              ? 'Actualización obligatoria'
+              : 'Nueva actualización disponible'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Versión actual: ${pkg.version}+${pkg.buildNumber}'),
+              Text('Versión nueva: ${info.latestVersion}+${info.latestBuild}'),
+              const SizedBox(height: 10),
+              if (info.changelog.isNotEmpty) ...[
+                const Text('Cambios:'),
+                const SizedBox(height: 6),
+                ...info.changelog.take(4).map((line) => Text('- $line')),
+              ],
+            ],
+          ),
+          actions: [
+            if (!force)
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Más tarde'),
+              ),
+            FilledButton(
+              onPressed: () async {
+                final opened = await _updateService.openDownloadUrl(info);
+                if (!ctx.mounted) return;
+                if (!opened) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                        content: Text('No se pudo abrir la descarga.')),
+                  );
+                }
+                if (!force && ctx.mounted) {
+                  Navigator.of(ctx).pop();
+                }
+              },
+              child: const Text('Actualizar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showLicenseDialog(String initialMessage) async {
+    final userController = TextEditingController();
+    String mensaje = initialMessage;
+    bool cargando = false;
+
+    if (!mounted) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Activar cuenta'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(mensaje),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: userController,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: cargando
+                      ? null
+                      : () async {
+                          final email = userController.text.trim();
+                          if (!_emailRegex.hasMatch(email)) {
+                            setStateDialog(() {
+                              mensaje =
+                                  'Introduce un email válido para activar tu cuenta.';
+                            });
+                            return;
+                          }
+                          setStateDialog(() => cargando = true);
+                          final res = await _licenseService.solicitarLicenciaAutomatica(
+                            identificadorUsuario: email,
+                            nombreApp: 'Tiro Deportivo AMG',
+                          );
+                          if (!ctx.mounted) return;
+                          setStateDialog(() {
+                            cargando = false;
+                            mensaje = res.mensaje;
+                          });
+                          if (res.esValida) {
+                            Navigator.of(ctx).pop();
+                          }
+                        },
+                  child: const Text('Activar'),
+                ),
+                if (!kIsWeb)
+                  TextButton(
+                    onPressed: cargando
+                        ? null
+                        : () {
+                            exit(0);
+                          },
+                    child: const Text('Salir'),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,10 +251,9 @@ class HomeScreen extends StatelessWidget {
                       'Registro de Tiro',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 26, 
-                        fontWeight: FontWeight.bold, 
-                        color: Colors.blueGrey
-                      ),
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey),
                     ),
                   ],
                 ),
@@ -55,29 +262,61 @@ class HomeScreen extends StatelessWidget {
               // --- BOTONES DEL MENÚ ---
               if (kDebugMode) ...[
                 // ** NUEVA OPCIÓN DE PRUEBAS (PRIMERA) **
-                _buildMenuItem(context, 'Recorte Diana (Pruebas)', Icons.camera_alt, Colors.deepOrange, 
-                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecorteDianaScreen()))
-                ),
+                _buildMenuItem(
+                    context,
+                    'Recorte Diana (Pruebas)',
+                    Icons.camera_alt,
+                    Colors.deepOrange,
+                    () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const RecorteDianaScreen()))),
               ],
-              _buildMenuItem(context, 'Competición', Icons.emoji_events, Colors.amber[700]!, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => CompeticionScreen()))
-              ),
+              _buildMenuItem(
+                  context,
+                  'Competición',
+                  Icons.emoji_events,
+                  Colors.amber[700]!,
+                  () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const CompeticionScreen()))),
 
-              _buildMenuItem(context, 'Entrenamiento', Icons.sports_baseball, Colors.teal, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => EntrenamientoScreen()))
-              ),
+              _buildMenuItem(
+                  context,
+                  'Entrenamiento',
+                  Icons.sports_baseball,
+                  Colors.teal,
+                  () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const EntrenamientoScreen()))),
 
-              _buildMenuItem(context, 'Historial y Análisis', Icons.analytics, Colors.indigo, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistorialScreen()))
-              ),
+              _buildMenuItem(
+                  context,
+                  'Historial y Análisis',
+                  Icons.analytics,
+                  Colors.indigo,
+                  () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const HistorialScreen()))),
 
-              _buildMenuItem(context, 'Copia de Seguridad', Icons.cloud_sync, Colors.blueGrey, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => BackupScreen()))
-              ),
+              _buildMenuItem(
+                  context,
+                  'Copia de Seguridad',
+                  Icons.cloud_sync,
+                  Colors.blueGrey,
+                  () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const BackupScreen()))),
 
-              _buildMenuItem(context, 'Configuración', Icons.settings, Colors.grey[700]!, 
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConfigScreen()))
-              ),
+              _buildMenuItem(
+                  context,
+                  'Configuración',
+                  Icons.settings,
+                  Colors.grey[700]!,
+                  () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ConfigScreen()))),
             ],
           ),
         ),
@@ -85,7 +324,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuItem(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildMenuItem(BuildContext context, String title, IconData icon,
+      Color color, VoidCallback onTap) {
     return Card(
       elevation: 4,
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -93,20 +333,24 @@ class HomeScreen extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        splashColor: color.withOpacity(0.1),
+        splashColor: color.withValues(alpha: 0.1),
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Row(
             children: <Widget>[
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle),
                 child: Icon(icon, size: 28, color: color),
               ),
               const SizedBox(width: 20),
               Expanded(
                 // Aquí quitamos la necesidad de que el título contenga la numeración
-                child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                child: Text(title,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w600)),
               ),
               const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
             ],

@@ -7,6 +7,7 @@ import '../services/entrenamiento_service.dart';
 import '../services/pdf_service.dart';
 import '../services/perfil_service.dart'; 
 import '../services/equipo_service.dart';
+import '../services/municion_service.dart';
 import 'sesion_detalle_screen.dart';
 import 'estadisticas_screen.dart'; // <--- NUEVO IMPORT
 
@@ -33,14 +34,41 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
   final _pdfService = PdfService();
   final _perfilService = PerfilService();
   final _equipoService = EquipoService();
+  final _municionService = MunicionService();
 
   List<SesionResumen> _fases = [];
   bool _cargando = true;
 
   // Datos editables del torneo
   EquipoDetalle? _equipoUsado;
+  MunicionDetalle? _municionUsada;
   String _notasGuardadas = "";
   String _lugarGuardado = ""; 
+  int? _distanciaMetros;
+  String? _posicionTiro;
+  bool _esInterior = true;
+  double? _temperaturaC;
+  double? _humedadPct;
+  double? _presionHpa;
+  double? _vientoMs;
+  String? _vientoDireccion;
+  String? _iluminacion;
+
+  String _buildCondicionesTexto() {
+    final parts = <String>[];
+    if (_distanciaMetros != null) parts.add('${_distanciaMetros}m');
+    if (_posicionTiro != null && _posicionTiro!.isNotEmpty) parts.add('Posición: $_posicionTiro');
+    parts.add(_esInterior ? 'Interior' : 'Exterior');
+    if (_iluminacion != null && _iluminacion!.isNotEmpty) parts.add('Luz: $_iluminacion');
+    if (_temperaturaC != null) parts.add('T: ${_temperaturaC!.toStringAsFixed(1)}°C');
+    if (_humedadPct != null) parts.add('H: ${_humedadPct!.toStringAsFixed(0)}%');
+    if (_presionHpa != null) parts.add('P: ${_presionHpa!.toStringAsFixed(0)} hPa');
+    if (_vientoMs != null) {
+      final dir = (_vientoDireccion == null || _vientoDireccion!.isEmpty) ? '' : ' $_vientoDireccion';
+      parts.add('V: ${_vientoMs!.toStringAsFixed(1)} m/s$dir');
+    }
+    return parts.join(' | ');
+  }
 
   @override
   void initState() {
@@ -54,6 +82,15 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
     EquipoDetalle? equipoDetectado;
     String notasDetectadas = "";
     String lugarDetectado = "";
+    int? distanciaDetectada;
+    String? posicionDetectada;
+    bool interiorDetectado = true;
+    double? temperaturaDetectada;
+    double? humedadDetectada;
+    double? presionDetectada;
+    double? vientoDetectado;
+    String? vientoDirDetectada;
+    String? iluminacionDetectada;
 
     if (datos.isNotEmpty) {
       int idSesion = datos.first.id;
@@ -68,6 +105,18 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
             notasDetectadas = sesionFull.nota!;
         }
         lugarDetectado = sesionFull.lugar ?? "";
+        if (sesionFull.idMunicion != null) {
+          _municionUsada = await _municionService.obtenerDetallePorId(sesionFull.idMunicion!);
+        }
+        distanciaDetectada = sesionFull.distanciaMetros;
+        posicionDetectada = sesionFull.posicionTiro;
+        interiorDetectado = sesionFull.esInterior ?? true;
+        temperaturaDetectada = sesionFull.temperaturaC;
+        humedadDetectada = sesionFull.humedadPct;
+        presionDetectada = sesionFull.presionHpa;
+        vientoDetectado = sesionFull.vientoMs;
+        vientoDirDetectada = sesionFull.vientoDireccion;
+        iluminacionDetectada = sesionFull.iluminacion;
       }
     }
 
@@ -77,9 +126,30 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
         _equipoUsado = equipoDetectado;
         _notasGuardadas = notasDetectadas;
         _lugarGuardado = lugarDetectado;
+        _distanciaMetros = distanciaDetectada;
+        _posicionTiro = posicionDetectada;
+        _esInterior = interiorDetectado;
+        _temperaturaC = temperaturaDetectada;
+        _humedadPct = humedadDetectada;
+        _presionHpa = presionDetectada;
+        _vientoMs = vientoDetectado;
+        _vientoDireccion = vientoDirDetectada;
+        _iluminacion = iluminacionDetectada;
         _cargando = false;
       });
     }
+  }
+
+  int? _parseInt(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return null;
+    return int.tryParse(v);
+  }
+
+  double? _parseDouble(String value) {
+    final v = value.trim().replaceAll(',', '.');
+    if (v.isEmpty) return null;
+    return double.tryParse(v);
   }
 
   void _editarDatosTorneo() async {
@@ -95,6 +165,15 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
     
     final lugarCtrl = TextEditingController(text: _lugarGuardado);
     final notasCtrl = TextEditingController(text: _notasGuardadas);
+    final distanciaCtrl = TextEditingController(text: _distanciaMetros?.toString() ?? "");
+    final tempCtrl = TextEditingController(text: _temperaturaC?.toString() ?? "");
+    final humedadCtrl = TextEditingController(text: _humedadPct?.toString() ?? "");
+    final presionCtrl = TextEditingController(text: _presionHpa?.toString() ?? "");
+    final vientoCtrl = TextEditingController(text: _vientoMs?.toString() ?? "");
+    final vientoDirCtrl = TextEditingController(text: _vientoDireccion ?? "");
+    String? posicionTemp = _posicionTiro;
+    String? iluminacionTemp = _iluminacion;
+    bool interiorTemp = _esInterior;
 
     if (!mounted) return;
 
@@ -122,6 +201,75 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                   ),
                   const SizedBox(height: 15),
                   TextField(
+                    controller: distanciaCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Distancia (m)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      const Text('Interior'),
+                      Switch(
+                        value: interiorTemp,
+                        onChanged: (v) => setStateDialog(() => interiorTemp = v),
+                      ),
+                      Text(interiorTemp ? 'Si' : 'No'),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  DropdownButtonFormField<String>(
+                    value: posicionTemp,
+                    decoration: const InputDecoration(labelText: 'Posicion de tiro', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'Pie', child: Text('Pie')),
+                      DropdownMenuItem(value: 'Rodilla', child: Text('Rodilla')),
+                      DropdownMenuItem(value: 'Tendido', child: Text('Tendido')),
+                      DropdownMenuItem(value: 'Banco', child: Text('Banco')),
+                    ],
+                    onChanged: (v) => setStateDialog(() => posicionTemp = v),
+                  ),
+                  const SizedBox(height: 15),
+                  DropdownButtonFormField<String>(
+                    value: iluminacionTemp,
+                    decoration: const InputDecoration(labelText: 'Iluminacion', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'Artificial', child: Text('Artificial')),
+                      DropdownMenuItem(value: 'Natural', child: Text('Natural')),
+                      DropdownMenuItem(value: 'Mixta', child: Text('Mixta')),
+                    ],
+                    onChanged: (v) => setStateDialog(() => iluminacionTemp = v),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: tempCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Temperatura (°C)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: humedadCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Humedad (%)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: presionCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Presion (hPa)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: vientoCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Viento (m/s)', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: vientoDirCtrl,
+                    decoration: const InputDecoration(labelText: 'Direccion del viento', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
                     controller: notasCtrl,
                     decoration: const InputDecoration(labelText: 'Observaciones', border: OutlineInputBorder()),
                     maxLines: 2,
@@ -137,7 +285,20 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                 onPressed: () async {
                   Navigator.pop(ctx);
-                  await _guardarCambiosEnBD(equipoTemp, notasCtrl.text, lugarCtrl.text);
+                  await _guardarCambiosEnBD(
+                    equipoTemp,
+                    notasCtrl.text,
+                    lugarCtrl.text,
+                    distanciaMetros: _parseInt(distanciaCtrl.text),
+                    posicionTiro: posicionTemp,
+                    esInterior: interiorTemp,
+                    temperaturaC: _parseDouble(tempCtrl.text),
+                    humedadPct: _parseDouble(humedadCtrl.text),
+                    presionHpa: _parseDouble(presionCtrl.text),
+                    vientoMs: _parseDouble(vientoCtrl.text),
+                    vientoDireccion: vientoDirCtrl.text.trim().isEmpty ? null : vientoDirCtrl.text.trim(),
+                    iluminacion: iluminacionTemp,
+                  );
                 },
               )
             ],
@@ -147,7 +308,20 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
     );
   }
 
-  Future<void> _guardarCambiosEnBD(EquipoDetalle? nuevoEquipo, String nuevasNotas, String nuevoLugar) async {
+  Future<void> _guardarCambiosEnBD(
+    EquipoDetalle? nuevoEquipo,
+    String nuevasNotas,
+    String nuevoLugar, {
+    int? distanciaMetros,
+    String? posicionTiro,
+    bool? esInterior,
+    double? temperaturaC,
+    double? humedadPct,
+    double? presionHpa,
+    double? vientoMs,
+    String? vientoDireccion,
+    String? iluminacion,
+  }) async {
     if (nuevoEquipo == null) return;
     setState(() => _cargando = true);
 
@@ -157,12 +331,30 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
       nuevoIdEquipo: nuevoEquipo.id,
       nuevasNotas: nuevasNotas,
       nuevoLugar: nuevoLugar,
+      distanciaMetros: distanciaMetros,
+      posicionTiro: posicionTiro,
+      esInterior: esInterior,
+      temperaturaC: temperaturaC,
+      humedadPct: humedadPct,
+      presionHpa: presionHpa,
+      vientoMs: vientoMs,
+      vientoDireccion: vientoDireccion,
+      iluminacion: iluminacion,
     );
 
     setState(() {
         _equipoUsado = nuevoEquipo;
         _notasGuardadas = nuevasNotas;
         _lugarGuardado = nuevoLugar;
+        _distanciaMetros = distanciaMetros;
+        _posicionTiro = posicionTiro;
+        _esInterior = esInterior ?? true;
+        _temperaturaC = temperaturaC;
+        _humedadPct = humedadPct;
+        _presionHpa = presionHpa;
+        _vientoMs = vientoMs;
+        _vientoDireccion = vientoDireccion;
+        _iluminacion = iluminacion;
         _cargando = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datos actualizados y guardados.')));
@@ -182,8 +374,10 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
       grupos: grupos,
       perfil: perfil,
       equipo: _equipoUsado,
+      municion: _municionUsada,
       observaciones: _notasGuardadas, 
       lugar: _lugarGuardado, 
+      condicionesTexto: _buildCondicionesTexto(),
     );
   }
 
@@ -255,6 +449,14 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                     const SizedBox(width: 5),
                     Text(_equipoUsado?.nombre ?? "Arma no especificada", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500)),
                 ]),
+                if (_municionUsada != null) ...[
+                    const SizedBox(height: 5),
+                    Row(children: [
+                        const Icon(Icons.local_fire_department, size: 14, color: Colors.grey),
+                        const SizedBox(width: 5),
+                        Text('${_municionUsada!.marca} (${_municionUsada!.lote})', style: const TextStyle(color: Colors.black87)),
+                    ]),
+                ],
                 if (_lugarGuardado.isNotEmpty) ...[
                     const SizedBox(height: 5),
                     Row(children: [
@@ -262,6 +464,23 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                         const SizedBox(width: 5),
                         Text(_lugarGuardado, style: const TextStyle(color: Colors.black87)),
                     ]),
+                ],
+                if (_distanciaMetros != null) ...[
+                    const SizedBox(height: 5),
+                    Row(children: [
+                        const Icon(Icons.straighten, size: 14, color: Colors.grey),
+                        const SizedBox(width: 5),
+                        Text('$_distanciaMetros m', style: const TextStyle(color: Colors.black87)),
+                    ]),
+                ],
+                if (_temperaturaC != null || _humedadPct != null || _vientoMs != null) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      'Met: ${_temperaturaC?.toStringAsFixed(1) ?? '-'}°C | '
+                      'Hum: ${_humedadPct?.toStringAsFixed(0) ?? '-'}% | '
+                      'Viento: ${_vientoMs?.toStringAsFixed(1) ?? '-'} m/s ${_vientoDireccion ?? ''}',
+                      style: const TextStyle(color: Colors.black54),
+                    ),
                 ],
                 if (_notasGuardadas.isNotEmpty) ...[
                     const SizedBox(height: 5),

@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseProvider {
+  static const int schemaVersion = 5;
   static Database? _database;
   static final DatabaseProvider instance = DatabaseProvider._constructor();
 
@@ -16,7 +17,12 @@ class DatabaseProvider {
   Future<Database> _initDB() async {
     String path = await getDatabasesPath();
     path = join(path, 'tiro_deportivo.db');
-    return await openDatabase(path, version: 1, onCreate: _onCreate);
+    return await openDatabase(
+      path,
+      version: schemaVersion,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+    );
   }
 
   void _onCreate(Database db, int version) async {
@@ -72,7 +78,21 @@ class DatabaseProvider {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         marca TEXT,
         lote TEXT,
-        id_calibre INTEGER
+        id_calibre INTEGER,
+        cantidad_inicial INTEGER NOT NULL DEFAULT 0,
+        cantidad_actual INTEGER NOT NULL DEFAULT 0,
+        total_disparada INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE MovimientosMunicion (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_municion INTEGER NOT NULL,
+        tipo TEXT NOT NULL, -- compra|uso|ajuste
+        cantidad INTEGER NOT NULL,
+        fecha TEXT NOT NULL,
+        nota TEXT
       )
     ''');
 
@@ -83,6 +103,24 @@ class DatabaseProvider {
         numero_licencia TEXT,
         club TEXT,
         categoria TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE Licencias (
+        id INTEGER PRIMARY KEY,
+        license_key TEXT,
+        estado TEXT,
+        fecha_inicio TEXT,
+        fecha_fin TEXT,
+        plan TEXT,
+        features_json TEXT,
+        device_id TEXT,
+        ultima_validacion TEXT,
+        proxima_validacion TEXT,
+        dias_gracia_offline INTEGER NOT NULL DEFAULT 3,
+        max_dispositivos INTEGER,
+        firma TEXT
       )
     ''');
 
@@ -115,8 +153,18 @@ class DatabaseProvider {
         id_equipo INTEGER,
         id_plantilla_tiempos INTEGER,
         id_modalidad INTEGER,
+        id_municion INTEGER,
         nota TEXT,
-        lugar TEXT
+        lugar TEXT,
+        distancia_m INTEGER,
+        posicion_tiro TEXT,
+        es_interior INTEGER,
+        temperatura_c REAL,
+        humedad_pct REAL,
+        presion_hpa REAL,
+        viento_ms REAL,
+        viento_direccion TEXT,
+        iluminacion TEXT
       )
     ''');
 
@@ -134,6 +182,88 @@ class DatabaseProvider {
 
     // --- 2. PRECARGA DE DATOS MASIVA (CATÁLOGO COMPLETO) ---
     await _insertarDatosIniciales(db);
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _migrarV1aV2(db);
+    }
+    if (oldVersion < 3) {
+      await _migrarV2aV3(db);
+    }
+    if (oldVersion < 4) {
+      await _migrarV3aV4(db);
+    }
+    if (oldVersion < 5) {
+      await _migrarV4aV5(db);
+    }
+  }
+
+  Future<void> _migrarV1aV2(Database db) async {
+    // Migracion no destructiva: preserva datos existentes y agrega columnas/tablas.
+    await _agregarColumnaSiNoExiste(db, 'Municion', 'cantidad_inicial INTEGER NOT NULL DEFAULT 0');
+    await _agregarColumnaSiNoExiste(db, 'Municion', 'cantidad_actual INTEGER NOT NULL DEFAULT 0');
+    await _agregarColumnaSiNoExiste(db, 'Municion', 'total_disparada INTEGER NOT NULL DEFAULT 0');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS MovimientosMunicion (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_municion INTEGER NOT NULL,
+        tipo TEXT NOT NULL, -- compra|uso|ajuste
+        cantidad INTEGER NOT NULL,
+        fecha TEXT NOT NULL,
+        nota TEXT
+      )
+    ''');
+  }
+
+  Future<void> _migrarV2aV3(Database db) async {
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'id_municion INTEGER');
+  }
+
+  Future<void> _migrarV3aV4(Database db) async {
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'distancia_m INTEGER');
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'posicion_tiro TEXT');
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'es_interior INTEGER');
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'temperatura_c REAL');
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'humedad_pct REAL');
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'presion_hpa REAL');
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'viento_ms REAL');
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'viento_direccion TEXT');
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'iluminacion TEXT');
+  }
+
+  Future<void> _migrarV4aV5(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS Licencias (
+        id INTEGER PRIMARY KEY,
+        license_key TEXT,
+        estado TEXT,
+        fecha_inicio TEXT,
+        fecha_fin TEXT,
+        plan TEXT,
+        features_json TEXT,
+        device_id TEXT,
+        ultima_validacion TEXT,
+        proxima_validacion TEXT,
+        dias_gracia_offline INTEGER NOT NULL DEFAULT 3,
+        max_dispositivos INTEGER,
+        firma TEXT
+      )
+    ''');
+  }
+
+  Future<void> _agregarColumnaSiNoExiste(
+    Database db,
+    String tabla,
+    String definicionColumna,
+  ) async {
+    final nombreColumna = definicionColumna.trim().split(RegExp(r'\s+')).first;
+    final pragma = await db.rawQuery("PRAGMA table_info($tabla)");
+    final existe = pragma.any((col) => col['name'] == nombreColumna);
+    if (!existe) {
+      await db.execute('ALTER TABLE $tabla ADD COLUMN $definicionColumna');
+    }
   }
 
   Future<void> _insertarDatosIniciales(Database db) async {

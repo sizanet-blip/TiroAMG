@@ -14,12 +14,32 @@ class CompeticionRunnerScreen extends StatefulWidget {
   final Modalidad modalidad;
   final EquipoDetalle equipo;
   final MunicionDetalle? municion;
+  final String? lugar;
+  final int? distanciaMetros;
+  final String? posicionTiro;
+  final bool? esInterior;
+  final double? temperaturaC;
+  final double? humedadPct;
+  final double? presionHpa;
+  final double? vientoMs;
+  final String? vientoDireccion;
+  final String? iluminacion;
 
   const CompeticionRunnerScreen({
     super.key,
     required this.modalidad,
     required this.equipo,
     this.municion,
+    this.lugar,
+    this.distanciaMetros,
+    this.posicionTiro,
+    this.esInterior,
+    this.temperaturaC,
+    this.humedadPct,
+    this.presionHpa,
+    this.vientoMs,
+    this.vientoDireccion,
+    this.iluminacion,
   });
 
   @override
@@ -94,6 +114,16 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
           equipo: widget.equipo,
           plantilla: plantilla,
           municion: widget.municion,
+          lugar: widget.lugar,
+          distanciaMetros: widget.distanciaMetros,
+          posicionTiro: widget.posicionTiro,
+          esInterior: widget.esInterior,
+          temperaturaC: widget.temperaturaC,
+          humedadPct: widget.humedadPct,
+          presionHpa: widget.presionHpa,
+          vientoMs: widget.vientoMs,
+          vientoDireccion: widget.vientoDireccion,
+          iluminacion: widget.iluminacion,
           
           // PARÁMETROS NUEVOS PARA INFORMACIÓN VISUAL
           tituloSerie: "${faseActual.fase.descripcionFase} - Serie $numSerie/$totalSeries",
@@ -115,6 +145,17 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
       fecha: DateTime.now(),
       idEquipo: widget.equipo.id,
       idPlantilla: plantilla.id!,
+      idMunicion: widget.municion?.id,
+      lugar: widget.lugar,
+      distanciaMetros: widget.distanciaMetros,
+      posicionTiro: widget.posicionTiro,
+      esInterior: widget.esInterior,
+      temperaturaC: widget.temperaturaC,
+      humedadPct: widget.humedadPct,
+      presionHpa: widget.presionHpa,
+      vientoMs: widget.vientoMs,
+      vientoDireccion: widget.vientoDireccion,
+      iluminacion: widget.iluminacion,
       // Añadimos metadatos del torneo en la nota para identificarlo luego
       nota: 'Torneo: ${widget.modalidad.nombre} | ${fase.fase.descripcionFase} | Serie ${_indiceRepeticion + 1}',
     );

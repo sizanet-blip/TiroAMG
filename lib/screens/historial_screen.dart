@@ -356,6 +356,13 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                         Text(item.nombreTitulo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         const SizedBox(height: 4),
                         Text(item.nombreEquipo, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                        if (item.marcaMunicion != null && item.marcaMunicion!.isNotEmpty)
+                          Text(
+                            'Munición: ${item.marcaMunicion}${(item.loteMunicion != null && item.loteMunicion!.isNotEmpty) ? ' (${item.loteMunicion})' : ''}',
+                            style: const TextStyle(fontSize: 11, color: Colors.deepOrange),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         if (!esCompe && item.nota != null) 
                            Text(
                              item.nota!.replaceAll('Torneo: ', ''), 

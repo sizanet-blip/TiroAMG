@@ -4,10 +4,12 @@ import 'package:fl_chart/fl_chart.dart';
 import '../services/estadisticas_service.dart' hide DateTimeRange;
 import '../services/equipo_service.dart';
 import '../services/catalogo_service.dart';
+import '../services/municion_service.dart';
 import '../services/pdf_service.dart';
 import '../models/equipo_model.dart';
 import '../models/tipo_diana_model.dart';
 import '../models/disparo_model.dart';
+import '../models/municion_model.dart';
 
 class EstadisticasScreen extends StatefulWidget {
   final int modo; 
@@ -27,6 +29,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   final _statsService = EstadisticasService();
   final _equipoService = EquipoService();
   final _catalogoService = CatalogoService();
+  final _municionService = MunicionService();
   final _pdfService = PdfService(); 
 
   // COLOR TEMÁTICO: AZUL
@@ -36,10 +39,12 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 
   List<EquipoDetalle> _equipos = [];
   List<TipoDiana> _dianas = [];
+  List<MunicionDetalle> _municiones = [];
 
   int _filtroFechaSeleccionado = 0; 
   DateTimeRange? _rangoFechasManual; 
   EquipoDetalle? _equipoSel;
+  MunicionDetalle? _municionSel;
   TipoDiana? _dianaSel; 
   List<TipoDiana> _dianasEnContexto = []; 
   TipoDiana? _dianaPestanaSeleccionada;  
@@ -50,6 +55,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   List<Map<String, dynamic>> _datosProgreso = [];
   AnalisisAgrupacion? _analisis;
   List<DiagnosticoTecnico> _diagnostico = []; 
+  List<ResumenMunicionStats> _resumenMunicion = [];
+  List<ComparativoLotesContexto> _comparativoLotes = [];
 
   bool get _esModoDetalle => widget.idsSesionFijos != null && widget.idsSesionFijos!.isNotEmpty;
 
@@ -63,10 +70,12 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   void _cargarFiltrosIniciales() async {
     final e = await _equipoService.obtenerEquiposDetallados();
     final d = await _catalogoService.obtenerTiposDiana();
+    final m = await _municionService.obtenerMunicionDetallada();
     if (mounted) {
       setState(() {
         _equipos = e;
         _dianas = d;
+        _municiones = m;
         if (d.isNotEmpty) _dianaSel = d.first; 
         if (e.isNotEmpty) _equipoSel = e.first;
       });
@@ -94,6 +103,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     final dianasDetectadas = await _statsService.obtenerTiposDianaEnFiltro(
       rangoFechas: rangoCalculado,
       idEquipo: _equipoSel?.id,
+      idMunicion: _municionSel?.id,
       filtroModo: _esModoDetalle ? null : widget.modo,
       idsSesiones: widget.idsSesionFijos,
     );
@@ -115,6 +125,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     final progreso = await _statsService.obtenerEvolucionPuntos(
       rangoFechas: rangoCalculado,
       idEquipo: _equipoSel?.id,
+      idMunicion: _municionSel?.id,
       idTipoDiana: _dianaSel?.id, 
       filtroModo: _esModoDetalle ? null : widget.modo, 
       idsSesiones: widget.idsSesionFijos,
@@ -127,6 +138,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       analisis = await _statsService.calcularAnalisisAgrupacion(
         rangoFechas: rangoCalculado,
         idEquipo: _equipoSel?.id,
+        idMunicion: _municionSel?.id,
         idTipoDiana: dianaParaAnalisis.id,
         filtroModo: _esModoDetalle ? null : widget.modo,
         idsSesiones: widget.idsSesionFijos,
@@ -135,6 +147,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       diagnostico = await _statsService.calcularDiagnosticoTecnico(
         rangoFechas: rangoCalculado,
         idEquipo: _equipoSel?.id,
+        idMunicion: _municionSel?.id,
         idTipoDiana: dianaParaAnalisis.id,
         filtroModo: _esModoDetalle ? null : widget.modo,
         idsSesiones: widget.idsSesionFijos,
@@ -143,6 +156,20 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       );
     }
 
+    final resumenMun = await _statsService.obtenerResumenMunicion(
+      rangoFechas: rangoCalculado,
+      idEquipo: _equipoSel?.id,
+      filtroModo: _esModoDetalle ? null : widget.modo,
+      idsSesiones: widget.idsSesionFijos,
+    );
+    final comparativo = await _statsService.obtenerComparativoLotes(
+      rangoFechas: rangoCalculado,
+      idEquipo: _equipoSel?.id,
+      idMunicion: _municionSel?.id,
+      filtroModo: _esModoDetalle ? null : widget.modo,
+      idsSesiones: widget.idsSesionFijos,
+    );
+
     if (mounted) {
       setState(() {
         _dianasEnContexto = dianasDetectadas;
@@ -150,6 +177,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
         _datosProgreso = progreso;
         _analisis = analisis;
         _diagnostico = diagnostico;
+        _resumenMunicion = resumenMun;
+        _comparativoLotes = comparativo;
         _cargando = false;
       });
     }
@@ -180,12 +209,14 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       for (var diana in dianasAProcesar) {
          var analisis = await _statsService.calcularAnalisisAgrupacion(
             idTipoDiana: diana.id,
+            idMunicion: _municionSel?.id,
             rangoFechas: rangoPdf, idEquipo: equipoPdf, filtroModo: modoPdf, idsSesiones: sesionesPdf,
          );
 
          if (analisis != null && (analisis.disparosValidos.isNotEmpty || analisis.disparosDescartados.isNotEmpty)) {
            var diag = await _statsService.calcularDiagnosticoTecnico(
               idTipoDiana: diana.id,
+              idMunicion: _municionSel?.id,
               rangoFechas: rangoPdf, idEquipo: equipoPdf, filtroModo: modoPdf, idsSesiones: sesionesPdf,
               esZurdo: _soyZurdo, generarEtiquetas: _esModoDetalle, 
            );
@@ -215,6 +246,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
         periodoTexto: textoPeriodo,
         datosDianas: resultados,
         datosProgreso: _datosProgreso,
+        comparativoLotes: _comparativoLotes,
         observaciones: _esModoDetalle ? "Informe detallado de sesión." : "Informe de evolución."
       );
 
@@ -287,6 +319,20 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                           onChanged: (v) => setState(() { _equipoSel = v; _refrescarDatos(); }),
                         ),
                         const SizedBox(height: 10),
+                        DropdownButtonFormField<MunicionDetalle>(
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Munición', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
+                          value: _municionSel,
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text('Toda la munición')),
+                            ..._municiones.map((m) => DropdownMenuItem(
+                              value: m,
+                              child: Text('${m.marca} (${m.lote})', overflow: TextOverflow.ellipsis),
+                            )),
+                          ],
+                          onChanged: (v) => setState(() { _municionSel = v; _refrescarDatos(); }),
+                        ),
+                        const SizedBox(height: 10),
                         DropdownButtonFormField<TipoDiana>(
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Tipo de Diana', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
@@ -303,7 +349,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
           
           Expanded(
             child: DefaultTabController(
-              length: 3, 
+              length: 5, 
               child: Column(
                 children: [
                   TabBar(
@@ -313,6 +359,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                       Tab(text: 'AGRUPACIÓN', icon: Icon(Icons.gps_fixed)),
                       Tab(text: 'TÉCNICA', icon: Icon(Icons.psychology)),
                       Tab(text: 'EVOLUCIÓN', icon: Icon(Icons.show_chart)),
+                      Tab(text: 'MUNICIÓN', icon: Icon(Icons.local_fire_department)),
+                      Tab(text: 'COMPARATIVO', icon: Icon(Icons.compare_arrows)),
                     ],
                   ),
                   Expanded(
@@ -323,6 +371,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                           _buildVistaAgrupacion(),
                           _buildDiagnosticoTecnico(),
                           _buildGraficaProgreso(),
+                          _buildResumenMunicion(),
+                          _buildComparativoLotes(),
                         ],
                       ),
                   ),
@@ -490,6 +540,125 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
         )
       ]
     )));
+  }
+
+  Widget _buildResumenMunicion() {
+    if (_resumenMunicion.isEmpty) {
+      return const Center(
+        child: Text("No hay datos de munición para este filtro.", style: TextStyle(color: Colors.grey)),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: _resumenMunicion.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final r = _resumenMunicion[index];
+        final titulo = (r.idMunicion == null) ? 'Sin munición asociada' : '${r.marca} (${r.lote})';
+        return Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: _colorTemaClaro,
+              child: const Icon(Icons.local_fire_department, color: Colors.deepOrange),
+            ),
+            title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Sesiones: ${r.sesiones} | Disparos: ${r.disparos} | Puntos: ${r.totalPuntos.toStringAsFixed(0)}'),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text('Media', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                Text(r.media.toStringAsFixed(2), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _colorTemaOscuro)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildComparativoLotes() {
+    if (_comparativoLotes.isEmpty) {
+      return const Center(
+        child: Text(
+          "No hay contextos con al menos 2 lotes comparables.\nPrueba ampliando periodo o quitando filtros.",
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: _comparativoLotes.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final c = _comparativoLotes[index];
+        return Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(c.modalidad, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 4),
+                Text('Temp: ${c.rangoTemperatura} | Viento: ${c.rangoViento}', style: const TextStyle(color: Colors.grey)),
+                const Divider(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('MEJOR LOTE', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                            Text('${c.mejor.marca} (${c.mejor.lote})'),
+                            Text('Media: ${c.mejor.media.toStringAsFixed(2)} | Disparos: ${c.mejor.disparos}', style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('PEOR LOTE', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                            Text('${c.peor.marca} (${c.peor.lote})'),
+                            Text('Media: ${c.peor.media.toStringAsFixed(2)} | Disparos: ${c.peor.disparos}', style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Diferencia: ${c.diferencia.toStringAsFixed(2)} pts/disparo',
+                  style: TextStyle(
+                    color: c.diferencia >= 0 ? Colors.blueGrey : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
   
   Widget _datoEstadistico(String label, String valor, {bool esVerde = false}) { return Column(children: [Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)), Text(valor, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: esVerde ? Colors.green[700] : Colors.black87))]); }
