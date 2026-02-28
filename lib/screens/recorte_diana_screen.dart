@@ -18,19 +18,25 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
   final ImagePicker _picker = ImagePicker();
   File? _selectedImage;
   
-  // Esquinas detectadas en coordenadas de imagen (píxeles reales)
+  // Esquinas en coordenadas de imagen (píxeles reales)
+  // Siempre disponibles: detectadas automáticamente o cuadrado por defecto
   List<Offset>? _detectedCorners;
   bool _isDetecting = false;
+  bool _cornersAutoDetected = false; // true si se detectaron automáticamente
   String? _detectionMessage;
+  int? _draggingCornerIndex; // Índice de la esquina que se está arrastrando
+  bool _foldMode = false; // Modo pliegue activo (6 puntos en vez de 4)
   
   // Tamaño real de la imagen para poder convertir coordenadas
   Size? _imageSize;
 
   // Imagen recortada (resultado del warpPerspective)
   File? _croppedImage;
+  File? _croppedImageNormal; // Versión sin corrección de pliegue (para comparar)
+  bool _showComparison = false; // Mostrar comparación lado a lado
   bool _isCropping = false;
 
-  // Detección del centro de la diana
+  // Detección del centro de la diana (imagen principal / con pliegue)
   Offset? _dianaCenter;
   List<Map<String, double>>? _detectedCircles;
   List<List<Map<String, dynamic>>>? _ringContours; // Contornos reales de anillos
@@ -38,6 +44,13 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
   String? _centerMessage;
   Size? _croppedImageSize;
   double? _spacingPx; // Espaciado ISSF en píxeles
+
+  // Detección del centro para la versión NORMAL (comparación en modo pliegue)
+  Offset? _dianaCenterNormal;
+  List<Map<String, double>>? _detectedCirclesNormal;
+  List<List<Map<String, dynamic>>>? _ringContoursNormal;
+  String? _centerMessageNormal;
+  double? _spacingPxNormal;
 
   // Detección de impactos
   List<Map<String, double>>? _impacts;
@@ -53,15 +66,25 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
         setState(() {
           _selectedImage = file;
           _detectedCorners = null;
+          _cornersAutoDetected = false;
           _detectionMessage = null;
+          _draggingCornerIndex = null;
+          _foldMode = false;
           _imageSize = null;
           _croppedImage = null;
+          _croppedImageNormal = null;
+          _showComparison = false;
           _dianaCenter = null;
           _detectedCircles = null;
           _ringContours = null;
           _centerMessage = null;
           _croppedImageSize = null;
           _spacingPx = null;
+          _dianaCenterNormal = null;
+          _detectedCirclesNormal = null;
+          _ringContoursNormal = null;
+          _centerMessageNormal = null;
+          _spacingPxNormal = null;
           _impacts = null;
           _impactsMessage = null;
         });
@@ -96,7 +119,8 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
     }
   }
 
-  /// Detecta las 4 esquinas de la diana usando OpenCV
+  /// Detecta las 4 esquinas de la diana usando OpenCV.
+  /// Si no se detectan, genera un cuadrado centrado por defecto.
   Future<void> _detectCorners(File file) async {
     setState(() {
       _isDetecting = true;
@@ -111,10 +135,13 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
           _isDetecting = false;
           if (corners != null && corners.length == 4) {
             _detectedCorners = corners;
-            _detectionMessage = 'Detectadas 4 esquinas';
+            _cornersAutoDetected = true;
+            _detectionMessage = 'Esquinas detectadas. Puedes ajustarlas arrastrando los puntos.';
           } else {
-            _detectedCorners = null;
-            _detectionMessage = 'No se detectaron esquinas';
+            // Fallback: cuadrado centrado con margen del 10%
+            _detectedCorners = _generateDefaultSquare();
+            _cornersAutoDetected = false;
+            _detectionMessage = 'No se detectaron esquinas. Ajusta el cuadrado arrastrando los puntos.';
           }
         });
       }
@@ -122,25 +149,85 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
       if (mounted) {
         setState(() {
           _isDetecting = false;
-          _detectionMessage = 'Error: $e';
+          // En caso de error, generar cuadrado por defecto
+          _detectedCorners = _generateDefaultSquare();
+          _cornersAutoDetected = false;
+          _detectionMessage = 'Error en detección. Ajusta el cuadrado arrastrando los puntos.';
         });
       }
     }
   }
 
-  /// Recorta la imagen usando las esquinas detectadas y OpenCV warpPerspective
+  /// Genera un cuadrado centrado por defecto basado en el tamaño de la imagen.
+  /// El cuadrado ocupa el 80% de la dimensión menor de la imagen.
+  List<Offset> _generateDefaultSquare() {
+    if (_imageSize == null) return [];
+    final w = _imageSize!.width;
+    final h = _imageSize!.height;
+    final side = min(w, h) * 0.8;
+    final cx = w / 2;
+    final cy = h / 2;
+    final half = side / 2;
+    return [
+      Offset(cx - half, cy - half), // TL
+      Offset(cx + half, cy - half), // TR
+      Offset(cx - half, cy + half), // BL
+      Offset(cx + half, cy + half), // BR
+    ];
+  }
+
+  /// Activa o desactiva el modo pliegue, añadiendo/quitando los 2 puntos de pliegue
+  void _toggleFoldMode() {
+    if (_detectedCorners == null || _imageSize == null) return;
+    setState(() {
+      _foldMode = !_foldMode;
+      _croppedImage = null; // Forzar re-recorte
+      if (_foldMode) {
+        // Asegurar que solo tenemos 4 esquinas base
+        if (_detectedCorners!.length > 4) {
+          _detectedCorners = _detectedCorners!.sublist(0, 4);
+        }
+        // Añadir puntos de pliegue en el centro vertical (entre TL-TR y BL-BR)
+        final tl = _detectedCorners![0];
+        final tr = _detectedCorners![1];
+        final bl = _detectedCorners![2];
+        final br = _detectedCorners![3];
+        final foldTop = Offset((tl.dx + tr.dx) / 2, (tl.dy + tr.dy) / 2);
+        final foldBottom = Offset((bl.dx + br.dx) / 2, (bl.dy + br.dy) / 2);
+        _detectedCorners!.add(foldTop);
+        _detectedCorners!.add(foldBottom);
+      } else {
+        // Quitar los puntos de pliegue
+        if (_detectedCorners!.length > 4) {
+          _detectedCorners = _detectedCorners!.sublist(0, 4);
+        }
+      }
+    });
+  }
+
+  /// Recorta la imagen usando las esquinas detectadas y OpenCV warpPerspective.
+  /// Si _foldMode está activo, usa corrección en 2 mitades.
   Future<void> _cropImage() async {
     if (_selectedImage == null || _detectedCorners == null || _imageSize == null) return;
+    if (_foldMode && _detectedCorners!.length < 6) return;
 
     setState(() {
       _isCropping = true;
+      // Resetear detección previa para forzar recalculación
+      _croppedImageSize = null;
+      _dianaCenter = null;
+      _detectedCircles = null;
+      _ringContours = null;
+      _dianaCenterNormal = null;
+      _detectedCirclesNormal = null;
+      _ringContoursNormal = null;
     });
 
     try {
       final bytes = await _selectedImage!.readAsBytes();
       final corners = _detectedCorners!;
 
-      // Calcular tamaño de salida basado en las esquinas
+      // Calcular tamaño de salida basado en las 4 esquinas principales
       final tl = corners[0], tr = corners[1], bl = corners[2], br = corners[3];
       final widthTop = (tr - tl).distance;
       final widthBottom = (br - bl).distance;
@@ -153,14 +240,37 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
         throw Exception('Área de recorte inválida');
       }
 
-      final result = await OpenCVService.cropWithPerspective(
-        bytes, corners, outputWidth, outputHeight,
-      );
+      File? result;
+      File? resultNormal;
+      if (_foldMode) {
+        // Corrección en 2 mitades
+        final foldTop = corners[4];
+        final foldBottom = corners[5];
+        result = await OpenCVService.cropWithFoldCorrection(
+          bytes,
+          corners.sublist(0, 4), // Solo las 4 esquinas
+          foldTop,
+          foldBottom,
+          outputWidth,
+          outputHeight,
+        );
+        // También generar la versión normal para comparar
+        resultNormal = await OpenCVService.cropWithPerspective(
+          bytes, corners.sublist(0, 4), outputWidth, outputHeight,
+        );
+      } else {
+        // Corrección normal
+        result = await OpenCVService.cropWithPerspective(
+          bytes, corners, outputWidth, outputHeight,
+        );
+      }
 
       if (mounted) {
         setState(() {
           _isCropping = false;
           _croppedImage = result;
+          _croppedImageNormal = resultNormal;
+          _showComparison = false;
         });
 
         if (result == null) {
@@ -179,7 +289,8 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
     }
   }
 
-  /// Detecta el centro de la diana en la imagen recortada usando HoughCircles
+  /// Detecta el centro de la diana en la imagen recortada usando HoughCircles.
+  /// Si estamos en modo pliegue con imagen normal disponible, detecta en ambas.
   Future<void> _detectCenter() async {
     if (_croppedImage == null) return;
 
@@ -189,6 +300,10 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
       _dianaCenter = null;
       _detectedCircles = null;
       _ringContours = null;
+      _dianaCenterNormal = null;
+      _detectedCirclesNormal = null;
+      _ringContoursNormal = null;
+      _centerMessageNormal = null;
     });
 
     try {
@@ -201,12 +316,22 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
         }
       }
 
+      // --- Detectar en imagen principal (con pliegue si activo) ---
       final bytes = await _croppedImage!.readAsBytes();
       final result = await OpenCVService.detectTargetCenter(bytes);
+
+      // --- Detectar en imagen NORMAL si estamos en modo pliegue ---
+      Map<String, dynamic>? resultNormal;
+      if (_foldMode && _croppedImageNormal != null) {
+        final bytesNormal = await _croppedImageNormal!.readAsBytes();
+        resultNormal = await OpenCVService.detectTargetCenter(bytesNormal);
+      }
 
       if (mounted) {
         setState(() {
           _isDetectingCenter = false;
+
+          // Resultados de la imagen principal
           if (result != null && result['center'] != null) {
             _dianaCenter = result['center'] as Offset;
             _detectedCircles = (result['circles'] as List).cast<Map<String, double>>();
@@ -219,6 +344,19 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
             _centerMessage = result['message'] as String;
           } else {
             _centerMessage = result?['message'] as String? ?? 'No se detectó el centro';
+          }
+
+          // Resultados de la imagen normal (comparación)
+          if (resultNormal != null && resultNormal['center'] != null) {
+            _dianaCenterNormal = resultNormal['center'] as Offset;
+            _detectedCirclesNormal = (resultNormal['circles'] as List).cast<Map<String, double>>();
+            _ringContoursNormal = (resultNormal['ringContours'] as List?)
+                ?.map((contour) => (contour as List)
+                    .map((p) => p as Map<String, dynamic>)
+                    .toList())
+                .toList();
+            _spacingPxNormal = (resultNormal['spacing'] as num?)?.toDouble();
+            _centerMessageNormal = resultNormal['message'] as String;
           }
         });
       }
@@ -326,14 +464,14 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: _detectedCorners != null
-                    ? Colors.green.shade50
-                    : (_isDetecting ? Colors.blue.shade50 : Colors.orange.shade50),
+                color: _isDetecting
+                    ? Colors.blue.shade50
+                    : (_cornersAutoDetected ? Colors.green.shade50 : Colors.orange.shade50),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _detectedCorners != null
-                      ? Colors.green.shade300
-                      : (_isDetecting ? Colors.blue.shade300 : Colors.orange.shade300),
+                  color: _isDetecting
+                      ? Colors.blue.shade300
+                      : (_cornersAutoDetected ? Colors.green.shade300 : Colors.orange.shade300),
                 ),
               ),
               child: Row(
@@ -345,9 +483,9 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                     )
                   else
                     Icon(
-                      _detectedCorners != null ? Icons.check_circle : Icons.warning,
+                      _cornersAutoDetected ? Icons.check_circle : Icons.touch_app,
                       size: 18,
-                      color: _detectedCorners != null ? Colors.green : Colors.orange,
+                      color: _cornersAutoDetected ? Colors.green : Colors.orange,
                     ),
                   const SizedBox(width: 8),
                   Expanded(child: Text(_detectionMessage!, style: const TextStyle(fontSize: 13))),
@@ -401,6 +539,36 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                               ],
                             ),
                           ),
+                          // Botón de comparación (solo en modo pliegue con ambas imágenes)
+                          if (_foldMode && _croppedImageNormal != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              color: Colors.grey.shade200,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.compare, size: 16, color: Colors.grey),
+                                  const SizedBox(width: 6),
+                                  const Text('Comparar:', style: TextStyle(fontSize: 12)),
+                                  const SizedBox(width: 8),
+                                  ChoiceChip(
+                                    label: const Text('Pliegue', style: TextStyle(fontSize: 11)),
+                                    selected: !_showComparison,
+                                    selectedColor: Colors.orange.shade200,
+                                    onSelected: (_) => setState(() => _showComparison = false),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  ChoiceChip(
+                                    label: const Text('Normal', style: TextStyle(fontSize: 11)),
+                                    selected: _showComparison,
+                                    selectedColor: Colors.green.shade200,
+                                    onSelected: (_) => setState(() => _showComparison = true),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ],
+                              ),
+                            ),
                           // Imagen recortada con círculos detectados
                           Expanded(
                             flex: 3,
@@ -408,17 +576,47 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                               padding: const EdgeInsets.all(8.0),
                               child: LayoutBuilder(
                                 builder: (context, constraints) {
+                                  final displayImage = (_showComparison && _croppedImageNormal != null)
+                                      ? _croppedImageNormal!
+                                      : _croppedImage!;
                                   return Stack(
                                     alignment: Alignment.center,
                                     children: [
                                       Image.file(
-                                        _croppedImage!,
+                                        displayImage,
                                         fit: BoxFit.contain,
                                         width: constraints.maxWidth,
                                         height: constraints.maxHeight,
                                       ),
+                                      // Etiqueta de qué versión se muestra
+                                      if (_foldMode && _croppedImageNormal != null)
+                                        Positioned(
+                                          top: 4,
+                                          right: 4,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: _showComparison
+                                                  ? Colors.green.shade700.withValues(alpha: 0.85)
+                                                  : Colors.orange.shade700.withValues(alpha: 0.85),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              _showComparison ? 'SIN pliegue' : 'CON pliegue',
+                                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ),
                                       // Dibujar centro, anillos e impactos
-                                      if (_dianaCenter != null && _croppedImageSize != null)
+                                      if (_showComparison && _dianaCenterNormal != null && _croppedImageSize != null)
+                                        _buildCroppedOverlayFor(
+                                          constraints,
+                                          center: _dianaCenterNormal!,
+                                          circles: _detectedCirclesNormal,
+                                          ringContours: _ringContoursNormal,
+                                          impacts: null, // Sin impactos en comparación
+                                        )
+                                      else if (!_showComparison && _dianaCenter != null && _croppedImageSize != null)
                                         _buildCroppedOverlay(constraints),
                                     ],
                                   );
@@ -428,7 +626,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                           ),
                         ],
                       )
-                    // Solo imagen original con overlay de esquinas
+                    // Imagen original con esquinas interactivas
                     : LayoutBuilder(
                         builder: (context, constraints) {
                           return Stack(
@@ -441,7 +639,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                                 height: constraints.maxHeight,
                               ),
                               if (_detectedCorners != null && _imageSize != null)
-                                _buildCornersOverlay(constraints),
+                                _buildInteractiveCornersOverlay(constraints),
                             ],
                           );
                         },
@@ -466,10 +664,40 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                     'TL: (${_detectedCorners![0].dx.toStringAsFixed(0)}, ${_detectedCorners![0].dy.toStringAsFixed(0)})  '
                     'TR: (${_detectedCorners![1].dx.toStringAsFixed(0)}, ${_detectedCorners![1].dy.toStringAsFixed(0)})  '
                     'BL: (${_detectedCorners![2].dx.toStringAsFixed(0)}, ${_detectedCorners![2].dy.toStringAsFixed(0)})  '
-                    'BR: (${_detectedCorners![3].dx.toStringAsFixed(0)}, ${_detectedCorners![3].dy.toStringAsFixed(0)})',
+                    'BR: (${_detectedCorners![3].dx.toStringAsFixed(0)}, ${_detectedCorners![3].dy.toStringAsFixed(0)})'
+                    '${_foldMode && _detectedCorners!.length >= 6 ? '\nPT: (${_detectedCorners![4].dx.toStringAsFixed(0)}, ${_detectedCorners![4].dy.toStringAsFixed(0)})  PB: (${_detectedCorners![5].dx.toStringAsFixed(0)}, ${_detectedCorners![5].dy.toStringAsFixed(0)})' : ''}',
                     style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // Toggle modo pliegue
+                  Row(
+                    children: [
+                      Icon(
+                        _foldMode ? Icons.unfold_more : Icons.crop_square,
+                        size: 18,
+                        color: _foldMode ? Colors.orange : Colors.grey,
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('Diana doblada', style: TextStyle(fontSize: 13)),
+                      const SizedBox(width: 8),
+                      Switch(
+                        value: _foldMode,
+                        activeTrackColor: Colors.orange.shade200,
+                        thumbColor: WidgetStateProperty.resolveWith((states) =>
+                          states.contains(WidgetState.selected) ? Colors.orange : null),
+                        onChanged: (_) => _toggleFoldMode(),
+                      ),
+                      if (_foldMode)
+                        const Expanded(
+                          child: Text(
+                            'Arrastra PT y PB al pliegue',
+                            style: TextStyle(fontSize: 11, color: Colors.orange, fontStyle: FontStyle.italic),
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   // Botones de acción
                   Row(
                     children: [
@@ -481,10 +709,13 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
                               ? const SizedBox(width: 16, height: 16,
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : const Icon(Icons.crop, size: 18),
-                          label: Text(_croppedImage != null ? 'Re-recortar' : 'Recortar',
+                          label: Text(
+                            _croppedImage != null
+                                ? 'Re-recortar'
+                                : (_foldMode ? 'Corregir pliegue' : 'Recortar'),
                             style: const TextStyle(fontSize: 13)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green.shade700,
+                            backgroundColor: _foldMode ? Colors.orange.shade700 : Colors.green.shade700,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 10),
                           ),
@@ -621,6 +852,61 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
     );
   }
 
+  /// Overlay con datos explícitos (para comparación con imagen normal)
+  Widget _buildCroppedOverlayFor(
+    BoxConstraints constraints, {
+    required Offset center,
+    List<Map<String, double>>? circles,
+    List<List<Map<String, dynamic>>>? ringContours,
+    List<Map<String, double>>? impacts,
+  }) {
+    final imgW = _croppedImageSize!.width;
+    final imgH = _croppedImageSize!.height;
+
+    final double ratioX = constraints.maxWidth / imgW;
+    final double ratioY = constraints.maxHeight / imgH;
+    final double displayScale = min(ratioX, ratioY);
+
+    final double displayedW = imgW * displayScale;
+    final double displayedH = imgH * displayScale;
+    final double offsetX = (constraints.maxWidth - displayedW) / 2;
+    final double offsetY = (constraints.maxHeight - displayedH) / 2;
+
+    Offset toScreen(double x, double y) => Offset(
+      offsetX + x * displayScale,
+      offsetY + y * displayScale,
+    );
+
+    final screenContours = ringContours?.map((contour) {
+      return contour.map((p) {
+        final x = (p['x'] as num).toDouble();
+        final y = (p['y'] as num).toDouble();
+        return toScreen(x, y);
+      }).toList();
+    }).toList();
+
+    final screenImpacts = impacts?.map((imp) {
+      return {
+        'center': toScreen(imp['x']!, imp['y']!),
+        'radius': imp['r']! * displayScale,
+        'groupCount': imp['groupCount'] ?? 1.0,
+      };
+    }).toList();
+
+    return SizedBox(
+      width: constraints.maxWidth,
+      height: constraints.maxHeight,
+      child: CustomPaint(
+        painter: _DianaOverlayPainter(
+          center: toScreen(center.dx, center.dy),
+          ringContours: screenContours ?? [],
+          numRings: circles?.length ?? 0,
+          impacts: screenImpacts ?? [],
+        ),
+      ),
+    );
+  }
+
   /// Construye el overlay con los contornos reales y el centro de la diana (legacy)
   Widget _buildCirclesOverlay(BoxConstraints constraints) {
     final imgW = _croppedImageSize!.width;
@@ -669,7 +955,6 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
     final imgW = _imageSize!.width;
     final imgH = _imageSize!.height;
 
-    // Calcular cómo se ajusta la imagen en el espacio disponible (BoxFit.contain)
     final double ratioX = constraints.maxWidth / imgW;
     final double ratioY = constraints.maxHeight / imgH;
     final double scale = min(ratioX, ratioY);
@@ -679,7 +964,6 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
     final double offsetX = (constraints.maxWidth - displayedW) / 2;
     final double offsetY = (constraints.maxHeight - displayedH) / 2;
 
-    // Convertir coordenadas de imagen a coordenadas de pantalla
     Offset toScreen(Offset imgPt) => Offset(
       offsetX + imgPt.dx * scale,
       offsetY + imgPt.dy * scale,
@@ -691,7 +975,85 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
       width: constraints.maxWidth,
       height: constraints.maxHeight,
       child: CustomPaint(
-        painter: _CornersPainter(screenCorners),
+        painter: _CornersPainter(screenCorners, foldMode: _foldMode),
+      ),
+    );
+  }
+
+  /// Overlay interactivo: esquinas que se pueden arrastrar
+  Widget _buildInteractiveCornersOverlay(BoxConstraints constraints) {
+    final imgW = _imageSize!.width;
+    final imgH = _imageSize!.height;
+
+    final double ratioX = constraints.maxWidth / imgW;
+    final double ratioY = constraints.maxHeight / imgH;
+    final double scale = min(ratioX, ratioY);
+
+    final double displayedW = imgW * scale;
+    final double displayedH = imgH * scale;
+    final double offsetX = (constraints.maxWidth - displayedW) / 2;
+    final double offsetY = (constraints.maxHeight - displayedH) / 2;
+
+    Offset toScreen(Offset imgPt) => Offset(
+      offsetX + imgPt.dx * scale,
+      offsetY + imgPt.dy * scale,
+    );
+
+    Offset toImage(Offset screenPt) => Offset(
+      (screenPt.dx - offsetX) / scale,
+      (screenPt.dy - offsetY) / scale,
+    );
+
+    final screenCorners = _detectedCorners!.map(toScreen).toList();
+    const double hitRadius = 28.0; // Radio de detección táctil
+
+    final int numPoints = _foldMode && screenCorners.length >= 6 ? 6 : 4;
+
+    return SizedBox(
+      width: constraints.maxWidth,
+      height: constraints.maxHeight,
+      child: GestureDetector(
+        onPanStart: (details) {
+          final pos = details.localPosition;
+          // Buscar el punto más cercano dentro del radio de hit
+          double minDist = double.infinity;
+          int? closestIdx;
+          for (int i = 0; i < numPoints; i++) {
+            final dist = (screenCorners[i] - pos).distance;
+            if (dist < hitRadius && dist < minDist) {
+              minDist = dist;
+              closestIdx = i;
+            }
+          }
+          setState(() {
+            _draggingCornerIndex = closestIdx;
+          });
+        },
+        onPanUpdate: (details) {
+          if (_draggingCornerIndex == null) return;
+          final newScreenPos = details.localPosition;
+          // Convertir a coordenadas de imagen y limitar a los bordes
+          final imgPt = toImage(newScreenPos);
+          final clampedX = imgPt.dx.clamp(0.0, imgW);
+          final clampedY = imgPt.dy.clamp(0.0, imgH);
+          setState(() {
+            _detectedCorners![_draggingCornerIndex!] = Offset(clampedX, clampedY);
+            // Limpiar el recorte anterior cuando se mueven los puntos
+            _croppedImage = null;
+          });
+        },
+        onPanEnd: (_) {
+          setState(() {
+            _draggingCornerIndex = null;
+          });
+        },
+        child: CustomPaint(
+          painter: _CornersPainter(
+            screenCorners,
+            activeIndex: _draggingCornerIndex,
+            foldMode: _foldMode,
+          ),
+        ),
       ),
     );
   }
@@ -908,80 +1270,153 @@ class _CirclesPainter extends CustomPainter {
   }
 }
 
-/// Pinta el cuadrilátero y los puntos de las esquinas detectadas
+/// Pinta el cuadrilátero y los puntos de las esquinas detectadas.
+/// Soporta 4 puntos (normal) o 6 puntos (modo pliegue: 4 esquinas + 2 pliegue).
+/// Orden de puntos: [TL, TR, BL, BR, foldTop?, foldBottom?]
 class _CornersPainter extends CustomPainter {
-  final List<Offset> corners; // [TL, TR, BL, BR]
+  final List<Offset> corners; // [TL, TR, BL, BR] o [TL, TR, BL, BR, FT, FB]
+  final int? activeIndex; // Punto siendo arrastrado
+  final bool foldMode; // Si estamos en modo pliegue (6 puntos)
 
-  _CornersPainter(this.corners);
+  _CornersPainter(this.corners, {this.activeIndex, this.foldMode = false});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (corners.length != 4) return;
+    if (corners.length < 4) return;
 
     final tl = corners[0];
     final tr = corners[1];
     final bl = corners[2];
     final br = corners[3];
 
-    // Dibujar el cuadrilátero relleno semitransparente
-    final fillPaint = Paint()
-      ..color = Colors.red.withValues(alpha: 0.15)
-      ..style = PaintingStyle.fill;
+    if (foldMode && corners.length >= 6) {
+      final ft = corners[4]; // Fold Top
+      final fb = corners[5]; // Fold Bottom
 
-    final path = Path()
-      ..moveTo(tl.dx, tl.dy)
-      ..lineTo(tr.dx, tr.dy)
-      ..lineTo(br.dx, br.dy)
-      ..lineTo(bl.dx, bl.dy)
-      ..close();
+      // Mitad izquierda (semitransparente azul)
+      final fillLeft = Paint()
+        ..color = Colors.blue.withValues(alpha: 0.12)
+        ..style = PaintingStyle.fill;
+      final pathLeft = Path()
+        ..moveTo(tl.dx, tl.dy)
+        ..lineTo(ft.dx, ft.dy)
+        ..lineTo(fb.dx, fb.dy)
+        ..lineTo(bl.dx, bl.dy)
+        ..close();
+      canvas.drawPath(pathLeft, fillLeft);
 
-    canvas.drawPath(path, fillPaint);
+      // Mitad derecha (semitransparente verde)
+      final fillRight = Paint()
+        ..color = Colors.green.withValues(alpha: 0.12)
+        ..style = PaintingStyle.fill;
+      final pathRight = Path()
+        ..moveTo(ft.dx, ft.dy)
+        ..lineTo(tr.dx, tr.dy)
+        ..lineTo(br.dx, br.dy)
+        ..lineTo(fb.dx, fb.dy)
+        ..close();
+      canvas.drawPath(pathRight, fillRight);
 
-    // Dibujar el borde del cuadrilátero
-    final strokePaint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
+      // Bordes de ambas mitades
+      final strokePaint = Paint()
+        ..color = Colors.red
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+      canvas.drawPath(pathLeft, strokePaint);
+      canvas.drawPath(pathRight, strokePaint);
 
-    canvas.drawPath(path, strokePaint);
+      // Línea de pliegue (destacada en naranja discontinuo)
+      final foldPaint = Paint()
+        ..color = Colors.orange
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0;
+      canvas.drawLine(ft, fb, foldPaint);
+    } else {
+      // Modo normal: cuadrilátero único
+      final fillPaint = Paint()
+        ..color = Colors.red.withValues(alpha: 0.15)
+        ..style = PaintingStyle.fill;
 
-    // Dibujar los 4 puntos con etiquetas
-    final dotPaint = Paint()
-      ..color = Colors.yellow
-      ..style = PaintingStyle.fill;
+      final path = Path()
+        ..moveTo(tl.dx, tl.dy)
+        ..lineTo(tr.dx, tr.dy)
+        ..lineTo(br.dx, br.dy)
+        ..lineTo(bl.dx, bl.dy)
+        ..close();
 
-    final dotBorderPaint = Paint()
-      ..color = Colors.red.shade900
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
+      canvas.drawPath(path, fillPaint);
 
-    final labels = ['TL', 'TR', 'BL', 'BR'];
+      final strokePaint = Paint()
+        ..color = Colors.red
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+      canvas.drawPath(path, strokePaint);
+    }
 
-    for (int i = 0; i < 4; i++) {
-      // Círculo
-      canvas.drawCircle(corners[i], 8, dotPaint);
-      canvas.drawCircle(corners[i], 8, dotBorderPaint);
+    // Dibujar todos los puntos arrastrables
+    final int numPoints = foldMode && corners.length >= 6 ? 6 : 4;
+    final labels = foldMode && corners.length >= 6
+        ? ['TL', 'TR', 'BL', 'BR', 'PT', 'PB'] // P = Pliegue
+        : ['TL', 'TR', 'BL', 'BR'];
+
+    for (int i = 0; i < numPoints; i++) {
+      final isActive = i == activeIndex;
+      final isFoldPoint = i >= 4;
+      final radius = isActive ? 14.0 : 10.0;
+
+      // Círculo exterior (zona de toque visual)
+      if (isActive) {
+        canvas.drawCircle(
+          corners[i], 22,
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.3)
+            ..style = PaintingStyle.fill,
+        );
+      }
+
+      // Color: naranja para puntos de pliegue, amarillo para esquinas
+      final Color fillColor = isActive
+          ? Colors.greenAccent
+          : (isFoldPoint ? Colors.orange.shade300 : Colors.yellow);
+      final Color strokeColor = isActive
+          ? Colors.green.shade900
+          : (isFoldPoint ? Colors.deepOrange.shade900 : Colors.red.shade900);
+
+      // Punto principal
+      canvas.drawCircle(
+        corners[i], radius,
+        Paint()
+          ..color = fillColor
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawCircle(
+        corners[i], radius,
+        Paint()
+          ..color = strokeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5,
+      );
 
       // Etiqueta
       final textPainter = TextPainter(
         text: TextSpan(
           text: labels[i],
           style: TextStyle(
-            color: Colors.red.shade900,
+            color: strokeColor,
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            backgroundColor: Colors.white.withValues(alpha: 0.8),
+            backgroundColor: Colors.white.withValues(alpha: 0.85),
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
 
-      textPainter.paint(canvas, corners[i] + const Offset(10, -8));
+      textPainter.paint(canvas, corners[i] + Offset(radius + 4, -8));
     }
   }
 
   @override
   bool shouldRepaint(covariant _CornersPainter oldDelegate) {
-    return oldDelegate.corners != corners;
+    return true; // Repintar siempre para reflejar el arrastre en tiempo real
   }
 }
