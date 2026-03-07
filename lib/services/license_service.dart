@@ -150,9 +150,14 @@ class LicenseService {
 
     var backendRegistrado = false;
     var backendMensaje = '';
+    String? detalleFallo;
     final base = apiBaseUrl.trim();
 
-    if (base.isNotEmpty && licencia != null && licencia.licenciaKey.trim().isNotEmpty) {
+    if (base.isEmpty) {
+      detalleFallo = 'El servicio de licencias no está disponible';
+    } else if (licencia == null || licencia.licenciaKey.trim().isEmpty) {
+      detalleFallo = 'No hay una licencia válida para procesar la solicitud';
+    } else {
       try {
         final response = await http
             .post(
@@ -171,56 +176,59 @@ class LicenseService {
             )
             .timeout(const Duration(seconds: 8));
 
+        Map<String, dynamic>? data;
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            data = decoded;
+          }
+        } catch (_) {}
+
+        if (data != null && data['message'] is String) {
+          backendMensaje = (data['message'] as String).trim();
+        }
+
         if (response.statusCode >= 200 && response.statusCode < 300) {
           backendRegistrado = true;
-          try {
-            final data = jsonDecode(response.body);
-            if (data is Map<String, dynamic> && data['message'] is String) {
-              backendMensaje = (data['message'] as String).trim();
-            }
-          } catch (_) {}
+        } else if (response.statusCode >= 500) {
+          detalleFallo = 'Error temporal del servidor';
+        } else if (response.statusCode == 404) {
+          detalleFallo = 'La licencia no fue encontrada en el servidor';
+        } else if (response.statusCode == 403) {
+          detalleFallo = 'La licencia no coincide con el usuario vinculado';
+        } else if (response.statusCode == 400) {
+          detalleFallo = backendMensaje.isNotEmpty
+              ? backendMensaje
+              : 'La solicitud tiene datos incompletos';
+        } else {
+          detalleFallo = backendMensaje.isNotEmpty
+              ? backendMensaje
+              : 'No se pudo procesar la solicitud';
         }
+      } on TimeoutException {
+        detalleFallo = 'El servidor tardó demasiado en responder';
+        backendRegistrado = false;
+      } on SocketException {
+        detalleFallo = 'No hay conexión a internet';
+        backendRegistrado = false;
+      } on http.ClientException {
+        detalleFallo = 'No se pudo conectar con el servidor de licencias';
+        backendRegistrado = false;
       } catch (_) {
+        detalleFallo = 'Ocurrió un error inesperado al enviar la solicitud';
         backendRegistrado = false;
       }
     }
 
-    const subject = 'Solicitud de mejora de plan - Tiro Deportivo AMG';
-    final body = [
-      'Hola,',
-      '',
-      'Quiero solicitar una actualización de plan.',
-      '',
-      'Licencia: ${licencia?.licenciaKey ?? 'N/D'}',
-      'Plan actual: $currentPlan',
-      'Plan requerido: $requiredPlan',
-      'Función solicitada: $capability',
-      'Device ID: $deviceId',
-      'Plataforma: $_platformKey',
-      'Versión app: ${package.version}+${package.buildNumber}',
-    ].join('\n');
-
-    final emailUri = Uri(
-      scheme: 'mailto',
-      path: 'info@albertomaestre.es',
-      queryParameters: {
-        'subject': subject,
-        'body': body,
-      },
-    );
-
-    final emailAbierto = await launchUrl(
-      emailUri,
-      mode: LaunchMode.externalApplication,
-    );
+    const emailAbierto = false;
 
     final message = backendRegistrado
         ? (backendMensaje.isNotEmpty
-            ? '$backendMensaje\nSe ha abierto tu cliente de email para completar la solicitud.'
-            : 'Solicitud registrada. Se ha abierto tu cliente de email para completar la solicitud.')
-        : (emailAbierto
-            ? 'Se ha abierto tu cliente de email para solicitar la actualización.'
-            : 'No se pudo abrir el cliente de email. Escribe a info@albertomaestre.es.');
+            ? backendMensaje
+            : 'Solicitud de mejora de plan registrada correctamente.')
+        : 'No se pudo registrar la solicitud en este momento.'
+            '${detalleFallo != null && detalleFallo.isNotEmpty ? ' $detalleFallo.' : ''}'
+            ' Inténtalo de nuevo más tarde.';
 
     await _guardarEstadoUltimoUpgrade(
       capability: capability,
