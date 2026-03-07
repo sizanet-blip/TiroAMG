@@ -112,19 +112,23 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.modalidad.nombre), backgroundColor: Colors.amber[700]),
-      body: Padding(
+      body: ListView(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        children: [
             const Text('Prepara tu equipo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             
             // Selector Arma
             DropdownButtonFormField<EquipoDetalle>(
               decoration: const InputDecoration(labelText: 'Arma', border: OutlineInputBorder()),
+              isExpanded: true,
               value: _equipoSeleccionado,
-              items: _equipos.map((e) => DropdownMenuItem(value: e, child: Text(e.nombre))).toList(),
+              items: _equipos
+                  .map((e) => DropdownMenuItem(
+                        value: e,
+                        child: Text(e.nombre, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ))
+                  .toList(),
               onChanged: (v) => setState(() => _equipoSeleccionado = v),
             ),
             const SizedBox(height: 20),
@@ -132,10 +136,23 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
             // Selector Munición
             DropdownButtonFormField<MunicionDetalle>(
               decoration: const InputDecoration(labelText: 'Munición (Opcional)', border: OutlineInputBorder()),
+              isExpanded: true,
               value: _municionSeleccionada,
               items: [
-                const DropdownMenuItem(value: null, child: Text('Sin especificar')),
-                ..._municiones.map((m) => DropdownMenuItem(value: m, child: Text('${m.marca} (${m.lote}) - Stock ${m.cantidadActual}'))),
+                const DropdownMenuItem(
+                  value: null,
+                  child: Text('Sin especificar', maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+                ..._municiones.map(
+                  (m) => DropdownMenuItem(
+                    value: m,
+                    child: Text(
+                      '${m.marca} (${m.lote}) - Stock ${m.cantidadActual}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
               ],
               onChanged: (v) => setState(() => _municionSeleccionada = v),
             ),
@@ -214,7 +231,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
               decoration: const InputDecoration(labelText: 'Direccion del viento', border: OutlineInputBorder()),
             ),
             
-            const Spacer(),
+            const SizedBox(height: 20),
             
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
@@ -227,7 +244,6 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
               onPressed: _empezar,
             )
           ],
-        ),
       ),
     );
   }

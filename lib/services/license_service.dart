@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../database/database_provider.dart';
 import '../models/licencia_model.dart';
@@ -24,6 +25,341 @@ class LicenseService {
     final rows = await db.query('Licencias', where: 'id = 1', limit: 1);
     if (rows.isEmpty) return null;
     return LicenciaLocal.fromMap(rows.first);
+  }
+
+  Future<LicenseCapabilityServerResult> verificarCapacidadServidor({
+    required LicenciaLocal? licencia,
+    required String capability,
+    String? identificadorUsuario,
+  }) async {
+    final base = apiBaseUrl.trim();
+    if (base.isEmpty) {
+      return const LicenseCapabilityServerResult(
+        known: false,
+        allowed: false,
+        message: 'Licencias en servidor desactivadas.',
+      );
+    }
+
+    if (licencia == null || licencia.licenciaKey.trim().isEmpty) {
+      return const LicenseCapabilityServerResult(
+        known: true,
+        allowed: false,
+        message: 'Licencia no disponible para validar capacidad.',
+      );
+    }
+
+    try {
+      final package = await PackageInfo.fromPlatform();
+      final deviceId = await _obtenerDeviceIdPersistente();
+      final identifier = identificadorUsuario?.trim() ?? '';
+
+      final response = await http
+          .post(
+            Uri.parse('$base/licenses/can'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'license_key': licencia.licenciaKey,
+              'device_id': deviceId,
+              'capability': capability,
+              'platform': _platformKey,
+              'app_version': package.version,
+              'build_number': package.buildNumber,
+              if (identifier.isNotEmpty && identifier.contains('@'))
+                'email': identifier,
+              if (identifier.isNotEmpty && !identifier.contains('@'))
+                'username': identifier,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = jsonDecode(response.body);
+        final allowed = data is Map<String, dynamic> && data['allowed'] == true;
+        return LicenseCapabilityServerResult(
+          known: true,
+          allowed: allowed,
+          message: allowed
+              ? 'Capacidad permitida por servidor.'
+              : 'Función no habilitada para tu licencia.',
+        );
+      }
+
+      // Errores de negocio conocidos: bloqueamos.
+      if (response.statusCode >= 400 && response.statusCode < 500) {
+        String message = _mensajeServidorAmigable(
+          response.statusCode,
+          contexto: 'can',
+        );
+        try {
+          final data = jsonDecode(response.body);
+          if (data is Map<String, dynamic> &&
+              data['message'] is String &&
+              (data['message'] as String).trim().isNotEmpty) {
+            message = data['message'] as String;
+          }
+        } catch (_) {}
+        return LicenseCapabilityServerResult(
+          known: true,
+          allowed: false,
+          message: message,
+        );
+      }
+
+      // Errores 5xx: sin certeza, dejamos fallback local.
+      return const LicenseCapabilityServerResult(
+        known: false,
+        allowed: false,
+        message: 'Servidor de licencias no disponible temporalmente.',
+      );
+    } on SocketException {
+      return const LicenseCapabilityServerResult(
+        known: false,
+        allowed: false,
+        message: 'Sin conexión. Usando validación local.',
+      );
+    } on TimeoutException {
+      return const LicenseCapabilityServerResult(
+        known: false,
+        allowed: false,
+        message: 'Tiempo de espera agotado. Usando validación local.',
+      );
+    } on http.ClientException {
+      return const LicenseCapabilityServerResult(
+        known: false,
+        allowed: false,
+        message: 'Error de red. Usando validación local.',
+      );
+    } catch (_) {
+      return const LicenseCapabilityServerResult(
+        known: false,
+        allowed: false,
+        message: 'No se pudo validar con servidor. Usando validación local.',
+      );
+    }
+  }
+
+  Future<LicenseUpgradeResult> solicitarUpgrade({
+    required LicenciaLocal? licencia,
+    required String capability,
+    required String requiredPlan,
+    required String currentPlan,
+  }) async {
+    final deviceId = await _obtenerDeviceIdPersistente();
+    final package = await PackageInfo.fromPlatform();
+
+    var backendRegistrado = false;
+    var backendMensaje = '';
+    final base = apiBaseUrl.trim();
+
+    if (base.isNotEmpty && licencia != null && licencia.licenciaKey.trim().isNotEmpty) {
+      try {
+        final response = await http
+            .post(
+              Uri.parse('$base/licenses/upgrade-request'),
+              headers: const {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'license_key': licencia.licenciaKey.trim(),
+                'device_id': deviceId,
+                'capability': capability,
+                'required_plan': requiredPlan,
+                'current_plan': currentPlan,
+                'platform': _platformKey,
+                'app_version': package.version,
+                'build_number': package.buildNumber,
+              }),
+            )
+            .timeout(const Duration(seconds: 8));
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          backendRegistrado = true;
+          try {
+            final data = jsonDecode(response.body);
+            if (data is Map<String, dynamic> && data['message'] is String) {
+              backendMensaje = (data['message'] as String).trim();
+            }
+          } catch (_) {}
+        }
+      } catch (_) {
+        backendRegistrado = false;
+      }
+    }
+
+    final subject = 'Solicitud de mejora de plan - Tiro Deportivo AMG';
+    final body = [
+      'Hola,',
+      '',
+      'Quiero solicitar una actualización de plan.',
+      '',
+      'Licencia: ${licencia?.licenciaKey ?? 'N/D'}',
+      'Plan actual: $currentPlan',
+      'Plan requerido: $requiredPlan',
+      'Función solicitada: $capability',
+      'Device ID: $deviceId',
+      'Plataforma: $_platformKey',
+      'Versión app: ${package.version}+${package.buildNumber}',
+    ].join('\n');
+
+    final emailUri = Uri(
+      scheme: 'mailto',
+      path: 'info@albertomaestre.es',
+      queryParameters: {
+        'subject': subject,
+        'body': body,
+      },
+    );
+
+    final emailAbierto = await launchUrl(
+      emailUri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    final message = backendRegistrado
+        ? (backendMensaje.isNotEmpty
+            ? '$backendMensaje\nSe ha abierto tu cliente de email para completar la solicitud.'
+            : 'Solicitud registrada. Se ha abierto tu cliente de email para completar la solicitud.')
+        : (emailAbierto
+            ? 'Se ha abierto tu cliente de email para solicitar la actualización.'
+            : 'No se pudo abrir el cliente de email. Escribe a info@albertomaestre.es.');
+
+    await _guardarEstadoUltimoUpgrade(
+      capability: capability,
+      requiredPlan: requiredPlan,
+      currentPlan: currentPlan,
+      backendRegistered: backendRegistrado,
+      emailOpened: emailAbierto,
+      message: message,
+    );
+    await _registrarEnHistorialUpgrade(
+      capability: capability,
+      requiredPlan: requiredPlan,
+      currentPlan: currentPlan,
+      backendRegistered: backendRegistrado,
+      emailOpened: emailAbierto,
+      message: message,
+    );
+
+    return LicenseUpgradeResult(
+      backendRegistered: backendRegistrado,
+      emailOpened: emailAbierto,
+      message: message,
+    );
+  }
+
+  Future<LicenseUpgradeStatus?> obtenerUltimoUpgradeStatus() async {
+    final db = await DatabaseProvider.instance.database;
+    final rows = await db.query(
+      'Licencias',
+      columns: [
+        'ultimo_upgrade_at',
+        'ultimo_upgrade_capability',
+        'ultimo_upgrade_plan_requerido',
+        'ultimo_upgrade_plan_actual',
+        'ultimo_upgrade_backend_ok',
+        'ultimo_upgrade_email_ok',
+        'ultimo_upgrade_msg',
+      ],
+      where: 'id = 1',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    final rawDate = row['ultimo_upgrade_at']?.toString();
+    if (rawDate == null || rawDate.trim().isEmpty) return null;
+    final at = DateTime.tryParse(rawDate);
+    if (at == null) return null;
+
+    return LicenseUpgradeStatus(
+      at: at.toLocal(),
+      capability: row['ultimo_upgrade_capability']?.toString() ?? '-',
+      requiredPlan: row['ultimo_upgrade_plan_requerido']?.toString() ?? '-',
+      currentPlan: row['ultimo_upgrade_plan_actual']?.toString() ?? '-',
+      backendRegistered: (row['ultimo_upgrade_backend_ok'] as num?)?.toInt() == 1,
+      emailOpened: (row['ultimo_upgrade_email_ok'] as num?)?.toInt() == 1,
+      message: row['ultimo_upgrade_msg']?.toString() ?? '',
+    );
+  }
+
+  Future<List<LicenseUpgradeStatus>> obtenerHistorialUpgrade({
+    int limit = 20,
+  }) async {
+    final db = await DatabaseProvider.instance.database;
+    final rows = await db.query(
+      'UpgradeSolicitudes',
+      orderBy: 'id DESC',
+      limit: limit,
+    );
+
+    return rows
+        .map((row) {
+          final at = DateTime.tryParse(row['fecha']?.toString() ?? '');
+          if (at == null) return null;
+          return LicenseUpgradeStatus(
+            at: at.toLocal(),
+            capability: row['capability']?.toString() ?? '-',
+            requiredPlan: row['plan_requerido']?.toString() ?? '-',
+            currentPlan: row['plan_actual']?.toString() ?? '-',
+            backendRegistered: (row['backend_ok'] as num?)?.toInt() == 1,
+            emailOpened: (row['email_ok'] as num?)?.toInt() == 1,
+            message: row['mensaje']?.toString() ?? '',
+          );
+        })
+        .whereType<LicenseUpgradeStatus>()
+        .toList();
+  }
+
+  Future<int> limpiarHistorialUpgrade({bool limpiarUltimoEstado = false}) async {
+    final db = await DatabaseProvider.instance.database;
+    final borradas = await db.delete('UpgradeSolicitudes');
+    if (limpiarUltimoEstado) {
+      await _limpiarEstadoUltimoUpgrade();
+    }
+    return borradas;
+  }
+
+  Future<bool> exportarHistorialUpgradePorEmail({
+    required List<LicenseUpgradeStatus> items,
+    String to = 'info@albertomaestre.es',
+  }) async {
+    final exportItems = items.take(20).toList();
+    final truncado = items.length > exportItems.length;
+
+    final subject = 'Historial de solicitudes de mejora de plan - Tiro Deportivo AMG';
+    final body = <String>[
+      'Hola,',
+      '',
+      'Comparto historial de solicitudes de mejora de plan desde la app.',
+      '',
+      if (exportItems.isEmpty) 'No hay solicitudes en el historial.',
+      if (exportItems.isNotEmpty) ...[
+        'Solicitudes incluidas: ${exportItems.length}${truncado ? ' (truncado)' : ''}',
+        '',
+        for (final item in exportItems) ...[
+          '- Fecha: ${item.at.toString().split('.').first}',
+          '  Capability: ${item.capability}',
+          '  Plan requerido: ${item.requiredPlan}',
+          '  Plan actual: ${item.currentPlan}',
+          '  Backend: ${item.backendRegistered ? 'registrado' : 'pendiente'}',
+          '  Email: ${item.emailOpened ? 'abierto' : 'no abierto'}',
+          '  Mensaje: ${item.message}',
+          '',
+        ],
+      ],
+    ].join('\n');
+
+    final emailUri = Uri(
+      scheme: 'mailto',
+      path: to,
+      queryParameters: {
+        'subject': subject,
+        'body': body,
+      },
+    );
+
+    return launchUrl(
+      emailUri,
+      mode: LaunchMode.externalApplication,
+    );
   }
 
   Future<LicenciaCheckResult> revisarLicencia({bool forzarServidor = false}) async {
@@ -425,6 +761,87 @@ class LicenseService {
     );
   }
 
+  Future<void> _guardarEstadoUltimoUpgrade({
+    required String capability,
+    required String requiredPlan,
+    required String currentPlan,
+    required bool backendRegistered,
+    required bool emailOpened,
+    required String message,
+  }) async {
+    final db = await DatabaseProvider.instance.database;
+    await db.insert(
+      'Licencias',
+      {
+        'id': 1,
+        'ultimo_upgrade_at': DateTime.now().toUtc().toIso8601String(),
+        'ultimo_upgrade_capability': capability,
+        'ultimo_upgrade_plan_requerido': requiredPlan,
+        'ultimo_upgrade_plan_actual': currentPlan,
+        'ultimo_upgrade_backend_ok': backendRegistered ? 1 : 0,
+        'ultimo_upgrade_email_ok': emailOpened ? 1 : 0,
+        'ultimo_upgrade_msg': message,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+    await db.update(
+      'Licencias',
+      {
+        'ultimo_upgrade_at': DateTime.now().toUtc().toIso8601String(),
+        'ultimo_upgrade_capability': capability,
+        'ultimo_upgrade_plan_requerido': requiredPlan,
+        'ultimo_upgrade_plan_actual': currentPlan,
+        'ultimo_upgrade_backend_ok': backendRegistered ? 1 : 0,
+        'ultimo_upgrade_email_ok': emailOpened ? 1 : 0,
+        'ultimo_upgrade_msg': message,
+      },
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+  }
+
+  Future<void> _registrarEnHistorialUpgrade({
+    required String capability,
+    required String requiredPlan,
+    required String currentPlan,
+    required bool backendRegistered,
+    required bool emailOpened,
+    required String message,
+  }) async {
+    final db = await DatabaseProvider.instance.database;
+    await db.insert(
+      'UpgradeSolicitudes',
+      {
+        'fecha': DateTime.now().toUtc().toIso8601String(),
+        'capability': capability,
+        'plan_requerido': requiredPlan,
+        'plan_actual': currentPlan,
+        'backend_ok': backendRegistered ? 1 : 0,
+        'email_ok': emailOpened ? 1 : 0,
+        'mensaje': message,
+      },
+      conflictAlgorithm: ConflictAlgorithm.abort,
+    );
+  }
+
+  Future<void> _limpiarEstadoUltimoUpgrade() async {
+    final db = await DatabaseProvider.instance.database;
+    await db.update(
+      'Licencias',
+      {
+        'ultimo_upgrade_at': null,
+        'ultimo_upgrade_capability': null,
+        'ultimo_upgrade_plan_requerido': null,
+        'ultimo_upgrade_plan_actual': null,
+        'ultimo_upgrade_backend_ok': null,
+        'ultimo_upgrade_email_ok': null,
+        'ultimo_upgrade_msg': null,
+      },
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+  }
+
   String _mensajeServidorAmigable(int statusCode, {required String contexto}) {
     if (statusCode == 400) {
       if (contexto == 'request') {
@@ -432,6 +849,9 @@ class LicenseService {
       }
       if (contexto == 'activate') {
         return 'Faltan datos para activar la licencia.';
+      }
+      if (contexto == 'can') {
+        return 'Faltan datos para validar permisos de licencia.';
       }
       return 'La validación de licencia no tiene todos los datos requeridos.';
     }
@@ -444,6 +864,9 @@ class LicenseService {
     if (statusCode == 404) {
       if (contexto == 'request') {
         return 'No se encontró el servicio de licencias.';
+      }
+      if (contexto == 'can') {
+        return 'No se encontró la licencia al validar permisos.';
       }
       return 'La clave de licencia no existe o ya no es válida.';
     }
@@ -462,4 +885,48 @@ class _LicenseServerException implements Exception {
   final int statusCode;
 
   _LicenseServerException(this.statusCode);
+}
+
+class LicenseCapabilityServerResult {
+  final bool known;
+  final bool allowed;
+  final String message;
+
+  const LicenseCapabilityServerResult({
+    required this.known,
+    required this.allowed,
+    required this.message,
+  });
+}
+
+class LicenseUpgradeResult {
+  final bool backendRegistered;
+  final bool emailOpened;
+  final String message;
+
+  const LicenseUpgradeResult({
+    required this.backendRegistered,
+    required this.emailOpened,
+    required this.message,
+  });
+}
+
+class LicenseUpgradeStatus {
+  final DateTime at;
+  final String capability;
+  final String requiredPlan;
+  final String currentPlan;
+  final bool backendRegistered;
+  final bool emailOpened;
+  final String message;
+
+  const LicenseUpgradeStatus({
+    required this.at,
+    required this.capability,
+    required this.requiredPlan,
+    required this.currentPlan,
+    required this.backendRegistered,
+    required this.emailOpened,
+    required this.message,
+  });
 }

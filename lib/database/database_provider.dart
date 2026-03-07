@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseProvider {
-  static const int schemaVersion = 5;
+  static const int schemaVersion = 7;
   static Database? _database;
   static final DatabaseProvider instance = DatabaseProvider._constructor();
 
@@ -120,7 +120,27 @@ class DatabaseProvider {
         proxima_validacion TEXT,
         dias_gracia_offline INTEGER NOT NULL DEFAULT 3,
         max_dispositivos INTEGER,
-        firma TEXT
+        firma TEXT,
+        ultimo_upgrade_at TEXT,
+        ultimo_upgrade_capability TEXT,
+        ultimo_upgrade_plan_requerido TEXT,
+        ultimo_upgrade_plan_actual TEXT,
+        ultimo_upgrade_backend_ok INTEGER,
+        ultimo_upgrade_email_ok INTEGER,
+        ultimo_upgrade_msg TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE UpgradeSolicitudes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fecha TEXT NOT NULL,
+        capability TEXT NOT NULL,
+        plan_requerido TEXT,
+        plan_actual TEXT,
+        backend_ok INTEGER NOT NULL DEFAULT 0,
+        email_ok INTEGER NOT NULL DEFAULT 0,
+        mensaje TEXT
       )
     ''');
 
@@ -197,6 +217,12 @@ class DatabaseProvider {
     if (oldVersion < 5) {
       await _migrarV4aV5(db);
     }
+    if (oldVersion < 6) {
+      await _migrarV5aV6(db);
+    }
+    if (oldVersion < 7) {
+      await _migrarV6aV7(db);
+    }
   }
 
   Future<void> _migrarV1aV2(Database db) async {
@@ -249,6 +275,31 @@ class DatabaseProvider {
         dias_gracia_offline INTEGER NOT NULL DEFAULT 3,
         max_dispositivos INTEGER,
         firma TEXT
+      )
+    ''');
+  }
+
+  Future<void> _migrarV5aV6(Database db) async {
+    await _agregarColumnaSiNoExiste(db, 'Licencias', 'ultimo_upgrade_at TEXT');
+    await _agregarColumnaSiNoExiste(db, 'Licencias', 'ultimo_upgrade_capability TEXT');
+    await _agregarColumnaSiNoExiste(db, 'Licencias', 'ultimo_upgrade_plan_requerido TEXT');
+    await _agregarColumnaSiNoExiste(db, 'Licencias', 'ultimo_upgrade_plan_actual TEXT');
+    await _agregarColumnaSiNoExiste(db, 'Licencias', 'ultimo_upgrade_backend_ok INTEGER');
+    await _agregarColumnaSiNoExiste(db, 'Licencias', 'ultimo_upgrade_email_ok INTEGER');
+    await _agregarColumnaSiNoExiste(db, 'Licencias', 'ultimo_upgrade_msg TEXT');
+  }
+
+  Future<void> _migrarV6aV7(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS UpgradeSolicitudes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fecha TEXT NOT NULL,
+        capability TEXT NOT NULL,
+        plan_requerido TEXT,
+        plan_actual TEXT,
+        backend_ok INTEGER NOT NULL DEFAULT 0,
+        email_ok INTEGER NOT NULL DEFAULT 0,
+        mensaje TEXT
       )
     ''');
   }

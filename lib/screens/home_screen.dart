@@ -12,6 +12,8 @@ import 'package:flutter/foundation.dart'; // <--- Agrega esto para usar kDebugMo
 import 'package:package_info_plus/package_info_plus.dart';
 import '../services/app_update_service.dart';
 import '../services/license_service.dart';
+import '../services/license_permissions_service.dart';
+import '../models/licencia_model.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,9 +25,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final AppUpdateService _updateService = const AppUpdateService();
   final LicenseService _licenseService = const LicenseService();
+  final LicensePermissionsService _permissions = const LicensePermissionsService();
   final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
   bool _updateDialogShown = false;
   bool _licenseDialogShown = false;
+  LicenciaLocal? _licenciaActual;
 
   @override
   void initState() {
@@ -46,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return false;
 
     if (initialResult.esValida) {
+      _actualizarLicencia(initialResult.licencia);
       if (initialResult.enGraciaOffline) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(initialResult.mensaje)),
@@ -61,7 +66,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final retryResult = await _licenseService.revisarLicencia(forzarServidor: true);
     if (!mounted) return false;
-    if (retryResult.esValida) return true;
+    if (retryResult.esValida) {
+      _actualizarLicencia(retryResult.licencia);
+      return true;
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -69,6 +77,85 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     return false;
+  }
+
+  void _actualizarLicencia(LicenciaLocal? licencia) {
+    if (!mounted) return;
+    setState(() {
+      _licenciaActual = licencia;
+    });
+  }
+
+  Future<void> _abrirSiPermitido({
+    required BuildContext context,
+    required LicenseCapability capability,
+    required VoidCallback onAllowed,
+  }) async {
+    final permitidoLocal = _permissions.canAccess(_licenciaActual, capability);
+    if (!permitidoLocal) {
+      await _mostrarDialogoUpgrade(capability: capability);
+      return;
+    }
+
+    final serverResult = await _licenseService.verificarCapacidadServidor(
+      licencia: _licenciaActual,
+      capability: _permissions.toServerCapability(capability),
+    );
+
+    // known=true: respuesta autoritativa del servidor.
+    if (serverResult.known && !serverResult.allowed) {
+      if (!mounted) return;
+      await _mostrarDialogoUpgrade(
+        capability: capability,
+        detalleServidor: serverResult.message,
+      );
+      return;
+    }
+
+    onAllowed();
+  }
+
+  Future<void> _mostrarDialogoUpgrade({
+    required LicenseCapability capability,
+    String? detalleServidor,
+  }) async {
+    if (!mounted) return;
+    final planNecesario = _permissions.requiredPlanLabel(capability);
+    final planActual = _permissions.currentPlanLabel(_licenciaActual?.plan);
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Función bloqueada por licencia'),
+        content: Text(
+          detalleServidor?.trim().isNotEmpty == true
+              ? '$detalleServidor\n\nTu plan actual: $planActual.\nPlan requerido: $planNecesario o superior.'
+              : 'Tu plan actual es $planActual.\nEsta opción requiere plan $planNecesario o superior.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final result = await _licenseService.solicitarUpgrade(
+                licencia: _licenciaActual,
+                capability: _permissions.toServerCapability(capability),
+                requiredPlan: planNecesario,
+                currentPlan: planActual,
+              );
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(result.message)),
+              );
+            },
+            child: const Text('Solicitar mejora de plan'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkUpdatesOnStart() async {
@@ -258,6 +345,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+              if (_licenciaActual != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Center(
+                    child: Chip(
+                      avatar: const Icon(Icons.verified, size: 18),
+                      label: Text(
+                        'Plan: ${_permissions.currentPlanLabel(_licenciaActual?.plan)}',
+                      ),
+                    ),
+                  ),
+                ),
 
               // --- BOTONES DEL MENÚ ---
               if (kDebugMode) ...[
@@ -277,10 +376,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Competición',
                   Icons.emoji_events,
                   Colors.amber[700]!,
-                  () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const CompeticionScreen()))),
+                  () => _abrirSiPermitido(
+                        context: context,
+                        capability: LicenseCapability.competition,
+                        onAllowed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CompeticionScreen()),
+                        ),
+                      )),
 
               _buildMenuItem(
                   context,
@@ -297,18 +400,28 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Historial y Análisis',
                   Icons.analytics,
                   Colors.indigo,
-                  () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const HistorialScreen()))),
+                  () => _abrirSiPermitido(
+                        context: context,
+                        capability: LicenseCapability.analytics,
+                        onAllowed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HistorialScreen()),
+                        ),
+                      )),
 
               _buildMenuItem(
                   context,
                   'Copia de Seguridad',
                   Icons.cloud_sync,
                   Colors.blueGrey,
-                  () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const BackupScreen()))),
+                  () => _abrirSiPermitido(
+                        context: context,
+                        capability: LicenseCapability.backup,
+                        onAllowed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const BackupScreen()),
+                        ),
+                      )),
 
               _buildMenuItem(
                   context,

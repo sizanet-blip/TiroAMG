@@ -88,6 +88,12 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
   
   void _lanzarSiguienteSerie() async {
     if (_torneoFinalizado) return;
+    if (_fases.isEmpty || _indiceFase >= _fases.length) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay fases disponibles para esta modalidad.')),
+      );
+      return;
+    }
 
     // 1. Obtener la configuración de la fase actual
     final faseActual = _fases[_indiceFase];
@@ -225,6 +231,22 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_cargando) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+    if (_fases.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.modalidad.nombre), backgroundColor: Colors.blueGrey[900]),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Esta modalidad no tiene fases configuradas.\nRevisa la modalidad en configuración.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    }
 
     // Si terminamos, mostramos pantalla final estática
     if (_torneoFinalizado) {
