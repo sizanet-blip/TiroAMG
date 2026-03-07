@@ -297,7 +297,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
-                        value: planSolicitado,
+                        initialValue: planSolicitado,
                         decoration: const InputDecoration(
                           labelText: 'Plan que quieres solicitar',
                           border: OutlineInputBorder(),
@@ -369,7 +369,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
     if (!mounted) return;
     String filtro = 'todos';
 
-    List<LicenseUpgradeStatus> _filtrar(List<LicenseUpgradeStatus> items) {
+    List<LicenseUpgradeStatus> filtrar(List<LicenseUpgradeStatus> items) {
       switch (filtro) {
         case 'backend_ok':
           return items.where((e) => e.backendRegistered).toList();
@@ -391,7 +391,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
           final screenSize = MediaQuery.sizeOf(ctx);
           final dialogWidth = (screenSize.width - 32).clamp(280.0, 760.0).toDouble();
           final listHeight = (screenSize.height * 0.45).clamp(170.0, 360.0).toDouble();
-          final filtrado = _filtrar(historial);
+          final filtrado = filtrar(historial);
           return AlertDialog(
             title: const Text('Historial de solicitudes'),
             content: SizedBox(
@@ -402,7 +402,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         DropdownButtonFormField<String>(
-                          value: filtro,
+                          initialValue: filtro,
                           decoration: const InputDecoration(
                             labelText: 'Filtrar por estado',
                             border: OutlineInputBorder(),
@@ -528,6 +528,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     final ultimo = await _licenseService.obtenerUltimoUpgradeStatus();
                     if (!mounted) return;
                     setState(() => _ultimoUpgrade = ultimo);
+                    if (!ctx.mounted) return;
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(

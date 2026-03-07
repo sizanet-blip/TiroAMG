@@ -185,7 +185,7 @@ class LicenseService {
       }
     }
 
-    final subject = 'Solicitud de mejora de plan - Tiro Deportivo AMG';
+    const subject = 'Solicitud de mejora de plan - Tiro Deportivo AMG';
     final body = [
       'Hola,',
       '',
@@ -324,7 +324,7 @@ class LicenseService {
     final exportItems = items.take(20).toList();
     final truncado = items.length > exportItems.length;
 
-    final subject = 'Historial de solicitudes de mejora de plan - Tiro Deportivo AMG';
+    const subject = 'Historial de solicitudes de mejora de plan - Tiro Deportivo AMG';
     final body = <String>[
       'Hola,',
       '',
