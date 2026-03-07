@@ -133,7 +133,7 @@ class _PlantillaTiemposFormScreenState extends State<PlantillaTiemposFormScreen>
               )
               : DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: 'Tipo de Diana a usar', border: OutlineInputBorder()),
-                value: _selectedDianaId,
+                initialValue: _selectedDianaId,
                 items: _dianas.map((d) => DropdownMenuItem(value: d.id, child: Text(d.nombre))).toList(),
                 onChanged: (val) => setState(() => _selectedDianaId = val),
                 validator: (v) => v == null ? 'Selecciona una diana' : null,
@@ -145,7 +145,7 @@ class _PlantillaTiemposFormScreenState extends State<PlantillaTiemposFormScreen>
                 title: const Text('¿Es Modalidad Duelo / Fase?', style: TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: const Text('Actívalo si la diana aparece y desaparece (Ej: 3s/7s).'),
                 value: _esDuelo,
-                activeColor: Colors.deepOrange,
+                activeThumbColor: Colors.deepOrange,
                 onChanged: (val) {
                   setState(() {
                     _esDuelo = val;

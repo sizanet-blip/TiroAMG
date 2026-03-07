@@ -163,8 +163,6 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
     );
   }
 
-  String _formatoFecha(DateTime fecha) => "${fecha.day}/${fecha.month}/${fecha.year}";
-  
   String _formatoCorto(DateTime fecha) => "${fecha.day}/${fecha.month}";
   
   String _obtenerMes(int mes) {
@@ -222,7 +220,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                   child: DropdownButton<int>(
                     value: _filtroSeleccionado,
                     isExpanded: true,
-                    underline: Container(height: 2, color: Colors.indigo.withOpacity(0.2)),
+                    underline: Container(height: 2, color: Colors.indigo.withValues(alpha: 0.2)),
                     icon: const Icon(Icons.arrow_drop_down, color: Colors.indigo),
                     style: const TextStyle(color: Colors.black87, fontSize: 16),
                     
@@ -337,7 +335,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                     decoration: BoxDecoration(
                       color: esCompe ? Colors.amber[50] : Colors.teal[50],
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: esCompe ? Colors.amber.withOpacity(0.3) : Colors.teal.withOpacity(0.3))
+                      border: Border.all(color: esCompe ? Colors.amber.withValues(alpha: 0.3) : Colors.teal.withValues(alpha: 0.3))
                     ),
                     child: Column(
                       children: [

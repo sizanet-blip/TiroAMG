@@ -1,7 +1,6 @@
-import 'dart:math'; 
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../services/estadisticas_service.dart' hide DateTimeRange;
+import '../services/estadisticas_service.dart';
 import '../services/equipo_service.dart';
 import '../services/catalogo_service.dart';
 import '../services/municion_service.dart';
@@ -197,8 +196,11 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             rangoFechas: null, idEquipo: null, filtroModo: null   
          );
       } else {
-         if (_dianasEnContexto.isNotEmpty) dianasAProcesar = _dianasEnContexto;
-         else if (_dianaSel != null) dianasAProcesar = [_dianaSel!];
+         if (_dianasEnContexto.isNotEmpty) {
+           dianasAProcesar = _dianasEnContexto;
+         } else if (_dianaSel != null) {
+           dianasAProcesar = [_dianaSel!];
+         }
       }
 
       DateTimeRange? rangoPdf = _esModoDetalle ? null : _obtenerRangoActual();
@@ -213,7 +215,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             rangoFechas: rangoPdf, idEquipo: equipoPdf, filtroModo: modoPdf, idsSesiones: sesionesPdf,
          );
 
-         if (analisis != null && (analisis.disparosValidos.isNotEmpty || analisis.disparosDescartados.isNotEmpty)) {
+         if (analisis.disparosValidos.isNotEmpty || analisis.disparosDescartados.isNotEmpty) {
            var diag = await _statsService.calcularDiagnosticoTecnico(
               idTipoDiana: diana.id,
               idMunicion: _municionSel?.id,
@@ -238,8 +240,11 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       }
 
       String textoPeriodo = "Histórico";
-      if (_esModoDetalle) textoPeriodo = "Detalle de Sesión";
-      else if (rangoPdf != null) textoPeriodo = "${rangoPdf.start.day}/${rangoPdf.start.month} - ${rangoPdf.end.day}/${rangoPdf.end.month}";
+      if (_esModoDetalle) {
+        textoPeriodo = "Detalle de Sesión";
+      } else if (rangoPdf != null) {
+        textoPeriodo = "${rangoPdf.start.day}/${rangoPdf.start.month} - ${rangoPdf.end.day}/${rangoPdf.end.month}";
+      }
 
       await _pdfService.generarInformeAnalisisCompleto(
         perfil: null, 
@@ -306,7 +311,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                         DropdownButtonFormField<int>(
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Periodo', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
-                          value: _filtroFechaSeleccionado,
+                          initialValue: _filtroFechaSeleccionado,
                           items: [const DropdownMenuItem(value: 0, child: Text('Todo')), const DropdownMenuItem(value: 1, child: Text('Hoy')), const DropdownMenuItem(value: 2, child: Text('Este Mes')), const DropdownMenuItem(value: 3, child: Text('Últimos 3 Meses')), const DropdownMenuItem(value: 4, child: Text('Este Año')), DropdownMenuItem(value: 5, child: Text(_filtroFechaSeleccionado == 5 && _rangoFechasManual != null ? '${_formatoCorto(_rangoFechasManual!.start)} - ${_formatoCorto(_rangoFechasManual!.end)}' : 'Personalizado...', overflow: TextOverflow.ellipsis))],
                           onChanged: (v) { if (v == 5) { _seleccionarFechasManuales(); } else { setState(() { _filtroFechaSeleccionado = v!; _refrescarDatos(); }); } },
                         ),
@@ -314,15 +319,15 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                         DropdownButtonFormField<EquipoDetalle>(
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Arma', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
-                          value: _equipoSel,
-                          items: [const DropdownMenuItem(value: null, child: Text('Todas las armas')), ..._equipos.map((e) => DropdownMenuItem(value: e, child: Text(e.nombre, overflow: TextOverflow.ellipsis))).toList()],
+                          initialValue: _equipoSel,
+                          items: [const DropdownMenuItem(value: null, child: Text('Todas las armas')), ..._equipos.map((e) => DropdownMenuItem(value: e, child: Text(e.nombre, overflow: TextOverflow.ellipsis)))],
                           onChanged: (v) => setState(() { _equipoSel = v; _refrescarDatos(); }),
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<MunicionDetalle>(
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Munición', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
-                          value: _municionSel,
+                          initialValue: _municionSel,
                           items: [
                             const DropdownMenuItem(value: null, child: Text('Toda la munición')),
                             ..._municiones.map((m) => DropdownMenuItem(
@@ -336,7 +341,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                         DropdownButtonFormField<TipoDiana>(
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Tipo de Diana', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
-                          value: _dianaSel,
+                          initialValue: _dianaSel,
                           items: _dianas.map((d) => DropdownMenuItem(value: d, child: Text(d.nombre, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) => setState(() { _dianaSel = v; _refrescarDatos(); }),
                         ),
@@ -391,7 +396,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text("Diestro"), Switch(value: _soyZurdo, onChanged: (v) { setState(() => _soyZurdo = v); _refrescarDatos(); }, activeColor: _colorTema), const Text("Zurdo")]),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text("Diestro"), Switch(value: _soyZurdo, onChanged: (v) { setState(() => _soyZurdo = v); _refrescarDatos(); }, activeThumbColor: _colorTema), const Text("Zurdo")]),
           const SizedBox(height: 10),
           SizedBox(height: 200, child: PieChart(PieChartData(sections: _generarSeccionesPastel(), centerSpaceRadius: 40, sectionsSpace: 2))),
           const SizedBox(height: 20),
@@ -415,13 +420,13 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
-                          decoration: BoxDecoration(color: colorBg, borderRadius: BorderRadius.circular(10), border: Border.all(color: colorTxt.withOpacity(0.3))), 
+                          decoration: BoxDecoration(color: colorBg, borderRadius: BorderRadius.circular(10), border: Border.all(color: colorTxt.withValues(alpha: 0.3))), 
                           child: Text(detalle.etiqueta, style: TextStyle(fontSize: 11, color: colorTxt, fontWeight: FontWeight.bold))
                         );
                       }).toList()
                     )
                   ]
-          ])))).toList(),
+          ])))),
         ],
       ),
     );
@@ -475,7 +480,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     int numDescartes = _analisis!.disparosDescartados.length;
 
     return SingleChildScrollView(child: Column(children: [
-          Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: colorConsejo.withOpacity(0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: colorConsejo)), child: Column(children: [
+          Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: colorConsejo.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: colorConsejo)), child: Column(children: [
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(iconoConsejo, color: colorConsejo), const SizedBox(width: 10), Expanded(child: Text(consejo, style: TextStyle(fontWeight: FontWeight.bold, color: colorConsejo, fontSize: 16)))]), 
             
             // --- AQUI ESTA EL CAMBIO DE "TENDENCIA" EN PANTALLA ---
@@ -508,14 +513,14 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     // DEGRADADO AZUL PARA LA GRÁFICA EN PANTALLA
     final List<Color> gradientColors = [
       _colorTema,
-      _colorTema.withOpacity(0.0),
+      _colorTema.withValues(alpha: 0.0),
     ];
 
     return Padding(padding: const EdgeInsets.all(24.0), child: LineChart(LineChartData(
       gridData: FlGridData(
         show: true, 
         drawVerticalLine: false,
-        getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.withOpacity(0.2), strokeWidth: 1),
+        getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.withValues(alpha: 0.2), strokeWidth: 1),
       ), 
       titlesData: FlTitlesData(leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40, getTitlesWidget: (val, meta) => Text(val.toInt().toString(), style: const TextStyle(fontSize: 10, color: Colors.grey)))), bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false))), 
       borderData: FlBorderData(show: false), 
@@ -532,7 +537,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
           belowBarData: BarAreaData(
             show: true, 
             gradient: LinearGradient(
-              colors: gradientColors.map((color) => color.withOpacity(0.3)).toList(),
+              colors: gradientColors.map((color) => color.withValues(alpha: 0.3)).toList(),
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             )
@@ -610,9 +615,9 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.08),
+                          color: Colors.green.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green.withOpacity(0.3)),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,9 +634,9 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.08),
+                          color: Colors.red.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -698,7 +703,7 @@ class DianaPainter extends CustomPainter {
     canvas.drawCircle(center, radius, paintFondo);
 
     final paintNegro = Paint()..color = Colors.black..style = PaintingStyle.fill;
-    final paintLineaBlanca = Paint()..color = Colors.white.withOpacity(0.9)..style = PaintingStyle.stroke..strokeWidth = 1.2;
+    final paintLineaBlanca = Paint()..color = Colors.white.withValues(alpha: 0.9)..style = PaintingStyle.stroke..strokeWidth = 1.2;
     final paintLineaGris = Paint()..color = Colors.grey[400]!..style = PaintingStyle.stroke..strokeWidth = 1.0;
 
     if (esEstiloDuelo) {
@@ -749,9 +754,9 @@ class DianaPainter extends CustomPainter {
     canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), Paint()..color = esFondoNegro?Colors.white:Colors.black..strokeWidth=1);
     canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), Paint()..color = esFondoNegro?Colors.white:Colors.black..strokeWidth=1);
 
-    final paintDescartado = Paint()..color = Colors.grey.withOpacity(0.5)..style = PaintingStyle.fill;
-    final paintValido = Paint()..color = const Color(0xFF00C853).withOpacity(0.8)..style = PaintingStyle.fill;
-    final paintBordeImpacto = Paint()..color = Colors.white.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth=1;
+    final paintDescartado = Paint()..color = Colors.grey.withValues(alpha: 0.5)..style = PaintingStyle.fill;
+    final paintValido = Paint()..color = const Color(0xFF00C853).withValues(alpha: 0.8)..style = PaintingStyle.fill;
+    final paintBordeImpacto = Paint()..color = Colors.white.withValues(alpha: 0.5)..style = PaintingStyle.stroke..strokeWidth=1;
 
     double tamano = radius * 0.04; 
 

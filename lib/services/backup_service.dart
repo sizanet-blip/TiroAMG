@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:share_plus/share_plus.dart';
@@ -21,15 +22,17 @@ class BackupService {
 
       // 2. Compartir el archivo (esto abre el menú nativo de Android/iOS)
       // Desde ahí puedes guardarlo en Drive, Archivos, Email, etc.
-      final result = await Share.shareXFiles(
-        [XFile(path)], 
-        text: 'Copia de seguridad Tiro Deportivo AMG',
-        subject: 'Copia de Seguridad ${DateTime.now().toString().split(' ')[0]}'
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(path)],
+          text: 'Copia de seguridad Tiro Deportivo AMG',
+          subject: 'Copia de Seguridad ${DateTime.now().toString().split(' ')[0]}',
+        ),
       );
 
       return result.status == ShareResultStatus.success;
     } catch (e) {
-      print("Error exportando: $e");
+      debugPrint("Error exportando: $e");
       return false;
     }
   }
@@ -65,7 +68,7 @@ class BackupService {
         return false;
       }
     } catch (e) {
-      print("Error importando: $e");
+      debugPrint("Error importando: $e");
       return false;
     }
   }

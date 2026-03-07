@@ -70,7 +70,9 @@ class DianaPainter extends CustomPainter {
       final paintNegro = Paint()..color = const Color(0xFF1A1A1A)..style = PaintingStyle.fill;
       final paintLinea = Paint()..color = Colors.white54..style = PaintingStyle.stroke..strokeWidth = 1.0;
       canvas.drawCircle(center, radius, paintNegro);
-      for(int i=0; i<6; i++) canvas.drawCircle(center, radius - (i*(radius/6)), paintLinea);
+      for (int i = 0; i < 6; i++) {
+        canvas.drawCircle(center, radius - (i * (radius / 6)), paintLinea);
+      }
   }
 
   void _pintarDianaPrecision(Canvas canvas, Offset center, double radius) {
@@ -93,7 +95,7 @@ class DianaPainter extends CustomPainter {
   }
 
   void _pintarImpactos(Canvas canvas, double radius) {
-    final paintImpacto = Paint()..color = Colors.greenAccent.withOpacity(0.6)..style = PaintingStyle.fill; // Un poco transparente para ver acumulación
+    final paintImpacto = Paint()..color = Colors.greenAccent.withValues(alpha: 0.6)..style = PaintingStyle.fill; // Un poco transparente para ver acumulación
     
     // Cálculo de tamaño relativo
     int totalZonas = esEstiloDuelo ? 6 : (11 - valorMinimo);

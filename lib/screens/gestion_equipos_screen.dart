@@ -97,7 +97,7 @@ class _GestionEquiposScreenState extends State<GestionEquiposScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: Colors.teal.withOpacity(0.1),
+                      backgroundColor: Colors.teal.withValues(alpha: 0.1),
                       child: Icon(
                         esAire ? Icons.air : Icons.local_fire_department, 
                         color: Colors.teal,

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math'; // Para min y max
 import 'package:image/image.dart' as img; // Alias para el paquete 'image'
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart' show Offset;
 
@@ -29,7 +30,7 @@ class TargetAnalyzerService {
       final originalImage = img.decodeImage(bytes);
       
       if (originalImage == null) {
-        print("Error: No se pudo decodificar la imagen.");
+        debugPrint("Error: No se pudo decodificar la imagen.");
         return null;
       }
 
@@ -73,7 +74,7 @@ class TargetAnalyzerService {
       return File(tempPath);
 
     } catch (e) {
-      print("Error durante el recorte: $e");
+      debugPrint("Error durante el recorte: $e");
       return null;
     }
   }

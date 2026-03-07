@@ -122,7 +122,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
             DropdownButtonFormField<EquipoDetalle>(
               decoration: const InputDecoration(labelText: 'Arma', border: OutlineInputBorder()),
               isExpanded: true,
-              value: _equipoSeleccionado,
+              initialValue: _equipoSeleccionado,
               items: _equipos
                   .map((e) => DropdownMenuItem(
                         value: e,
@@ -137,7 +137,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
             DropdownButtonFormField<MunicionDetalle>(
               decoration: const InputDecoration(labelText: 'Munición (Opcional)', border: OutlineInputBorder()),
               isExpanded: true,
-              value: _municionSeleccionada,
+              initialValue: _municionSeleccionada,
               items: [
                 const DropdownMenuItem(
                   value: null,
@@ -180,7 +180,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
               ],
             ),
             DropdownButtonFormField<String>(
-              value: _posicionTiro,
+              initialValue: _posicionTiro,
               decoration: const InputDecoration(labelText: 'Posicion de tiro', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: 'Pie', child: Text('Pie')),
@@ -192,7 +192,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _iluminacion,
+              initialValue: _iluminacion,
               decoration: const InputDecoration(labelText: 'Iluminacion', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: 'Artificial', child: Text('Artificial')),

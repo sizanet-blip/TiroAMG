@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/sesion_model.dart';
-import '../models/informe_model.dart';
 import '../models/equipo_model.dart';
 import '../models/municion_model.dart';
 import '../services/entrenamiento_service.dart';
@@ -190,7 +189,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                   DropdownButtonFormField<EquipoDetalle>(
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Arma Utilizada', border: OutlineInputBorder()),
-                    value: equipoTemp,
+                    initialValue: equipoTemp,
                     items: equipos.map((e) => DropdownMenuItem(value: e, child: Text(e.nombre, overflow: TextOverflow.ellipsis))).toList(),
                     onChanged: (v) => setStateDialog(() => equipoTemp = v),
                   ),
@@ -218,7 +217,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                   ),
                   const SizedBox(height: 15),
                   DropdownButtonFormField<String>(
-                    value: posicionTemp,
+                    initialValue: posicionTemp,
                     decoration: const InputDecoration(labelText: 'Posicion de tiro', border: OutlineInputBorder()),
                     items: const [
                       DropdownMenuItem(value: 'Pie', child: Text('Pie')),
@@ -230,7 +229,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                   ),
                   const SizedBox(height: 15),
                   DropdownButtonFormField<String>(
-                    value: iluminacionTemp,
+                    initialValue: iluminacionTemp,
                     decoration: const InputDecoration(labelText: 'Iluminacion', border: OutlineInputBorder()),
                     items: const [
                       DropdownMenuItem(value: 'Artificial', child: Text('Artificial')),
@@ -342,6 +341,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
       iluminacion: iluminacion,
     );
 
+    if (!mounted) return;
     setState(() {
         _equipoUsado = nuevoEquipo;
         _notasGuardadas = nuevasNotas;
@@ -514,7 +514,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                   color: esEnsayo ? Colors.orange[50] : Colors.white,
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: esEnsayo ? Colors.orange[200] : Colors.amber.withOpacity(0.2),
+                      backgroundColor: esEnsayo ? Colors.orange[200] : Colors.amber.withValues(alpha: 0.2),
                       child: Text('${index + 1}', style: TextStyle(color: Colors.amber[900], fontWeight: FontWeight.bold)),
                     ),
                     title: Text(fase.nombreTitulo),

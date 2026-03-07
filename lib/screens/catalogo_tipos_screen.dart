@@ -31,7 +31,7 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
     final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Nuevo Tipo de Arma'),
         content: TextField(
           controller: controller,
@@ -41,7 +41,7 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
@@ -49,7 +49,7 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
               if (controller.text.trim().isNotEmpty) {
                 await _service.crearTipoArma(TipoArma(nombre: controller.text.trim()));
                 _cargarDatos();
-                if (mounted) Navigator.pop(context);
+                if (dialogCtx.mounted) Navigator.pop(dialogCtx);
               }
             },
             child: const Text('Guardar'),
@@ -66,7 +66,7 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Editar Tipo de Arma'),
         content: TextField(
           controller: controller,
@@ -76,7 +76,7 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
@@ -87,7 +87,7 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
                   TipoArma(id: item.id, nombre: controller.text.trim())
                 );
                 _cargarDatos();
-                if (mounted) Navigator.pop(context);
+                if (dialogCtx.mounted) Navigator.pop(dialogCtx);
               }
             },
             child: const Text('Actualizar'),
@@ -155,7 +155,7 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
                 final item = _lista[index];
                 return ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: Colors.blueGrey.withOpacity(0.1),
+                    backgroundColor: Colors.blueGrey.withValues(alpha: 0.1),
                     child: const Icon(Icons.category, color: Colors.blueGrey, size: 20),
                   ),
                   title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.w500)),

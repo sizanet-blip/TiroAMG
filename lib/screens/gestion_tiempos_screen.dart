@@ -73,7 +73,7 @@ class _GestionTiemposScreenState extends State<GestionTiemposScreen> {
                   child: ListTile(
                     // Icono diferente según el modo (Duelo o Fijo)
                     leading: CircleAvatar(
-                      backgroundColor: item.esDuel ? Colors.orange.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
+                      backgroundColor: item.esDuel ? Colors.orange.withValues(alpha: 0.2) : Colors.blue.withValues(alpha: 0.2),
                       child: Icon(
                         item.esDuel ? Icons.timer : Icons.ads_click, // Icono visual
                         color: item.esDuel ? Colors.deepOrange : Colors.blue,

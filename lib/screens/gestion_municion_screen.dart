@@ -179,7 +179,7 @@ class _GestionMunicionScreenState extends State<GestionMunicionScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: Colors.teal.withOpacity(0.1),
+                      backgroundColor: Colors.teal.withValues(alpha: 0.1),
                       child: const Icon(Icons.apps, color: Colors.teal), // Icono de caja/lote
                     ),
                     title: Text('${item.marca} (${item.nombreCalibre})', style: const TextStyle(fontWeight: FontWeight.bold)),

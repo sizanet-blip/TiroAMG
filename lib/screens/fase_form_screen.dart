@@ -113,7 +113,7 @@ class _FaseFormScreenState extends State<FaseFormScreen> {
                   ? const Text('¡No hay plantillas de tiempo creadas! Ve a Configuración.', style: TextStyle(color: Colors.red))
                   : DropdownButtonFormField<int>(
                       decoration: const InputDecoration(labelText: 'Regla de Tiempo a usar', border: OutlineInputBorder()),
-                      value: _selectedPlantillaId,
+                      initialValue: _selectedPlantillaId,
                       items: _plantillasDisponibles.map((p) => DropdownMenuItem(value: p.id, child: Text(p.nombreDisciplina))).toList(),
                       onChanged: (val) => setState(() => _selectedPlantillaId = val),
                     ),
@@ -146,7 +146,7 @@ class _FaseFormScreenState extends State<FaseFormScreen> {
                 title: const Text('¿Es fase de Ensayo (Sighters)?'),
                 subtitle: const Text('Si activo, los puntos no sumarán al total del torneo.'),
                 value: _esEnsayo,
-                activeColor: Colors.amber,
+                activeThumbColor: Colors.amber,
                 onChanged: (val) => setState(() => _esEnsayo = val),
               ),
 

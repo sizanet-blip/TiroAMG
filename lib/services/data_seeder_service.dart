@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_provider.dart';
 
@@ -28,7 +29,7 @@ class DataSeederService {
     List<int> idsMuniciones = await _asegurarMunicionPrueba(db);
     
     // --- A. GENERAR 50 ENTRENAMIENTOS SUELTOS (Antes eran 10) ---
-    print("Generando entrenamientos...");
+    debugPrint("Generando entrenamientos...");
     for (int i = 0; i < 50; i++) { 
         DateTime fecha = DateTime.now().subtract(Duration(days: _rng.nextInt(180))); // Últimos 6 meses
         int idEquipo = idsEquipos[_rng.nextInt(idsEquipos.length)];
@@ -47,7 +48,7 @@ class DataSeederService {
     }
 
     // --- B. GENERAR COMPETICIONES (HISTORIAL MÚLTIPLE) ---
-    print("Generando competiciones...");
+    debugPrint("Generando competiciones...");
     for (var modMap in resModalidades) {
         // ¡CAMBIO AQUÍ! Generamos 5 ediciones distintas de cada torneo
         for (int i = 0; i < 5; i++) {

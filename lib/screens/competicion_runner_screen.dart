@@ -63,7 +63,6 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
   
   // Puntuación
   int _puntosTotales = 0;
-  int _puntosFaseActual = 0;
   
   // Historial visual para mostrar en la lista de abajo
   final List<String> _logEventos = [];
@@ -100,13 +99,12 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     
     // 2. Necesitamos el objeto Plantilla completo para configurar la diana
     final plantilla = await _plantillaService.obtenerPorId(faseActual.fase.idPlantillaTiempos);
+    if (!mounted) return;
     
     if (plantilla == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error cargando la plantilla de tiempos")));
       return;
     }
-
-    if (!mounted) return;
 
     // Datos informativos para la pantalla de disparo
     int numSerie = _indiceRepeticion + 1;
@@ -173,7 +171,6 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
       
       if (!fase.fase.esEnsayo) {
         _puntosTotales += puntos;
-        _puntosFaseActual += puntos;
       }
 
       // Añadir al log visual
@@ -188,7 +185,6 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
       if (_indiceRepeticion >= fase.fase.repeticiones) {
         // Fin de la fase -> Pasar a la siguiente
         _indiceRepeticion = 0; // Reset contador de series
-        _puntosFaseActual = 0; // Reset puntos parciales
         _indiceFase++;         // Siguiente fase en la lista
 
         // ¿Hemos terminado todas las fases?

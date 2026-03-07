@@ -123,10 +123,10 @@ class CornerDetectionService {
       }
       
       final result = [
-        tl!,    // top-left
-        tr!,    // top-right
-        bl!,    // bottom-left
-        br!,    // bottom-right
+        tl,    // top-left
+        tr,    // top-right
+        bl,    // bottom-left
+        br,    // bottom-right
       ];
       
       debugPrint('Esquinas ordenadas (método de cuadrantes):');

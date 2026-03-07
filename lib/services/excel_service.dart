@@ -28,7 +28,11 @@ class ExcelService {
 
     // Totales
     List<Disparo> todos = [];
-    for(var g in grupos) if(!g.esEnsayo) todos.addAll(g.disparos);
+    for (var g in grupos) {
+      if (!g.esEnsayo) {
+        todos.addAll(g.disparos);
+      }
+    }
     
     int totalPuntos = todos.fold(0, (s, i) => s + i.puntuacion.floor());
     int totalMoscas = todos.where((d) => d.esMosca).length;
@@ -41,17 +45,22 @@ class ExcelService {
     sheetResumen.appendRow([TextCellValue('VALOR'), TextCellValue('CANTIDAD')]);
     Map<String, int> conteo = {"X": 0, "10": 0, "9": 0, "8": 0, "7": 0, "6": 0, "5": 0, "M": 0};
     for (var d in todos) {
-       if (d.esMosca) conteo["X"] = conteo["X"]! + 1;
-       else if (d.puntuacion < 1) conteo["M"] = conteo["M"]! + 1;
+       if (d.esMosca) {
+         conteo["X"] = conteo["X"]! + 1;
+       } else if (d.puntuacion < 1) {
+         conteo["M"] = conteo["M"]! + 1;
+       }
        else {
          int val = d.puntuacion.floor();
-         if(val>=5) conteo["$val"] = (conteo["$val"] ?? 0) + 1;
+         if (val >= 5) {
+           conteo["$val"] = (conteo["$val"] ?? 0) + 1;
+         }
        }
     }
     // Escribir filas
-    ["X", "10", "9", "8", "7", "6", "5", "M"].forEach((k) {
-       sheetResumen.appendRow([TextCellValue(k), IntCellValue(conteo[k] ?? 0)]);
-    });
+    for (final k in ["X", "10", "9", "8", "7", "6", "5", "M"]) {
+      sheetResumen.appendRow([TextCellValue(k), IntCellValue(conteo[k] ?? 0)]);
+    }
 
     if (excel.sheets.containsKey('Sheet1')) {
       excel.delete('Sheet1');
@@ -87,11 +96,16 @@ class ExcelService {
           
           Map<String, int> c = {"X":0, "10":0, "9":0, "8":0, "7":0, "M":0};
           for(var t in serie) {
-              if (t.esMosca) c["X"] = c["X"]! + 1;
-              else if (t.puntuacion < 1) c["M"] = c["M"]! + 1;
+              if (t.esMosca) {
+                c["X"] = c["X"]! + 1;
+              } else if (t.puntuacion < 1) {
+                c["M"] = c["M"]! + 1;
+              }
               else {
                  int v = t.puntuacion.floor();
-                 if(c.containsKey("$v")) c["$v"] = c["$v"]! + 1;
+                 if (c.containsKey("$v")) {
+                   c["$v"] = c["$v"]! + 1;
+                 }
               }
           }
 
@@ -132,7 +146,12 @@ class ExcelService {
         ..writeAsBytesSync(fileBytes);
 
       // Lanzar el menú de compartir (En móvil permite "Guardar en Archivos")
-      await Share.shareXFiles([XFile(filePath)], text: 'Reporte de Tiro generado.');
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(filePath)],
+          text: 'Reporte de Tiro generado.',
+        ),
+      );
     }
   }
 }

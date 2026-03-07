@@ -110,7 +110,7 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
     final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Nueva Competición'),
         content: TextField(
           controller: controller,
@@ -123,7 +123,7 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context), 
+            onPressed: () => Navigator.pop(dialogCtx), 
             child: const Text('Cancelar')
           ),
           ElevatedButton(
@@ -135,7 +135,7 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
                   esOficial: false, 
                 ));
                 _cargarDatos();
-                if (mounted) Navigator.pop(context);
+                if (dialogCtx.mounted) Navigator.pop(dialogCtx);
               }
             },
             child: const Text('Crear'),
@@ -184,7 +184,7 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: item.esOficial ? Colors.amber.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
+                      backgroundColor: item.esOficial ? Colors.amber.withValues(alpha: 0.2) : Colors.blue.withValues(alpha: 0.2),
                       child: Icon(
                         item.esOficial ? Icons.emoji_events : Icons.edit_note,
                         color: item.esOficial ? Colors.amber[800] : Colors.blue,

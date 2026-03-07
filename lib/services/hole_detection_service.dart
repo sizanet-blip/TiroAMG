@@ -8,7 +8,7 @@ import '../models/disparo_model.dart';
 
 class HoleDetectionService {
   // Almacenar información de agujeros por número de disparo (temporal para visualización)
-  static Map<int, Map<String, dynamic>> _holeInfo = {}; // {numero: {centerX, centerY, radius}}
+  static final Map<int, Map<String, dynamic>> _holeInfo = {}; // {numero: {centerX, centerY, radius}}
   
   // Almacenar la imagen binaria generada (para visualización)
   static File? _binaryImageFile;
@@ -186,7 +186,6 @@ class HoleDetectionService {
         (_) => List.generate(originalImage.width, (_) => false),
       );
       
-      int excludedPixels = 0;
       for (int y = 0; y < originalImage.height; y++) {
         for (int x = 0; x < originalImage.width; x++) {
           final pixel = originalImage.getPixel(x, y);
@@ -197,7 +196,6 @@ class HoleDetectionService {
           
           if (distance <= colorTolerance) {
             excludeMask[y][x] = true;
-            excludedPixels++;
             // Cambiar píxeles rojos a blanco para que no interfieran
             originalImage.setPixel(x, y, img.ColorRgb8(255, 255, 255));
           }
@@ -230,23 +228,13 @@ class HoleDetectionService {
         }
       }
       
-      // Contar píxeles negros detectados para debug
-      int blackPixels = 0;
-      for (int y = 0; y < binaryImage.height; y++) {
-        for (int x = 0; x < binaryImage.width; x++) {
-          if (binaryImage.getPixel(x, y).r < 128) blackPixels++;
-        }
-      }
-
       // Guardar imagen binaria para visualización
       try {
-        final Uint8List? encodedBytes = img.encodeJpg(binaryImage, quality: 100);
-        if (encodedBytes != null) {
-          final tempDir = await getTemporaryDirectory();
-          final binaryFilePath = '${tempDir.path}/binary_diana_${DateTime.now().millisecondsSinceEpoch}.jpg';
-          await File(binaryFilePath).writeAsBytes(encodedBytes);
-          _binaryImageFile = File(binaryFilePath);
-        }
+        final Uint8List encodedBytes = img.encodeJpg(binaryImage, quality: 100);
+        final tempDir = await getTemporaryDirectory();
+        final binaryFilePath = '${tempDir.path}/binary_diana_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        await File(binaryFilePath).writeAsBytes(encodedBytes);
+        _binaryImageFile = File(binaryFilePath);
       } catch (e) {
         // Error silencioso
       }
@@ -324,61 +312,11 @@ class HoleDetectionService {
       for (var hole in holes) {
         final centerX = hole['centerX']!;
         final centerY = hole['centerY']!;
-        final area = hole['area']!;
         final radius = hole['radius'] as double;
         
         // Convertir a coordenadas normalizadas relativas al centro de la diana
         final normalizedX = (centerX - dianaCenter.dx) / dianaRadius;
         final normalizedY = (centerY - dianaCenter.dy) / dianaRadius;
-        
-        // Calcular distancia al centro
-        final distancia = sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
-        
-        // Normalizar el radio del agujero también
-        final radioNormalizado = radius / dianaRadius;
-        
-        // Calcular puntuación usando los círculos detectados si están disponibles
-        final puntuacion = _calcularPuntuacion(distancia, detectedCircleRadii: detectedCircleRadii);
-        
-        // Verificar si el agujero toca la línea de algún círculo
-        // Si toca la línea, debe contar como si estuviera dentro de ese círculo (zona más alta)
-        // Consideramos que toca si el borde del agujero (distancia - radio) toca el círculo
-        double? puntuacionTocaLinea;
-        if (detectedCircleRadii != null && detectedCircleRadii.isNotEmpty) {
-          const double umbralTocaLinea = 0.025;
-          final numCircles = detectedCircleRadii.length;
-          
-          // Calcular la distancia del borde más cercano del agujero al centro
-          final distanciaBordeCercano = (distancia - radioNormalizado).clamp(0.0, 1.0);
-          
-          // Buscar el círculo más pequeño (zona más alta) que está siendo tocado
-          // Empezar desde el círculo más pequeño (índice 0) para encontrar la zona más alta
-          int? indiceCirculoTocado;
-          for (int i = 0; i < numCircles; i++) {
-            final radioCirculo = detectedCircleRadii[i];
-            
-            // Verificar si el borde del agujero toca el círculo
-            // El agujero toca el círculo si:
-            // 1. El borde más cercano está dentro del umbral del círculo, O
-            // 2. La distancia del centro está dentro del umbral del círculo
-            final distanciaAlCirculoDesdeBorde = (distanciaBordeCercano - radioCirculo).abs();
-            final distanciaAlCirculoDesdeCentro = (distancia - radioCirculo).abs();
-            
-            if (distanciaAlCirculoDesdeBorde <= umbralTocaLinea || 
-                distanciaAlCirculoDesdeCentro <= umbralTocaLinea) {
-              // Guardar el índice del círculo más pequeño que toca (zona más alta)
-              if (indiceCirculoTocado == null || i < indiceCirculoTocado) {
-                indiceCirculoTocado = i;
-              }
-            }
-          }
-          
-          // Si se encontró un círculo tocado, usar su zona
-          if (indiceCirculoTocado != null) {
-            final zonaTocaLinea = numCircles - indiceCirculoTocado;
-            puntuacionTocaLinea = zonaTocaLinea.clamp(1, 10).toDouble();
-          }
-        }
         
         // Calcular cuántos disparos hay en este agujero basándose en el área
         // Si el área es N veces el área base, probablemente hay N disparos
@@ -432,7 +370,6 @@ class HoleDetectionService {
               
               // Verificar si el impacto toca el círculo
               final distanciaAlCirculoDesdeBordeCercano = (distanciaBordeCercanoDisparo - radioCirculo).abs();
-              final distanciaAlCirculoDesdeBordeLejano = (distanciaBordeLejanoDisparo - radioCirculo).abs();
               final distanciaAlCirculoDesdeCentro = (distanciaDisparo - radioCirculo).abs();
               
               // El impacto toca el círculo si:
@@ -651,85 +588,6 @@ class HoleDetectionService {
       'radius': radius, // Radio calculado basado en el área
       'contourPoints': contourPoints, // Puntos del contorno (para referencia, pero usaremos círculo perfecto)
     };
-  }
-
-  /// Calcula el perímetro aproximado de una región
-  int _calculatePerimeter(
-    List<Point<int>> region,
-    int minX,
-    int maxX,
-    int minY,
-    int maxY,
-  ) {
-    // Crear un mapa de píxeles para verificar vecinos
-    final pixelMap = <String, bool>{};
-    for (var point in region) {
-      pixelMap['${point.x},${point.y}'] = true;
-    }
-    
-    int perimeter = 0;
-    for (var point in region) {
-      final x = point.x;
-      final y = point.y;
-      
-      // Verificar si cada vecino (4-conectividad) está fuera de la región
-      // Si un vecino no está en la región, ese borde es parte del perímetro
-      if (!pixelMap.containsKey('${x + 1},$y')) perimeter++;
-      if (!pixelMap.containsKey('${x - 1},$y')) perimeter++;
-      if (!pixelMap.containsKey('$x,${y + 1}')) perimeter++;
-      if (!pixelMap.containsKey('$x,${y - 1}')) perimeter++;
-    }
-    
-    return perimeter;
-  }
-
-  /// Calcula la uniformidad de una región
-  /// Los agujeros reales tienen una distribución más uniforme que los números
-  double _calculateUniformity(
-    List<Point<int>> region,
-    int minX,
-    int maxX,
-    int minY,
-    int maxY,
-  ) {
-    if (region.isEmpty) return 0.0;
-    
-    // Calcular el centroide
-    double sumX = 0, sumY = 0;
-    for (var point in region) {
-      sumX += point.x;
-      sumY += point.y;
-    }
-    final centerX = sumX / region.length;
-    final centerY = sumY / region.length;
-    
-    // Calcular la distancia promedio desde el centro
-    double sumDistances = 0;
-    for (var point in region) {
-      final dx = point.x - centerX;
-      final dy = point.y - centerY;
-      sumDistances += sqrt(dx * dx + dy * dy);
-    }
-    final avgDistance = sumDistances / region.length;
-    
-    // Calcular la desviación estándar de las distancias
-    double sumSquaredDiff = 0;
-    for (var point in region) {
-      final dx = point.x - centerX;
-      final dy = point.y - centerY;
-      final distance = sqrt(dx * dx + dy * dy);
-      final diff = distance - avgDistance;
-      sumSquaredDiff += diff * diff;
-    }
-    final variance = sumSquaredDiff / region.length;
-    final stdDev = sqrt(variance);
-    
-    // La uniformidad es inversamente proporcional a la desviación estándar
-    // Normalizada por la distancia promedio
-    if (avgDistance == 0) return 1.0;
-    final uniformity = 1.0 / (1.0 + (stdDev / avgDistance));
-    
-    return uniformity;
   }
 
   /// Calcula la puntuación basada en la distancia normalizada

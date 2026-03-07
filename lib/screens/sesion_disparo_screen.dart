@@ -66,7 +66,6 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   final List<Offset> _puntosVisuales = [];
   
   int _puntosTotal = 0;
-  int _contadorMoscas = 0;
   
   // Configuración Diana
   int _valorMinimo = 1;
@@ -279,10 +278,6 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         
         _puntosTotal += valor;
         
-        if (_tieneMosca && distNorm < (0.05 * (10/totalZonas))) {
-          _contadorMoscas++;
-        }
-        
         _listaDisparos.add(Disparo(
           numero: _listaDisparos.length + 1,
           x: (localPosition.dx - centro.dx) / radioMax,
@@ -355,7 +350,6 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                 _listaDisparos.clear();
                 _puntosVisuales.clear();
                 _puntosTotal = 0;
-                _contadorMoscas = 0;
                 _resetearValoresTiempo();
               });
             },
@@ -468,8 +462,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                             child: ClipOval(
                               child: Transform(
                                 transform: Matrix4.identity()
-                                  ..translate(-_posicionDedo!.dx * 2 + 50, -_posicionDedo!.dy * 2 + 50)
-                                  ..scale(2.0),
+                                  ..translateByDouble(-_posicionDedo!.dx * 2 + 50, -_posicionDedo!.dy * 2 + 50, 0, 1)
+                                  ..scaleByDouble(2.0, 2.0, 1.0, 1.0),
                                 child: CustomPaint(
                                   size: size,
                                   painter: DianaPainter(
@@ -490,7 +484,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                       if (_mostrandoLupa && _posicionDedo != null)
                         Positioned(
                            left: _posicionDedo!.dx + offX - 50, top: _posicionDedo!.dy + offY - 120,
-                           child: Container(width: 100, height: 100, child: const Center(child: Icon(Icons.add, color: Colors.red, size: 20)))
+                           child: const SizedBox(width: 100, height: 100, child: Center(child: Icon(Icons.add, color: Colors.red, size: 20)))
                         )
                    ],
                  ),

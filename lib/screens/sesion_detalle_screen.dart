@@ -70,7 +70,9 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
     try {
       var listEquipos = await _equipoService.obtenerEquiposDetallados();
       _equipoDetalle = listEquipos.firstWhere((e) => e.id == sesion.idEquipo);
-    } catch(e) {}
+    } catch (e) {
+      debugPrint('No se pudo resolver el equipo de la sesión: $e');
+    }
 
     if (sesion.idMunicion != null) {
       _municionDetalle = await _municionService.obtenerDetallePorId(sesion.idMunicion!);
@@ -90,7 +92,9 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
           _tieneGuias = dianaConfig.tieneGuias;
           _esEstiloDuelo = _anilloNegroInicio <= 5;
         });
-      } catch (e) {}
+      } catch (e) {
+        debugPrint('No se pudo cargar la configuración de diana: $e');
+      }
     }
 
     if (mounted) {
@@ -169,7 +173,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                   DropdownButtonFormField<EquipoDetalle>(
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Arma Utilizada', border: OutlineInputBorder()),
-                    value: equipoTemp,
+                    initialValue: equipoTemp,
                     items: equipos.map((e) => DropdownMenuItem(value: e, child: Text(e.nombre, overflow: TextOverflow.ellipsis))).toList(),
                     onChanged: (v) => setStateDialog(() => equipoTemp = v),
                   ),
@@ -197,7 +201,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                   ),
                   const SizedBox(height: 15),
                   DropdownButtonFormField<String>(
-                    value: posicionTemp,
+                    initialValue: posicionTemp,
                     decoration: const InputDecoration(labelText: 'Posicion de tiro', border: OutlineInputBorder()),
                     items: const [
                       DropdownMenuItem(value: 'Pie', child: Text('Pie')),
@@ -209,7 +213,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                   ),
                   const SizedBox(height: 15),
                   DropdownButtonFormField<String>(
-                    value: iluminacionTemp,
+                    initialValue: iluminacionTemp,
                     decoration: const InputDecoration(labelText: 'Iluminacion', border: OutlineInputBorder()),
                     items: const [
                       DropdownMenuItem(value: 'Artificial', child: Text('Artificial')),
@@ -320,6 +324,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
       iluminacion: iluminacion,
     );
 
+    if (!mounted) return;
     _cargarDatosCompletos();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sesión actualizada')));
   }
@@ -503,10 +508,10 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                             margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             decoration: BoxDecoration(
-                              color: tiro.esMosca ? Colors.amber.withOpacity(0.1) : Colors.white,
+                              color: tiro.esMosca ? Colors.amber.withValues(alpha: 0.1) : Colors.white,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: Colors.grey[300]!),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 3, offset: const Offset(0, 1))]
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 3, offset: const Offset(0, 1))]
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -613,7 +618,7 @@ class DianaPainter extends CustomPainter {
     canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), Paint()..color = Colors.white..strokeWidth=1);
     canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), Paint()..color = Colors.white..strokeWidth=1);
 
-    final paintImpacto = Paint()..color = Colors.greenAccent.withOpacity(0.6)..style = PaintingStyle.fill;
+    final paintImpacto = Paint()..color = Colors.greenAccent.withValues(alpha: 0.6)..style = PaintingStyle.fill;
     double tamano = (radius * 0.04) * (10 / totalZonas);
     for(var p in impactos) {
        canvas.drawCircle(p, tamano, paintImpacto);

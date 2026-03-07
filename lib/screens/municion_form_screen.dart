@@ -120,7 +120,7 @@ class _MunicionFormScreenState extends State<MunicionFormScreen> {
               // Desplegable de Calibres
               DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: 'Calibre', border: OutlineInputBorder()),
-                value: _selectedCalibre,
+                initialValue: _selectedCalibre,
                 items: _calibres.map((e) => DropdownMenuItem(value: e.id, child: Text(e.nombre))).toList(),
                 onChanged: (val) => setState(() => _selectedCalibre = val),
                 validator: (v) => v == null ? 'Selecciona un calibre' : null,

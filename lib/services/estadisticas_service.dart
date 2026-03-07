@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter/material.dart'; 
-import 'package:sqflite/sqflite.dart';
 import '../database/database_provider.dart';
 import '../models/disparo_model.dart';
 import '../models/tipo_diana_model.dart';
@@ -93,12 +92,18 @@ class EstadisticasService {
     List<Disparo> validos = []; List<Disparo> descartados = [];
     if (disparos.length < 5) { validos = List.from(disparos); } else {
       double sumaDistancias = 0;
-      for (var d in disparos) sumaDistancias += sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
+      for (var d in disparos) {
+        sumaDistancias += sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
+      }
       double distanciaMedia = sumaDistancias / disparos.length;
       double umbral = distanciaMedia * 2.5; 
       for (var d in disparos) {
         double dist = sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
-        if (dist > umbral && dist > 0.15) descartados.add(d); else validos.add(d);
+        if (dist > umbral && dist > 0.15) {
+          descartados.add(d);
+        } else {
+          validos.add(d);
+        }
       }
     }
 
@@ -113,8 +118,18 @@ class EstadisticasService {
     if (validos.length >= 3) {
        double minX = 999, maxX = -999, minY = 999, maxY = -999;
        for(var d in validos) {
-          if(d.x < minX) minX = d.x; if(d.x > maxX) maxX = d.x;
-          if(d.y < minY) minY = d.y; if(d.y > maxY) maxY = d.y;
+          if (d.x < minX) {
+            minX = d.x;
+          }
+          if (d.x > maxX) {
+            maxX = d.x;
+          }
+          if (d.y < minY) {
+            minY = d.y;
+          }
+          if (d.y > maxY) {
+            maxY = d.y;
+          }
        }
        double ancho = maxX - minX; double alto = maxY - minY;
        
@@ -123,7 +138,9 @@ class EstadisticasService {
        } else if (ancho > alto * 1.2) {
           tendencia = "Dispersión HORIZONTAL\nRevisa el dedo en el gatillo o la postura.";
        }
-    } else if (validos.isEmpty) { tendencia = "Sin impactos válidos"; }
+    } else if (validos.isEmpty) {
+      tendencia = "Sin impactos válidos";
+    }
 
     double sumPuntosPotenciales = 0; double sumRadio = 0;
     int valorMinimo = res.first['valor_minimo'] as int;
@@ -137,12 +154,22 @@ class EstadisticasService {
           if (esEstiloDuelo) {
              double calculo = 11 - (distCentrada * 6);
              puntosVirtuales = calculo.floor();
-             if (puntosVirtuales < 5) puntosVirtuales = 0; if (puntosVirtuales > 10) puntosVirtuales = 10;
+             if (puntosVirtuales < 5) {
+               puntosVirtuales = 0;
+             }
+             if (puntosVirtuales > 10) {
+               puntosVirtuales = 10;
+             }
           } else {
              int totalZonas = 11 - valorMinimo;
              double calculo = 11 - (distCentrada * totalZonas);
              puntosVirtuales = calculo.floor();
-             if (puntosVirtuales < valorMinimo) puntosVirtuales = 0; if (puntosVirtuales > 10) puntosVirtuales = 10;
+             if (puntosVirtuales < valorMinimo) {
+               puntosVirtuales = 0;
+             }
+             if (puntosVirtuales > 10) {
+               puntosVirtuales = 10;
+             }
           }
       }
       sumPuntosPotenciales += puntosVirtuales;
@@ -189,7 +216,15 @@ class EstadisticasService {
       bool abajo = (angleDeg > 0); bool arriba = (angleDeg < 0); 
       if (esZurdo) { bool temp = izquierda; izquierda = derecha; derecha = temp; }
       String errorKey = "";
-      if (abajo && izquierda) errorKey = "Gatillazo (Dedazo)"; else if (arriba && derecha) errorKey = "Empujar (Anticipación)"; else if (abajo && derecha) errorKey = "Apretar Empuñadura"; else if (arriba && izquierda) errorKey = "Muñeca floja (Breaking)";
+      if (abajo && izquierda) {
+        errorKey = "Gatillazo (Dedazo)";
+      } else if (arriba && derecha) {
+        errorKey = "Empujar (Anticipación)";
+      } else if (abajo && derecha) {
+        errorKey = "Apretar Empuñadura";
+      } else if (arriba && izquierda) {
+        errorKey = "Muñeca floja (Breaking)";
+      }
       if (errorKey.isNotEmpty && mapaErrores.containsKey(errorKey)) { mapaErrores[errorKey]!.add(DetalleError(etiqueta, d.puntuacion)); }
     }
 

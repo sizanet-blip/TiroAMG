@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -152,7 +151,7 @@ class PdfService {
                    pw.SizedBox(height: 30),
                 ]
               );
-            }).toList(),
+            }),
 
             pw.SizedBox(height: 10),
             
@@ -205,7 +204,15 @@ class PdfService {
   }
   Future<void> generarInformeTorneoProfesional({required String nombreTorneo, required DateTime fecha, required List<GrupoFaseInforme> grupos, EquipoDetalle? equipo, MunicionDetalle? municion, PerfilUsuario? perfil, String? lugar, String? observaciones, String? condicionesTexto}) async {
     final doc = pw.Document(); final fontRegular = await PdfGoogleFonts.openSansRegular(); final fontBold = await PdfGoogleFonts.openSansBold(); pw.ImageProvider? logoImage; try { logoImage = await imageFromAssetBundle('assets/logo.png'); } catch (_) {}
-    List<Disparo> disparosPuntuables = []; for(var g in grupos) if (!g.esEnsayo) disparosPuntuables.addAll(g.disparos); int totalPuntos = disparosPuntuables.fold(0, (sum, item) => sum + item.puntuacion.floor()); int totalMoscas = disparosPuntuables.where((d) => d.esMosca).length; String fechaStr = "${fecha.day}/${fecha.month}/${fecha.year}";
+    List<Disparo> disparosPuntuables = [];
+    for (var g in grupos) {
+      if (!g.esEnsayo) {
+        disparosPuntuables.addAll(g.disparos);
+      }
+    }
+    int totalPuntos = disparosPuntuables.fold(0, (sum, item) => sum + item.puntuacion.floor());
+    int totalMoscas = disparosPuntuables.where((d) => d.esMosca).length;
+    String fechaStr = "${fecha.day}/${fecha.month}/${fecha.year}";
     doc.addPage(pw.MultiPage(pageFormat: PdfPageFormat.a4, margin: const pw.EdgeInsets.all(30), theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold), build: (pw.Context context) {
           return [pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [if (logoImage != null) pw.Container(width: 60, height: 60, child: pw.Image(logoImage)), pw.SizedBox(width: 20), pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [pw.Text("ACTA DE PUNTUACIÓN", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: colorAzul)), pw.Text(nombreTorneo, style: const pw.TextStyle(fontSize: 14))]))]), pw.SizedBox(height: 15), pw.Table(border: pw.TableBorder.all(color: colorGrisBorde, width: 0.5), children: [pw.TableRow(decoration: const pw.BoxDecoration(color: colorGrisClaro), children: [_celdaFicha("TIRADOR", perfil?.nombre ?? ""), _celdaFicha("LICENCIA", perfil?.licencia ?? ""), _celdaFicha("CLUB", perfil?.club ?? "")]), pw.TableRow(children: [_celdaFicha("ARMA", equipo?.nombre ?? ""), _celdaFicha("MUNICIÓN", municion != null ? "${municion.marca} (${municion.lote})" : ""), _celdaFicha("FECHA", "$fechaStr - ${lugar ?? ''}")]), pw.TableRow(children: [_celdaFicha("CONDICIONES", condicionesTexto ?? "-"), _celdaFicha("OBSERVACIONES", observaciones ?? "-"), _celdaFicha("", "")])]), pw.SizedBox(height: 20), pw.Container(padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 10), decoration: const pw.BoxDecoration(color: colorAzul), child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [pw.Text(" PUNTUACIÓN TOTAL", style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 16)), pw.Text("$totalPuntos ($totalMoscas x)  ", style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 18))])), _construirTablaFrecuencias(disparosPuntuables, mostrarCabecera: true), pw.SizedBox(height: 20), ..._generarBloquesDetallados(grupos), pw.Spacer(), pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceAround, children: [pw.Column(children: [pw.Container(width: 120, height: 1, color: PdfColors.black), pw.SizedBox(height: 5), pw.Text("Firma del Tirador", style: const pw.TextStyle(fontSize: 8))]), pw.Column(children: [pw.Container(width: 120, height: 1, color: PdfColors.black), pw.SizedBox(height: 5), pw.Text("Firma Árbitro", style: const pw.TextStyle(fontSize: 8))])])];
     })); await Printing.layoutPdf(onLayout: (format) => doc.save(), name: 'Acta_Puntuacion.pdf');
@@ -213,8 +220,105 @@ class PdfService {
 
   // --- HELPERS ---
   pw.Widget _celdaFicha(String t, String v) { return pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [pw.Text(t, style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700, fontWeight: pw.FontWeight.bold)), pw.Text(v.isEmpty ? "-" : v, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))])); }
-  List<pw.Widget> _generarBloquesDetallados(List<GrupoFaseInforme> grupos) { List<pw.Widget> w = []; for (var g in grupos) { w.add(pw.Padding(padding: const pw.EdgeInsets.only(top: 10, bottom: 5), child: pw.Text(g.titulo, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: colorAzul)))); int bs = g.disparos.length > 20 ? 10 : 5; int ns = (g.disparos.length / bs).ceil(); Map<int, pw.TableColumnWidth> cw = { 0: const pw.FixedColumnWidth(35), bs+1: const pw.FixedColumnWidth(40) }; for(int k=1; k<=bs; k++) cw[k] = const pw.FlexColumnWidth(); for (int i = 0; i < ns; i++) { int s = i * bs; int e = min(s + bs, g.disparos.length); var ser = g.disparos.sublist(s, e); int pts = ser.fold(0, (x, y) => x + y.puntuacion.floor()); List<String> f = ["Serie ${i + 1}"]; for(var t in ser) f.add(t.puntuacion >= 10 ? (t.esMosca ? "X" : "10") : t.puntuacion.floor().toString()); while(f.length <= bs) f.add("-"); f.add("$pts"); List<String> h = ['S']; for(int k=1; k<=bs; k++) h.add('$k'); h.add('TOT'); w.add(pw.Table.fromTextArray(headers: i == 0 ? h : [], data: [f], border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5), headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8), cellStyle: const pw.TextStyle(fontSize: 9), cellAlignment: pw.Alignment.center, headerDecoration: i==0 ? const pw.BoxDecoration(color: colorGrisClaro) : null, columnWidths: cw)); } } return w; }
-  pw.Widget _construirTablaFrecuencias(List<Disparo> d, {bool mostrarCabecera = true}) { Map<String, int> c = {"X":0,"10":0,"9":0,"8":0,"7":0,"6":0,"5":0,"4":0,"3":0,"2":0,"1":0,"M":0}; for (var x in d) { if (x.esMosca) c["X"] = c["X"]! + 1; else if (x.puntuacion < 1) c["M"] = c["M"]! + 1; else { int v = x.puntuacion.floor(); if(v>=1 && v<=10) c["$v"] = c["$v"]! + 1; } } final h = ['Valor', 'Cantidad', 'Subtotal']; final da = <List<String>>[]; const o = ["X", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "M"]; for(var k in o) { int cnt = c[k] ?? 0; if (cnt > 0) { String s = k == "M" ? "0" : "${(k=="X"?10:int.parse(k)) * cnt}"; da.add([k, "$cnt", s]); } } return pw.Table.fromTextArray(headers: mostrarCabecera ? h : [], data: da, border: pw.TableBorder.all(color: PdfColors.grey500, width: 0.5), headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9), headerDecoration: const pw.BoxDecoration(color: colorGrisClaro), cellStyle: const pw.TextStyle(fontSize: 9), cellAlignment: pw.Alignment.center, cellAlignments: {0: pw.Alignment.centerLeft}, columnWidths: {0: const pw.FixedColumnWidth(40), 1: const pw.FixedColumnWidth(40), 2: const pw.FixedColumnWidth(40)}); }
+  List<pw.Widget> _generarBloquesDetallados(List<GrupoFaseInforme> grupos) {
+    final w = <pw.Widget>[];
+    for (final g in grupos) {
+      w.add(
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(top: 10, bottom: 5),
+          child: pw.Text(
+            g.titulo,
+            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: colorAzul),
+          ),
+        ),
+      );
+
+      final bs = g.disparos.length > 20 ? 10 : 5;
+      final ns = (g.disparos.length / bs).ceil();
+      final cw = <int, pw.TableColumnWidth>{
+        0: const pw.FixedColumnWidth(35),
+        bs + 1: const pw.FixedColumnWidth(40),
+      };
+      for (int k = 1; k <= bs; k++) {
+        cw[k] = const pw.FlexColumnWidth();
+      }
+
+      for (int i = 0; i < ns; i++) {
+        final s = i * bs;
+        final e = min(s + bs, g.disparos.length);
+        final ser = g.disparos.sublist(s, e);
+        final pts = ser.fold<int>(0, (x, y) => x + y.puntuacion.floor());
+
+        final f = <String>["Serie ${i + 1}"];
+        for (final t in ser) {
+          f.add(t.puntuacion >= 10 ? (t.esMosca ? "X" : "10") : t.puntuacion.floor().toString());
+        }
+        while (f.length <= bs) {
+          f.add("-");
+        }
+        f.add("$pts");
+
+        final h = <String>['S'];
+        for (int k = 1; k <= bs; k++) {
+          h.add('$k');
+        }
+        h.add('TOT');
+
+        w.add(
+          pw.TableHelper.fromTextArray(
+            headers: i == 0 ? h : [],
+            data: [f],
+            border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
+            cellStyle: const pw.TextStyle(fontSize: 9),
+            cellAlignment: pw.Alignment.center,
+            headerDecoration: i == 0 ? const pw.BoxDecoration(color: colorGrisClaro) : null,
+            columnWidths: cw,
+          ),
+        );
+      }
+    }
+    return w;
+  }
+
+  pw.Widget _construirTablaFrecuencias(List<Disparo> d, {bool mostrarCabecera = true}) {
+    final c = <String, int>{"X": 0, "10": 0, "9": 0, "8": 0, "7": 0, "6": 0, "5": 0, "4": 0, "3": 0, "2": 0, "1": 0, "M": 0};
+    for (final x in d) {
+      if (x.esMosca) {
+        c["X"] = c["X"]! + 1;
+      } else if (x.puntuacion < 1) {
+        c["M"] = c["M"]! + 1;
+      } else {
+        final v = x.puntuacion.floor();
+        if (v >= 1 && v <= 10) {
+          c["$v"] = c["$v"]! + 1;
+        }
+      }
+    }
+
+    final h = ['Valor', 'Cantidad', 'Subtotal'];
+    final da = <List<String>>[];
+    const o = ["X", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "M"];
+    for (final k in o) {
+      final cnt = c[k] ?? 0;
+      if (cnt > 0) {
+        final s = k == "M" ? "0" : "${(k == "X" ? 10 : int.parse(k)) * cnt}";
+        da.add([k, "$cnt", s]);
+      }
+    }
+
+    return pw.TableHelper.fromTextArray(
+      headers: mostrarCabecera ? h : [],
+      data: da,
+      border: pw.TableBorder.all(color: PdfColors.grey500, width: 0.5),
+      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
+      headerDecoration: const pw.BoxDecoration(color: colorGrisClaro),
+      cellStyle: const pw.TextStyle(fontSize: 9),
+      cellAlignment: pw.Alignment.center,
+      cellAlignments: {0: pw.Alignment.centerLeft},
+      columnWidths: {0: const pw.FixedColumnWidth(40), 1: const pw.FixedColumnWidth(40), 2: const pw.FixedColumnWidth(40)},
+    );
+  }
   pw.Widget _buildCabeceraPrincipal(pw.ImageProvider? l, String t, PerfilUsuario? p, String i) { return pw.Row(children: [if(l!=null) pw.Container(width:50,height:50,child:pw.Image(l)), pw.SizedBox(width:15), pw.Expanded(child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[pw.Text(t,style:pw.TextStyle(fontSize:18,fontWeight:pw.FontWeight.bold,color:colorAzul)),pw.Text("Tirador: ${p?.nombre??'Usuario'} (Lic: ${p?.licencia??'-'})",style:const pw.TextStyle(fontSize:10)),pw.Text(i,style:const pw.TextStyle(fontSize:10))]))]); }
   List<ComparativoLotesContexto> _ordenarComparativoPorImpacto(List<ComparativoLotesContexto> data) {
     final copy = List<ComparativoLotesContexto>.from(data);
@@ -297,7 +401,7 @@ class PdfService {
       ];
     }).toList();
 
-    return pw.Table.fromTextArray(
+    return pw.TableHelper.fromTextArray(
       headers: const ['Modalidad', 'Temp', 'Viento', 'Mejor lote (media)', 'Peor lote (media)', 'Diff'],
       data: filas,
       border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),

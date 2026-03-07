@@ -194,13 +194,11 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
       binaryImage = _cleanBinaryImage(binaryImage); // Segunda pasada para mejor limpieza
       
       // Guardar imagen binaria
-      final Uint8List? encodedBytes = img.encodeJpg(binaryImage, quality: 100);
-      if (encodedBytes != null) {
-        final tempDir = await getTemporaryDirectory();
-        final binaryFilePath = '${tempDir.path}/binary_diana_blanca_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        await File(binaryFilePath).writeAsBytes(encodedBytes);
-        hole_service.HoleDetectionService.setBinaryImageFile(File(binaryFilePath));
-      }
+      final Uint8List encodedBytes = img.encodeJpg(binaryImage, quality: 100);
+      final tempDir = await getTemporaryDirectory();
+      final binaryFilePath = '${tempDir.path}/binary_diana_blanca_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await File(binaryFilePath).writeAsBytes(encodedBytes);
+      hole_service.HoleDetectionService.setBinaryImageFile(File(binaryFilePath));
 
       // Obtener imagen binaria
       final binaryImageFile = hole_service.HoleDetectionService.getBinaryImageFile();
@@ -270,7 +268,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
     try {
       // Detectar siempre, independientemente del blur
       // (pero funciona mejor cuando blur = 0)
-      debugPrint('Detectando líneas con blur: ${_blurRadius}');
+      debugPrint('Detectando líneas con blur: $_blurRadius');
 
       final bytes = await binaryImageFile.readAsBytes();
       final image = img.decodeImage(bytes);
@@ -933,6 +931,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
   }
 
   /// Genera un círculo completo desde el centro con el radio dado
+  // ignore: unused_element
   List<Offset> _generarCirculoCompleto(
     Offset center,
     double radius,
@@ -966,6 +965,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
 
   /// Completa un círculo incompleto usando el centro y radio estimados
   /// Rellena los huecos en la trayectoria del círculo
+  // ignore: unused_element
   List<Offset> _completarCirculo(
     List<Offset> pixelsDetectados,
     Offset center,
@@ -974,7 +974,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
     int imageHeight,
   ) {
     final completedPixels = <Offset>[];
-    final existingPixels = Set<String>();
+    final existingPixels = <String>{};
     
     // Agregar los píxeles ya detectados
     for (var pixel in pixelsDetectados) {
@@ -1078,6 +1078,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
   }
 
   /// Flood fill para encontrar regiones negras conectadas
+  // ignore: unused_element
   List<Point<int>> _floodFillBlack(
     img.Image image,
     List<List<bool>> visited,
@@ -1167,13 +1168,11 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
       binaryImage = _cleanBinaryImage(binaryImage); // Segunda pasada para mejor limpieza
       
       // Guardar imagen binaria
-      final Uint8List? encodedBytes = img.encodeJpg(binaryImage, quality: 100);
-      if (encodedBytes != null) {
-        final tempDir = await getTemporaryDirectory();
-        final binaryFilePath = '${tempDir.path}/binary_diana_negra_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        await File(binaryFilePath).writeAsBytes(encodedBytes);
-        hole_service.HoleDetectionService.setBinaryImageFile(File(binaryFilePath));
-      }
+      final Uint8List encodedBytes = img.encodeJpg(binaryImage, quality: 100);
+      final tempDir = await getTemporaryDirectory();
+      final binaryFilePath = '${tempDir.path}/binary_diana_negra_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await File(binaryFilePath).writeAsBytes(encodedBytes);
+      hole_service.HoleDetectionService.setBinaryImageFile(File(binaryFilePath));
 
     setState(() {
         _isProcessing = false;
@@ -1407,13 +1406,11 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
       binaryImage = _cleanBinaryImage(binaryImage); // Segunda pasada para mejor limpieza
       
       // Guardar imagen binaria
-      final Uint8List? encodedBytes = img.encodeJpg(binaryImage, quality: 100);
-      if (encodedBytes != null) {
-        final tempDir = await getTemporaryDirectory();
-        final binaryFilePath = '${tempDir.path}/binary_diana_blanca_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        await File(binaryFilePath).writeAsBytes(encodedBytes);
-        hole_service.HoleDetectionService.setBinaryImageFile(File(binaryFilePath));
-      }
+      final Uint8List encodedBytes = img.encodeJpg(binaryImage, quality: 100);
+      final tempDir = await getTemporaryDirectory();
+      final binaryFilePath = '${tempDir.path}/binary_diana_blanca_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await File(binaryFilePath).writeAsBytes(encodedBytes);
+      hole_service.HoleDetectionService.setBinaryImageFile(File(binaryFilePath));
 
       // Detectar líneas negras (círculos) en la imagen binaria
       final binaryImageFile = hole_service.HoleDetectionService.getBinaryImageFile();
@@ -1450,7 +1447,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
             : 0;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Zona blanca: ${numCircles} círculos detectados y dibujados en verde.'),
+            content: Text('Zona blanca: $numCircles círculos detectados y dibujados en verde.'),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -1499,7 +1496,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
         final binaryImage = hole_service.HoleDetectionService.getBinaryImageFile();
         if (binaryImage != null) {
           final lineResult = await _detectarLineasNegras(binaryImage);
-          if (lineResult != null && lineResult['radii'] != null) {
+          if (lineResult['radii'] != null) {
             final radii = lineResult['radii'] as List<double>;
             // Normalizar los radios dividiéndolos por el radio de la diana
             normalizedRadii = radii.map((r) => r / _dianaRadius!).toList();
@@ -1673,6 +1670,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
   }
 
   /// Muestra un diálogo con los resultados
+  // ignore: unused_element
   void _mostrarResultados() {
     final totalPuntos = _disparosDetectados.fold<int>(
       0, 
@@ -2130,6 +2128,7 @@ class _CropTargetScreenState extends State<CropTargetScreen> {
   bool _isLayoutCalculated = false;
   bool _autoDetected = false; // Indica si se detectaron esquinas automáticamente
   List<Offset>? _imageCorners; // Coordenadas de imagen original (para recalcular cuando cambia el tamaño)
+  // ignore: unused_field
   img.ColorRgb8? _selectedColor; // Color seleccionado por el usuario
   bool _waitingForColorSelection = false; // Indica si estamos esperando selección de color
   // Color por defecto para detección automática de esquinas (R:247 G:28 B:108)
@@ -2137,6 +2136,7 @@ class _CropTargetScreenState extends State<CropTargetScreen> {
   Offset? _cursorPosition; // Posición del cursor (cruz)
   img.ColorRgb8? _currentColor; // Color actual bajo el cursor
   int _colorTolerance = 50; // Tolerancia de color (0-100)
+  // ignore: unused_field
   String? _debugInfo; // Información de debug para mostrar en pantalla
   bool _colorLocked = false; // Indica si el color está fijado (después de hacer click)
 
@@ -2254,14 +2254,14 @@ class _CropTargetScreenState extends State<CropTargetScreen> {
         final double horizontalOffset = (size.width - displayedWidth) / 2;
         final double verticalOffset = (size.height - displayedHeight) / 2;
         
-        final toImageCoords = (Offset screenOffset) {
+        Offset toImageCoords(Offset screenOffset) {
           final double x = (screenOffset.dx - horizontalOffset) / scaleFactor;
           final double y = (screenOffset.dy - verticalOffset) / scaleFactor;
           return Offset(
             x.clamp(0.0, imageWidth.toDouble()),
             y.clamp(0.0, imageHeight.toDouble()),
           );
-        };
+        }
         
         final imageCoord = toImageCoords(clampedOffset);
         
@@ -2524,11 +2524,11 @@ class _CropTargetScreenState extends State<CropTargetScreen> {
       final double verticalOffset = (actualContainerSize.height - displayedHeight) / 2;
 
       // Convertir coordenadas de imagen a coordenadas de pantalla
-      final toScreenCoords = (Offset imgPoint) {
+      Offset toScreenCoords(Offset imgPoint) {
         final x = horizontalOffset + (imgPoint.dx * scaleFactor);
         final y = verticalOffset + (imgPoint.dy * scaleFactor);
         return Offset(x, y);
-      };
+      }
 
       final tl = toScreenCoords(redCorners[0]); // top-left
       final tr = toScreenCoords(redCorners[1]); // top-right
@@ -2610,11 +2610,11 @@ class _CropTargetScreenState extends State<CropTargetScreen> {
       final double horizontalOffset = (containerSize.width - displayedWidth) / 2;
       final double verticalOffset = (containerSize.height - displayedHeight) / 2;
 
-        final toRealCoords = (Offset screenOffset) {
+        Offset toRealCoords(Offset screenOffset) {
         final double x = (screenOffset.dx - horizontalOffset) / scaleFactor;
         final double y = (screenOffset.dy - verticalOffset) / scaleFactor;
           return Offset(x.clamp(0.0, actualImageWidth.toDouble()), y.clamp(0.0, actualImageHeight.toDouble()));
-        };
+        }
       
         realPoints = [
         toRealCoords(_tl),
@@ -2680,10 +2680,7 @@ class _CropTargetScreenState extends State<CropTargetScreen> {
       }
 
       // Guardar la imagen recortada
-      final Uint8List? encodedBytes = img.encodeJpg(croppedImage, quality: 90);
-      if (encodedBytes == null) {
-         throw Exception("No se pudo codificar la imagen recortada.");
-      }
+      final Uint8List encodedBytes = img.encodeJpg(croppedImage, quality: 90);
       
       final tempDir = await getTemporaryDirectory();
       final croppedFilePath = '${tempDir.path}/cropped_diana_${DateTime.now().millisecondsSinceEpoch}.jpg';
@@ -3027,12 +3024,12 @@ class _CropTargetScreenState extends State<CropTargetScreen> {
                                         final double horizontalOffset = (actualContainerSize.width - displayedWidth) / 2;
                                         final double verticalOffset = (actualContainerSize.height - displayedHeight) / 2;
                                         
-                                        final toScreenCoords = (Offset imgPoint) {
+                                        Offset toScreenCoords(Offset imgPoint) {
                                           return Offset(
                                             horizontalOffset + (imgPoint.dx * scaleFactor),
                                             verticalOffset + (imgPoint.dy * scaleFactor),
                                           );
-                                        };
+                                        }
                                         
                                         final recalculatedTl = toScreenCoords(_imageCorners![0]);
                                         final recalculatedTr = toScreenCoords(_imageCorners![1]);
@@ -3328,7 +3325,7 @@ class TargetZonesPainter extends CustomPainter {
         
         // Pint para el contorno rojo
         final contourPaint = Paint()
-          ..color = Colors.red.withOpacity(0.8)
+          ..color = Colors.red.withValues(alpha: 0.8)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0;
         
@@ -3657,6 +3654,7 @@ class HolesPainter extends CustomPainter {
   }
 
   /// Dibuja una estrella simple
+  // ignore: unused_element
   void _drawStar(Canvas canvas, Offset center, double radius, Paint paint) {
     final path = Path();
     for (int i = 0; i < 5; i++) {

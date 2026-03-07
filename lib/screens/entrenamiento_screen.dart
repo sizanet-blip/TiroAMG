@@ -176,7 +176,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
               icon: Icons.hardware,
               child: DropdownButtonFormField<EquipoDetalle>(
                 decoration: const InputDecoration(border: OutlineInputBorder()),
-                value: _equipoSeleccionado,
+                initialValue: _equipoSeleccionado,
                 isExpanded: true,
                 items: _equipos.map((e) {
                   return DropdownMenuItem(
@@ -196,7 +196,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
               icon: Icons.timer,
               child: DropdownButtonFormField<PlantillaTiempos>(
                 decoration: const InputDecoration(border: OutlineInputBorder()),
-                value: _plantillaSeleccionada,
+                initialValue: _plantillaSeleccionada,
                 isExpanded: true,
                 items: _plantillas.map((p) {
                   return DropdownMenuItem(
@@ -222,7 +222,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                   border: OutlineInputBorder(),
                   labelText: 'Seleccionar lote...',
                 ),
-                value: _municionSeleccionada,
+                initialValue: _municionSeleccionada,
                 isExpanded: true,
                 items: [
                   // Opción nula para deseleccionar
@@ -277,7 +277,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _posicionTiro,
+                    initialValue: _posicionTiro,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       labelText: 'Posicion de tiro',
@@ -292,7 +292,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _iluminacion,
+                    initialValue: _iluminacion,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       labelText: 'Iluminacion',

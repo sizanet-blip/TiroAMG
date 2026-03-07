@@ -31,7 +31,7 @@ class _CatalogoCalibresScreenState extends State<CatalogoCalibresScreen> {
     final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Nuevo Calibre'),
         content: TextField(
           controller: controller,
@@ -40,7 +40,7 @@ class _CatalogoCalibresScreenState extends State<CatalogoCalibresScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
@@ -48,7 +48,7 @@ class _CatalogoCalibresScreenState extends State<CatalogoCalibresScreen> {
               if (controller.text.trim().isNotEmpty) {
                 await _service.crearCalibre(Calibre(nombre: controller.text.trim()));
                 _cargarDatos();
-                if (mounted) Navigator.pop(context);
+                if (dialogCtx.mounted) Navigator.pop(dialogCtx);
               }
             },
             child: const Text('Guardar'),
@@ -63,7 +63,7 @@ class _CatalogoCalibresScreenState extends State<CatalogoCalibresScreen> {
     final controller = TextEditingController(text: item.nombre);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Editar Calibre'),
         content: TextField(
           controller: controller,
@@ -72,7 +72,7 @@ class _CatalogoCalibresScreenState extends State<CatalogoCalibresScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
@@ -82,7 +82,7 @@ class _CatalogoCalibresScreenState extends State<CatalogoCalibresScreen> {
                   Calibre(id: item.id, nombre: controller.text.trim())
                 );
                 _cargarDatos();
-                if (mounted) Navigator.pop(context);
+                if (dialogCtx.mounted) Navigator.pop(dialogCtx);
               }
             },
             child: const Text('Actualizar'),
@@ -151,7 +151,7 @@ class _CatalogoCalibresScreenState extends State<CatalogoCalibresScreen> {
                 final item = _lista[index];
                 return ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: Colors.blueGrey.withOpacity(0.1),
+                    backgroundColor: Colors.blueGrey.withValues(alpha: 0.1),
                     child: const Icon(Icons.straighten, color: Colors.blueGrey, size: 20),
                   ),
                   title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.w500)),

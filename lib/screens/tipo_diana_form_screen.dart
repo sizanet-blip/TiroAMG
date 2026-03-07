@@ -184,7 +184,7 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
                 title: const Text('Fondo Negro Total'),
                 subtitle: const Text('Activar para dianas de Duelo/Velocidad.'),
                 value: _esFondoNegro,
-                activeColor: Colors.black,
+                activeThumbColor: Colors.black,
                 onChanged: (val) => setState(() => _esFondoNegro = val),
               ),
 
@@ -193,7 +193,7 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
                 title: const Text('Guías Horizontales'),
                 subtitle: const Text('Líneas blancas a las 3 y a las 9.'),
                 value: _tieneGuias,
-                activeColor: Colors.blueGrey,
+                activeThumbColor: Colors.blueGrey,
                 onChanged: (val) => setState(() => _tieneGuias = val),
               ),
 
