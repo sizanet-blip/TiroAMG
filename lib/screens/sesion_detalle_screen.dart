@@ -12,6 +12,10 @@ import '../services/equipo_service.dart';
 import '../services/pdf_service.dart';
 import '../services/perfil_service.dart';
 import '../services/municion_service.dart';
+import '../services/license_service.dart';
+import '../services/license_permissions_service.dart';
+import '../models/licencia_model.dart';
+import '../utils/license_ui_helper.dart';
 import 'estadisticas_screen.dart'; // <--- IMPORTANTE: Para navegar a estadísticas
 
 class SesionDetalleScreen extends StatefulWidget {
@@ -31,6 +35,8 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
   final _pdfService = PdfService();
   final _perfilService = PerfilService();
   final _municionService = MunicionService();
+  final LicenseService _licenseService = const LicenseService();
+  final LicensePermissionsService _permissions = const LicensePermissionsService();
   
   final ScrollController _scrollController = ScrollController();
 
@@ -38,6 +44,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
   PlantillaTiempos? _plantilla;
   List<Disparo> _disparos = [];
   bool _cargando = true;
+  LicenciaLocal? _licenciaActual;
 
   // Datos extra
   EquipoDetalle? _equipoDetalle;
@@ -55,6 +62,13 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
   void initState() {
     super.initState();
     _cargarDatosCompletos();
+    _cargarLicenciaActual();
+  }
+
+  Future<void> _cargarLicenciaActual() async {
+    final licencia = await _licenseService.obtenerLicenciaLocal();
+    if (!mounted) return;
+    setState(() => _licenciaActual = licencia);
   }
 
   Future<void> _cargarDatosCompletos() async {
@@ -352,6 +366,10 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
     );
   }
 
+  bool _permitido(LicenseCapability capability) {
+    return _permissions.canAccess(_licenciaActual, capability);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_cargando) return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -366,11 +384,31 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
         backgroundColor: Colors.indigo,
         elevation: 0,
         actions: [
-          // --- 1. BOTÓN ESTADÍSTICAS (NUEVO) ---
           IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: "Analizar esta sesión",
+            icon: Icon(
+              _permitido(LicenseCapability.analytics)
+                  ? Icons.bar_chart
+                  : Icons.lock,
+              color: _permitido(LicenseCapability.analytics)
+                  ? null
+                  : Colors.orange,
+            ),
+            tooltip: _permitido(LicenseCapability.analytics)
+                ? "Analizar esta sesión"
+                : LicenseUiHelper.blockedTooltip(
+                    permissions: _permissions,
+                    capability: LicenseCapability.analytics,
+                  ),
             onPressed: () {
+              if (!_permitido(LicenseCapability.analytics)) {
+                LicenseUiHelper.showBlockedSnackBar(
+                  context: context,
+                  permissions: _permissions,
+                  licencia: _licenciaActual,
+                  capability: LicenseCapability.analytics,
+                );
+                return;
+              }
               Navigator.push(
                 context, 
                 MaterialPageRoute(
@@ -387,7 +425,34 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
           IconButton(icon: const Icon(Icons.edit), tooltip: "Editar Datos", onPressed: _editarDatosSesion),
           
           // --- 3. BOTÓN IMPRIMIR ---
-          IconButton(icon: const Icon(Icons.print), onPressed: _generarPDF, tooltip: 'Imprimir / PDF')
+          IconButton(
+            icon: Icon(
+              _permitido(LicenseCapability.backup)
+                  ? Icons.print
+                  : Icons.lock,
+              color: _permitido(LicenseCapability.backup)
+                  ? null
+                  : Colors.orange,
+            ),
+            tooltip: _permitido(LicenseCapability.backup)
+                ? 'Imprimir / PDF'
+                : LicenseUiHelper.blockedTooltip(
+                    permissions: _permissions,
+                    capability: LicenseCapability.backup,
+                  ),
+            onPressed: () {
+              if (!_permitido(LicenseCapability.backup)) {
+                LicenseUiHelper.showBlockedSnackBar(
+                  context: context,
+                  permissions: _permissions,
+                  licencia: _licenciaActual,
+                  capability: LicenseCapability.backup,
+                );
+                return;
+              }
+              _generarPDF();
+            },
+          )
         ],
       ),
       body: Column(

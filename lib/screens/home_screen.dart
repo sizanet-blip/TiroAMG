@@ -14,6 +14,7 @@ import '../services/app_update_service.dart';
 import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
+import '../utils/license_ui_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -308,6 +309,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bloqueoCompeticion =
+        !_permissions.canAccess(_licenciaActual, LicenseCapability.competition);
+    final bloqueoBackup =
+        !_permissions.canAccess(_licenciaActual, LicenseCapability.backup);
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -376,6 +382,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Competición',
                   Icons.emoji_events,
                   Colors.amber[700]!,
+                  locked: bloqueoCompeticion,
+                  lockPlanLabel: _permissions.requiredPlanLabel(
+                    LicenseCapability.competition,
+                  ),
                   () => _abrirSiPermitido(
                         context: context,
                         capability: LicenseCapability.competition,
@@ -400,12 +410,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Historial y Análisis',
                   Icons.analytics,
                   Colors.indigo,
-                  () => _abrirSiPermitido(
-                        context: context,
-                        capability: LicenseCapability.analytics,
-                        onAllowed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const HistorialScreen()),
+                  () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => HistorialScreen(
+                            puedeVerEstadisticas: _permissions.canAccess(
+                              _licenciaActual,
+                              LicenseCapability.analytics,
+                            ),
+                            puedeVerCompeticiones: _permissions.canAccess(
+                              _licenciaActual,
+                              LicenseCapability.competition,
+                            ),
+                            requiredPlanEstadisticas:
+                                _permissions.requiredPlanLabel(
+                              LicenseCapability.analytics,
+                            ),
+                          ),
                         ),
                       )),
 
@@ -414,6 +435,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Copia de Seguridad',
                   Icons.cloud_sync,
                   Colors.blueGrey,
+                  locked: bloqueoBackup,
+                  lockPlanLabel: _permissions.requiredPlanLabel(
+                    LicenseCapability.backup,
+                  ),
                   () => _abrirSiPermitido(
                         context: context,
                         capability: LicenseCapability.backup,
@@ -428,8 +453,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Configuración',
                   Icons.settings,
                   Colors.grey[700]!,
-                  () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ConfigScreen()))),
+                  () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ConfigScreen()),
+                    );
+                    if (!mounted) return;
+                    final refreshed = await _licenseService.revisarLicencia(
+                      forzarServidor: true,
+                    );
+                    if (!mounted) return;
+                    _actualizarLicencia(refreshed.licencia);
+                  }),
             ],
           ),
         ),
@@ -437,8 +472,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMenuItem(BuildContext context, String title, IconData icon,
-      Color color, VoidCallback onTap) {
+  Widget _buildMenuItem(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap, {
+    bool locked = false,
+    String? lockPlanLabel,
+  }) {
+    final lockColor = LicenseUiHelper.lockColorForPlan(lockPlanLabel);
     return Card(
       elevation: 4,
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -465,11 +508,39 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.w600)),
               ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (locked)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock, size: 16, color: lockColor),
+                          if (lockPlanLabel != null && lockPlanLabel.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Text(
+                                lockPlanLabel.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: lockColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                ],
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
 }

@@ -13,6 +13,7 @@ import '../services/app_update_service.dart';
 import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
+import '../utils/license_ui_helper.dart';
 
 class ConfigScreen extends StatefulWidget {
   const ConfigScreen({super.key});
@@ -33,6 +34,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
   String _licenciaDetalle = 'Estado de licencia cargado automáticamente.';
   bool _cargandoInfo = true;
   bool _comprobandoActualizacion = false;
+  bool _refrescandoLicencia = false;
   LicenciaLocal? _licenciaActual;
   LicenseUpgradeStatus? _ultimoUpgrade;
 
@@ -65,8 +67,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
     }
   }
 
-  Future<void> _cargarEstadoLicencia() async {
-    final result = await _licenseService.revisarLicencia();
+  Future<void> _cargarEstadoLicencia({bool forzarServidor = false}) async {
+    final result = await _licenseService.revisarLicencia(
+      forzarServidor: forzarServidor,
+    );
     final ultimoUpgrade = await _licenseService.obtenerUltimoUpgradeStatus();
     if (!mounted) return;
 
@@ -83,6 +87,34 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _licenciaActual = lic;
       _ultimoUpgrade = ultimoUpgrade;
     });
+  }
+
+  Future<void> _refrescarEstadoLicenciaManual() async {
+    if (_refrescandoLicencia) return;
+    final planAntes = _permissions.currentPlanLabel(_licenciaActual?.plan);
+    setState(() => _refrescandoLicencia = true);
+    try {
+      await _cargarEstadoLicencia(forzarServidor: true);
+      final planDespues = _permissions.currentPlanLabel(_licenciaActual?.plan);
+      final mensaje = planAntes != planDespues
+          ? 'Licencia actualizada: plan cambiado de $planAntes a $planDespues.'
+          : 'Licencia actualizada. No hubo cambio de plan.';
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mensaje)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo actualizar la licencia. Inténtalo más tarde.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _refrescandoLicencia = false);
+      }
+    }
   }
 
   VoidCallback _accionProtegida({
@@ -611,6 +643,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
     const dbEsperada = DatabaseProvider.schemaVersion;
     final dbReal = _dbUserVersion;
     final migracionOk = dbReal != null && dbReal >= dbEsperada;
+    final bloqueoReglas =
+        !_permissions.canAccess(_licenciaActual, LicenseCapability.settingsRules);
+    final bloqueoCatalogos =
+        !_permissions.canAccess(_licenciaActual, LicenseCapability.settingsCatalogs);
 
     return Scaffold(
       appBar: AppBar(
@@ -664,6 +700,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
             'Crear reglas de Duelo (3s/7s), Precisión, Estándar.',
             Icons.timer,
             Colors.indigo,
+            locked: bloqueoReglas,
+            lockPlanLabel: _permissions.requiredPlanLabel(
+              LicenseCapability.settingsRules,
+            ),
             _accionProtegida(
               capability: LicenseCapability.settingsRules,
               onAllowed: () => Navigator.push(
@@ -684,6 +724,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
             'Añadir/modificar categorías de armas.',
             Icons.category,
             Colors.blueGrey,
+            locked: bloqueoCatalogos,
+            lockPlanLabel: _permissions.requiredPlanLabel(
+              LicenseCapability.settingsCatalogs,
+            ),
             _accionProtegida(
               capability: LicenseCapability.settingsCatalogs,
               onAllowed: () => Navigator.push(
@@ -699,6 +743,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
             'Añadir/modificar calibres no estándar.',
             Icons.straighten,
             Colors.blueGrey,
+            locked: bloqueoCatalogos,
+            lockPlanLabel: _permissions.requiredPlanLabel(
+              LicenseCapability.settingsCatalogs,
+            ),
             _accionProtegida(
               capability: LicenseCapability.settingsCatalogs,
               onAllowed: () => Navigator.push(
@@ -715,6 +763,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
             'Definir tipos de diana (Precisión, Duelo...).',
             Icons.adjust, // Icono de diana
             Colors.blueGrey,
+            locked: bloqueoCatalogos,
+            lockPlanLabel: _permissions.requiredPlanLabel(
+              LicenseCapability.settingsCatalogs,
+            ),
             _accionProtegida(
               capability: LicenseCapability.settingsCatalogs,
               onAllowed: () => Navigator.push(
@@ -726,7 +778,23 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
           const Divider(height: 30),
           _buildSectionHeader('D. Estado de la Aplicación'),
-          _buildSubSectionHeader('Licencia'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: _buildSubSectionHeader('Licencia')),
+              TextButton.icon(
+                onPressed: _refrescandoLicencia ? null : _refrescarEstadoLicenciaManual,
+                icon: _refrescandoLicencia
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                label: Text(_refrescandoLicencia ? 'Refrescando...' : 'Refrescar'),
+              ),
+            ],
+          ),
           _buildInfoCard(
             leading: const Icon(Icons.key, color: Colors.deepPurple, size: 30),
             title: 'Licencia: $_licenciaEstado',
@@ -845,7 +913,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
     required String subtitle,
     VoidCallback? onTap,
     bool showChevron = false,
+    bool locked = false,
+    String? lockPlanLabel,
   }) {
+    final lockColor = LicenseUiHelper.lockColorForPlan(lockPlanLabel);
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 10),
@@ -854,8 +925,36 @@ class _ConfigScreenState extends State<ConfigScreen> {
         leading: leading,
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-        trailing: showChevron
-            ? const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey)
+        trailing: (showChevron || locked)
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (locked)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock, size: 16, color: lockColor),
+                          if (lockPlanLabel != null && lockPlanLabel.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Text(
+                                lockPlanLabel.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: lockColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (showChevron)
+                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                ],
+              )
             : null,
         onTap: onTap,
       ),
@@ -891,14 +990,25 @@ class _ConfigScreenState extends State<ConfigScreen> {
     );
   }
 
-  Widget _buildConfigItem(BuildContext context, String title, String subtitle,
-      IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildConfigItem(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    VoidCallback onTap, {
+    bool locked = false,
+    String? lockPlanLabel,
+  }) {
     return _buildInfoCard(
       leading: Icon(icon, color: color, size: 30),
       title: title,
       subtitle: subtitle,
       onTap: onTap,
       showChevron: true,
+      locked: locked,
+      lockPlanLabel: lockPlanLabel,
     );
   }
+
 }

@@ -5,9 +5,20 @@ import 'sesion_detalle_screen.dart';
 import 'competicion_historial_detalle_screen.dart';
 // Asegúrate de que el nombre del archivo de estadísticas coincida con el que tienes
 import 'estadisticas_screen.dart'; 
+import '../services/license_permissions_service.dart';
+import '../utils/license_ui_helper.dart';
 
 class HistorialScreen extends StatefulWidget {
-  const HistorialScreen({super.key});
+  final bool puedeVerEstadisticas;
+  final bool puedeVerCompeticiones;
+  final String requiredPlanEstadisticas;
+
+  const HistorialScreen({
+    super.key,
+    required this.puedeVerEstadisticas,
+    this.puedeVerCompeticiones = true,
+    this.requiredPlanEstadisticas = 'Medio',
+  });
 
   @override
   State<HistorialScreen> createState() => _HistorialScreenState();
@@ -15,6 +26,7 @@ class HistorialScreen extends StatefulWidget {
 
 class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProviderStateMixin {
   final _service = EntrenamientoService();
+  final LicensePermissionsService _permissions = const LicensePermissionsService();
   
   // Listas completas (Datos brutos)
   List<SesionResumen> _entrenamientosRaw = [];
@@ -35,7 +47,10 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: widget.puedeVerCompeticiones ? 2 : 1,
+      vsync: this,
+    );
     // Refrescar UI al cambiar pestaña para actualizar el botón de estadísticas
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) setState(() {});
@@ -178,27 +193,48 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
         title: const Text('Historial'),
         backgroundColor: Colors.indigo,
         actions: [
-          // Botón de Estadísticas contextual
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: _tabController.index == 0 ? "Estadísticas Entrenamientos" : "Estadísticas Competiciones",
-            onPressed: () {
-              int modo = _tabController.index == 0 ? 1 : 2; 
-              Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (_) => EstadisticasScreen(modo: modo))
-              );
-            },
-          ),
+          if (widget.puedeVerEstadisticas)
+            IconButton(
+              icon: const Icon(Icons.bar_chart),
+              tooltip: (widget.puedeVerCompeticiones && _tabController.index == 1)
+                  ? "Estadísticas Competiciones"
+                  : "Estadísticas Entrenamientos",
+              onPressed: () {
+                final modo = (widget.puedeVerCompeticiones && _tabController.index == 1)
+                    ? 2
+                    : 1;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => EstadisticasScreen(modo: modo)),
+                );
+              },
+            ),
+          if (!widget.puedeVerEstadisticas)
+            IconButton(
+              icon: const Icon(Icons.lock, color: Colors.orange),
+              tooltip: LicenseUiHelper.blockedTooltip(
+                permissions: _permissions,
+                capability: LicenseCapability.analytics,
+              ),
+              onPressed: () {
+                LicenseUiHelper.showBlockedSnackBar(
+                  context: context,
+                  permissions: _permissions,
+                  licencia: null,
+                  capability: LicenseCapability.analytics,
+                );
+              },
+            ),
         ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           indicatorColor: Colors.amber,
-          tabs: const [
-            Tab(text: 'ENTRENAMIENTOS', icon: Icon(Icons.sports_baseball)),
-            Tab(text: 'COMPETICIONES', icon: Icon(Icons.emoji_events)),
+          tabs: [
+            const Tab(text: 'ENTRENAMIENTOS', icon: Icon(Icons.sports_baseball)),
+            if (widget.puedeVerCompeticiones)
+              const Tab(text: 'COMPETICIONES', icon: Icon(Icons.emoji_events)),
           ],
         ),
       ),
@@ -265,7 +301,8 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                   controller: _tabController,
                   children: [
                     _construirLista(_entrenamientosFiltrados, false),
-                    _construirLista(_competicionesFiltradas, true),
+                    if (widget.puedeVerCompeticiones)
+                      _construirLista(_competicionesFiltradas, true),
                   ],
                 ),
           ),
