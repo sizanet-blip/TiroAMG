@@ -187,15 +187,20 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Historial'),
-        backgroundColor: Colors.indigo,
+        title: const Text('Historial', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: 0,
         actions: [
           if (widget.puedeVerEstadisticas)
             IconButton(
-              icon: const Icon(Icons.bar_chart),
+              icon: const Icon(Icons.bar_chart_rounded),
               tooltip: (widget.puedeVerCompeticiones && _tabController.index == 1)
                   ? "Estadísticas Competiciones"
                   : "Estadísticas Entrenamientos",
@@ -211,7 +216,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
             ),
           if (!widget.puedeVerEstadisticas)
             IconButton(
-              icon: const Icon(Icons.lock, color: Colors.orange),
+              icon: Icon(Icons.lock_rounded, color: Colors.orange.shade700),
               tooltip: LicenseUiHelper.blockedTooltip(
                 permissions: _permissions,
                 capability: LicenseCapability.analytics,
@@ -228,13 +233,16 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicatorColor: Colors.amber,
+          labelColor: colorScheme.primary,
+          unselectedLabelColor: colorScheme.onSurfaceVariant,
+          indicatorColor: colorScheme.primary,
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          dividerColor: colorScheme.outlineVariant.withValues(alpha: 0.5),
           tabs: [
-            const Tab(text: 'ENTRENAMIENTOS', icon: Icon(Icons.sports_baseball)),
+            const Tab(text: 'ENTRENOS', icon: Icon(Icons.sports_baseball_rounded)),
             if (widget.puedeVerCompeticiones)
-              const Tab(text: 'COMPETICIONES', icon: Icon(Icons.emoji_events)),
+              const Tab(text: 'COMPETICIÓN', icon: Icon(Icons.emoji_events_rounded)),
           ],
         ),
       ),
@@ -242,67 +250,73 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
         children: [
           // --- BARRA DE FILTROS ---
           Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
             child: Row(
               children: [
                 Icon(
-                  _filtroSeleccionado == 5 ? Icons.date_range : Icons.filter_list, 
-                  color: Colors.indigo, 
-                  size: 24
+                  _filtroSeleccionado == 5 ? Icons.date_range_rounded : Icons.filter_list_rounded, 
+                  color: colorScheme.primary, 
+                  size: 20
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: DropdownButton<int>(
-                    value: _filtroSeleccionado,
-                    isExpanded: true,
-                    underline: Container(height: 2, color: Colors.indigo.withValues(alpha: 0.2)),
-                    icon: const Icon(Icons.arrow_drop_down, color: Colors.indigo),
-                    style: const TextStyle(color: Colors.black87, fontSize: 16),
-                    
-                    onChanged: (int? newValue) {
-                      if (newValue == 5) {
-                        _seleccionarRango();
-                      } else if (newValue != null) {
-                        setState(() {
-                          _filtroSeleccionado = newValue;
-                          _rangoSeleccionado = null;
-                          _aplicarFiltros();
-                        });
-                      }
-                    },
-                    items: [
-                      const DropdownMenuItem(value: 0, child: Text('Mostrar Todo')),
-                      const DropdownMenuItem(value: 1, child: Text('Hoy')), // ¡NUEVO!
-                      const DropdownMenuItem(value: 2, child: Text('Este Mes')),
-                      const DropdownMenuItem(value: 3, child: Text('Últimos 3 Meses')),
-                      const DropdownMenuItem(value: 4, child: Text('Este Año')),
-                      DropdownMenuItem(
-                        value: 5, 
-                        child: Text(
-                          _filtroSeleccionado == 5 && _rangoSeleccionado != null
-                              ? '${_formatoCorto(_rangoSeleccionado!.start)} - ${_formatoCorto(_rangoSeleccionado!.end)}'
-                              : 'Rango Personalizado...'
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      value: _filtroSeleccionado,
+                      isExpanded: true,
+                      icon: Icon(Icons.expand_more_rounded, color: colorScheme.primary),
+                      style: TextStyle(color: colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w500),
+                      dropdownColor: colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(16),
+                      onChanged: (int? newValue) {
+                        if (newValue == 5) {
+                          _seleccionarRango();
+                        } else if (newValue != null) {
+                          setState(() {
+                            _filtroSeleccionado = newValue;
+                            _rangoSeleccionado = null;
+                            _aplicarFiltros();
+                          });
+                        }
+                      },
+                      items: [
+                        const DropdownMenuItem(value: 0, child: Text('Todos los registros')),
+                        const DropdownMenuItem(value: 1, child: Text('Solo de hoy')),
+                        const DropdownMenuItem(value: 2, child: Text('Este mes actual')),
+                        const DropdownMenuItem(value: 3, child: Text('Últimos 90 días')),
+                        const DropdownMenuItem(value: 4, child: Text('Este año completo')),
+                        DropdownMenuItem(
+                          value: 5, 
+                          child: Text(
+                            _filtroSeleccionado == 5 && _rangoSeleccionado != null
+                                ? '${_formatoCorto(_rangoSeleccionado!.start)} a ${_formatoCorto(_rangoSeleccionado!.end)}'
+                                : 'Elegir fechas personalizadas...'
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1),
-
+          
           // --- LISTAS ---
           Expanded(
             child: _cargando
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
               : TabBarView(
                   controller: _tabController,
                   children: [
-                    _construirLista(_entrenamientosFiltrados, false),
+                    _construirLista(_entrenamientosFiltrados, false, colorScheme, isDark),
                     if (widget.puedeVerCompeticiones)
-                      _construirLista(_competicionesFiltradas, true),
+                      _construirLista(_competicionesFiltradas, true, colorScheme, isDark),
                   ],
                 ),
           ),
@@ -311,21 +325,37 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
     );
   }
 
-  Widget _construirLista(List<SesionResumen> lista, bool esCompe) {
+  Widget _construirLista(List<SesionResumen> lista, bool esCompe, ColorScheme colorScheme, bool isDark) {
     if (lista.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              esCompe ? Icons.emoji_events_outlined : Icons.sports_baseball_outlined, 
-              size: 60, 
-              color: Colors.grey[300]
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                esCompe ? Icons.emoji_events_rounded : Icons.sports_baseball_rounded, 
+                size: 64, 
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 24),
             Text(
-              'No hay registros para este filtro', 
-              style: TextStyle(color: Colors.grey[400])
+              'Aún no hay registros aquí', 
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant, 
+                fontSize: 18, 
+                fontWeight: FontWeight.bold
+              )
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Cambia el filtro temporal o empieza una sesión.', 
+              style: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8))
             ),
           ],
         ),
@@ -333,16 +363,32 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: lista.length,
       itemBuilder: (context, index) {
         final item = lista[index];
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        final cardColor = esCompe 
+            ? (isDark ? Colors.amber.withValues(alpha: 0.1) : Colors.amber.withValues(alpha: 0.05))
+            : colorScheme.surfaceContainer;
+        
+        final iconColor = esCompe ? Colors.amber.shade700 : Colors.teal.shade600;
+        final dateBgColor = esCompe 
+            ? Colors.amber.withValues(alpha: isDark ? 0.2 : 0.15)
+            : Colors.teal.withValues(alpha: isDark ? 0.2 : 0.1);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: esCompe 
+                  ? Colors.amber.withValues(alpha: 0.3) 
+                  : colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+          ),
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
             onTap: () {
                if (esCompe) {
                  Navigator.push(
@@ -366,62 +412,106 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  // FECHA
+                  // CUADRO DE FECHA
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    width: 60,
+                    height: 60,
                     decoration: BoxDecoration(
-                      color: esCompe ? Colors.amber[50] : Colors.teal[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: esCompe ? Colors.amber.withValues(alpha: 0.3) : Colors.teal.withValues(alpha: 0.3))
+                      color: dateBgColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: esCompe ? Colors.amber.withValues(alpha: 0.4) : Colors.teal.withValues(alpha: 0.3)),
                     ),
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("${item.fecha.day}", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: esCompe ? Colors.amber[900] : Colors.teal[900])),
-                        Text(_obtenerMes(item.fecha.month), style: TextStyle(fontSize: 12, color: esCompe ? Colors.amber[900] : Colors.teal[900])),
+                        Text("${item.fecha.day}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, height: 1.1, color: iconColor)),
+                        Text(_obtenerMes(item.fecha.month), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: iconColor)),
                       ],
                     ),
                   ),
                   const SizedBox(width: 16),
                   
-                  // INFO
+                  // INFO CENTRAL
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item.nombreTitulo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(
+                          item.nombreTitulo, 
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colorScheme.onSurface)
+                        ),
                         const SizedBox(height: 4),
-                        Text(item.nombreEquipo, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                        if (item.marcaMunicion != null && item.marcaMunicion!.isNotEmpty)
-                          Text(
-                            'Munición: ${item.marcaMunicion}${(item.loteMunicion != null && item.loteMunicion!.isNotEmpty) ? ' (${item.loteMunicion})' : ''}',
-                            style: const TextStyle(fontSize: 11, color: Colors.deepOrange),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          item.nombreEquipo, 
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500)
+                        ),
+                        if (item.marcaMunicion != null && item.marcaMunicion!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.deepOrange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '${item.marcaMunicion}${(item.loteMunicion != null && item.loteMunicion!.isNotEmpty) ? ' · ${item.loteMunicion}' : ''}',
+                              style: TextStyle(fontSize: 10, color: isDark ? Colors.orange.shade300 : Colors.deepOrange.shade700, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        if (!esCompe && item.nota != null) 
+                        ],
+                        if (!esCompe && item.nota != null) ...[
+                           const SizedBox(height: 4),
                            Text(
                              item.nota!.replaceAll('Torneo: ', ''), 
-                             style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.blueGrey),
+                             style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
                              maxLines: 1, overflow: TextOverflow.ellipsis
                            ),
+                        ],
                       ],
                     ),
                   ),
                   
-                  // PUNTOS
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '${item.totalPuntos}', 
-                        style: TextStyle(
-                          fontSize: 24, 
-                          fontWeight: FontWeight.bold, 
-                          color: esCompe ? Colors.amber[800] : Colors.teal[800]
-                        )
-                      ),
-                      if (item.totalMoscas > 0) Text('${item.totalMoscas}x', style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.bold)),
-                    ],
+                  // PUNTOS Y MOSCAS
+                  Container(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${item.totalPuntos}', 
+                          style: TextStyle(
+                            fontSize: 26, 
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1, 
+                            color: iconColor
+                          )
+                        ),
+                        if (item.totalMoscas > 0) 
+                          Container(
+                            margin: const EdgeInsets.only(top: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: colorScheme.onSurface.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.stars_rounded, size: 12, color: iconColor),
+                                const SizedBox(width: 4),
+                                Text('${item.totalMoscas}x', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   )
                 ],
               ),

@@ -19,6 +19,10 @@ class LicenseService {
     'LICENSE_API_URL',
     defaultValue: '',
   );
+  static const bool devPlanSelectorEnabled = bool.fromEnvironment(
+    'DEV_PLAN_SELECTOR',
+    defaultValue: false,
+  );
 
   Future<LicenciaLocal?> obtenerLicenciaLocal() async {
     final db = await DatabaseProvider.instance.database;
@@ -371,6 +375,18 @@ class LicenseService {
   }
 
   Future<LicenciaCheckResult> revisarLicencia({bool forzarServidor = false}) async {
+    if (devPlanSelectorEnabled) {
+      final licenciaDev = await obtenerLicenciaLocal() ??
+          await simularPlanDesarrollo(planClave: 'basic');
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: false,
+        requiereActivacion: false,
+        mensaje: 'Modo desarrollo activo: licencia simulada.',
+        licencia: licenciaDev,
+      );
+    }
+
     if (apiBaseUrl.trim().isEmpty) {
       return const LicenciaCheckResult(
         esValida: true,
@@ -499,6 +515,31 @@ class LicenseService {
         licencia: null,
       );
     }
+  }
+
+  Future<LicenciaLocal> simularPlanDesarrollo({
+    required String planClave,
+  }) async {
+    final plan = _normalizarPlanDev(planClave);
+    final deviceId = await _obtenerDeviceIdPersistente();
+    final now = DateTime.now().toUtc();
+    final fechaFin = now.add(const Duration(days: 3650));
+    final payload = {
+      'id': 1,
+      'license_key': 'DEV-${plan.toUpperCase()}',
+      'estado': 'active',
+      'fecha_inicio': now.toIso8601String(),
+      'fecha_fin': fechaFin.toIso8601String(),
+      'plan': plan,
+      'features_json': jsonEncode(_featuresPorPlanDev(plan)),
+      'device_id': deviceId,
+      'ultima_validacion': now.toIso8601String(),
+      'proxima_validacion': now.add(const Duration(days: 30)).toIso8601String(),
+      'dias_gracia_offline': 3650,
+      'max_dispositivos': 99,
+      'firma': 'dev-mode',
+    };
+    return _guardarPayloadLicencia(payload);
   }
 
   Future<LicenciaCheckResult> solicitarLicenciaAutomatica({
@@ -885,6 +926,36 @@ class LicenseService {
       return 'El servidor de licencias no está disponible temporalmente.';
     }
     return 'No se pudo completar la operación de licencia en este momento.';
+  }
+
+  String _normalizarPlanDev(String raw) {
+    final p = raw.trim().toLowerCase();
+    switch (p) {
+      case 'medio':
+      case 'pro':
+      case 'completo':
+        return p;
+      default:
+        return 'basic';
+    }
+  }
+
+  Map<String, dynamic> _featuresPorPlanDev(String plan) {
+    final tier = plan == 'completo'
+        ? 3
+        : plan == 'pro'
+            ? 2
+            : plan == 'medio'
+                ? 1
+                : 0;
+    return {
+      'competition_mode': tier >= 2,
+      'advanced_stats': tier >= 1,
+      'backup_export': tier >= 2,
+      'training_rules': tier >= 1,
+      'catalog_management': tier >= 2,
+      'target_shot_detection': tier >= 3,
+    };
   }
 
 }

@@ -29,44 +29,79 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
 
   // --- MENÚ DE ACCIÓN (EMPEZAR O EDITAR) ---
   void _mostrarOpciones(Modalidad item) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     showModalBottomSheet(
       context: context,
+      backgroundColor: colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => Container(
         padding: const EdgeInsets.all(24),
-        height: 220, // Altura del panel
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              item.nombre, 
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), 
-              textAlign: TextAlign.center
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              alignment: Alignment.center,
             ),
-            const SizedBox(height: 10),
-            Text(
-              item.descripcion ?? 'Selecciona una acción',
-              style: const TextStyle(color: Colors.grey),
-              textAlign: TextAlign.center,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: item.esOficial ? Colors.amber.withValues(alpha: 0.2) : Colors.blue.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    item.esOficial ? Icons.emoji_events_rounded : Icons.edit_note_rounded,
+                    color: item.esOficial ? Colors.amber[800] : Colors.blue,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.nombre, 
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.onSurface), 
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.descripcion ?? 'Selecciona una acción',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 32),
             
             Row(
               children: [
                 // BOTÓN EDITAR
                 Expanded(
                   child: OutlinedButton.icon(
-                    icon: const Icon(Icons.edit, color: Colors.blueGrey),
-                    label: const Text('EDITAR FASES', style: TextStyle(color: Colors.blueGrey)),
+                    icon: Icon(Icons.edit_rounded, color: colorScheme.primary),
+                    label: Text('EDITAR', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      side: const BorderSide(color: Colors.blueGrey),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: BorderSide(color: colorScheme.outlineVariant),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
                     onPressed: () {
-                      Navigator.pop(ctx); // Cerrar menú
-                      // Ir al editor de fases
+                      Navigator.pop(ctx);
                       Navigator.push(
                         context, 
                         MaterialPageRoute(builder: (_) => CompeticionDetalleScreen(modalidad: item))
@@ -74,22 +109,22 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
                     },
                   ),
                 ),
-                const SizedBox(width: 15),
+                const SizedBox(width: 16),
                 
                 // BOTÓN EMPEZAR
                 Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('EMPEZAR'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.play_arrow_rounded, size: 24),
+                    label: const Text('EMPEZAR', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.amber.shade700,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      elevation: 5,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
                     ),
                     onPressed: () {
-                      Navigator.pop(ctx); // Cerrar menú
-                      // Ir al Setup para elegir arma y empezar
+                      Navigator.pop(ctx);
                       Navigator.push(
                         context, 
                         MaterialPageRoute(builder: (_) => CompeticionSetupScreen(modalidad: item))
@@ -98,7 +133,8 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
                   ),
                 ),
               ],
-            )
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -108,15 +144,30 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
   // Crear nueva modalidad
   void _crearModalidad() {
     final controller = TextEditingController();
+    final colorScheme = Theme.of(context).colorScheme;
+
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: const Text('Nueva Competición'),
+        backgroundColor: colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.add_circle_outline_rounded, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('Nueva Competición', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Nombre del Torneo', 
-            hintText: 'Ej: Mi Entrenamiento Mixto'
+            hintText: 'Ej: Entrenamiento Mixto',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant), borderRadius: BorderRadius.circular(12)),
+            focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.primary, width: 2), borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           ),
           autofocus: true,
           textCapitalization: TextCapitalization.sentences,
@@ -124,9 +175,13 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx), 
-            child: const Text('Cancelar')
+            child: Text('Cancelar', style: TextStyle(color: colorScheme.onSurfaceVariant))
           ),
-          ElevatedButton(
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+            ),
             onPressed: () async {
               if (controller.text.trim().isNotEmpty) {
                 await _service.crearModalidad(Modalidad(
@@ -138,7 +193,7 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
                 if (dialogCtx.mounted) Navigator.pop(dialogCtx);
               }
             },
-            child: const Text('Crear'),
+            child: const Text('Crear', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -146,21 +201,39 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
   }
 
   void _borrarModalidad(Modalidad item) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Borrar Competición'),
-        content: Text('¿Eliminar "${item.nombre}"?'),
+        backgroundColor: colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_rounded, color: Colors.red),
+            const SizedBox(width: 8),
+            const Text('Borrar Competición', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text('¿Eliminar definitivamente "${item.nombre}" y todos sus datos?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx), 
+            child: Text('Cancelar', style: TextStyle(color: colorScheme.onSurfaceVariant))
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade600, 
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.delete_forever_rounded, size: 20),
             onPressed: () async {
               Navigator.pop(ctx);
               await _service.borrarModalidadCompleta(item.id!);
               _cargarDatos();
             },
-            child: const Text('Borrar Todo'),
+            label: const Text('Borrar Todo'),
           ),
         ],
       ),
@@ -169,48 +242,127 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Competiciones'), 
-        backgroundColor: Colors.amber[700],
-      ),
-      body: _lista.isEmpty
-          ? const Center(child: Text('Cargando competiciones...'))
-          : ListView.builder(
-              itemCount: _lista.length,
-              itemBuilder: (context, index) {
-                final item = _lista[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: item.esOficial ? Colors.amber.withValues(alpha: 0.2) : Colors.blue.withValues(alpha: 0.2),
-                      child: Icon(
-                        item.esOficial ? Icons.emoji_events : Icons.edit_note,
-                        color: item.esOficial ? Colors.amber[800] : Colors.blue,
-                      ),
-                    ),
-                    title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(item.esOficial ? 'Oficial ISSF' : 'Personalizada'),
+      backgroundColor: colorScheme.surface,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            pinned: true,
+            backgroundColor: colorScheme.surface,
+            foregroundColor: colorScheme.onSurface,
+            elevation: 0,
+            title: const Text('Competiciones', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          if (_lista.isEmpty)
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: colorScheme.primary),
+                    const SizedBox(height: 16),
+                    Text('Cargando competiciones...', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 100), // Padding extra abajo para el FAB
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final item = _lista[index];
+                    final isOficial = item.esOficial;
                     
-                    // Solo permitimos borrar si NO es oficial
-                    trailing: item.esOficial 
-                      ? const Icon(Icons.lock_outline, color: Colors.grey, size: 20)
-                      : IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () => _borrarModalidad(item),
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                         ),
-                    
-                    // AQUÍ ESTÁ LA CLAVE: Al tocar, abre el menú de opciones
-                    onTap: () => _mostrarOpciones(item),
-                  ),
-                );
-              },
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => _mostrarOpciones(item),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isOficial 
+                                    ? Colors.amber.withValues(alpha: isDark ? 0.2 : 0.15) 
+                                    : Colors.blue.withValues(alpha: isDark ? 0.2 : 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  isOficial ? Icons.emoji_events_rounded : Icons.edit_note_rounded,
+                                  color: isOficial ? Colors.amber.shade700 : Colors.blue.shade600,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.nombre, 
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold, 
+                                        fontSize: 16,
+                                        color: colorScheme.onSurface,
+                                      )
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      isOficial ? 'Oficial ISSF' : 'Personalizada',
+                                      style: TextStyle(
+                                        color: colorScheme.onSurfaceVariant,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isOficial)
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Icon(Icons.lock_outline_rounded, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5), size: 20),
+                                )
+                              else
+                                IconButton(
+                                  icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400),
+                                  onPressed: () => _borrarModalidad(item),
+                                  tooltip: 'Borrar',
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: _lista.length,
+                ),
+              ),
             ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.amber[700],
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.amber.shade700,
+        foregroundColor: Colors.white,
+        elevation: 4,
         onPressed: _crearModalidad,
-        child: const Icon(Icons.add, color: Colors.white),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('NUEVA', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }

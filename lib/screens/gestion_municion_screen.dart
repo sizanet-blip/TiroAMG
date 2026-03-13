@@ -167,64 +167,136 @@ class _GestionMunicionScreenState extends State<GestionMunicionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Mis Municiones'), backgroundColor: Colors.teal),
+      backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        title: const Text('Mis Municiones', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: 0,
+        centerTitle: true,
+      ),
       body: _lista.isEmpty
-          ? const Center(child: Text('No hay munición registrada', style: TextStyle(color: Colors.grey)))
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.local_fire_department_rounded, size: 64, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                  const SizedBox(height: 16),
+                  Text('No tienes munición registrada', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16, fontWeight: FontWeight.w500)),
+                ],
+              ),
+            )
           : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               itemCount: _lista.length,
               itemBuilder: (context, index) {
                 final item = _lista[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.teal.withValues(alpha: 0.1),
-                      child: const Icon(Icons.apps, color: Colors.teal), // Icono de caja/lote
-                    ),
-                    title: Text('${item.marca} (${item.nombreCalibre})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(
-                      'Lote: ${item.lote}\nStock: ${item.cantidadActual} | Disparada: ${item.totalDisparada}',
-                    ),
-                    
-                    onLongPress: () => _borrarMunicion(item),
-                    
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        IconButton(
-                          tooltip: 'Donde se uso',
-                          icon: const Icon(Icons.map_outlined, color: Colors.blueGrey),
-                          onPressed: () => _verDondeSeUso(item),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                              radius: 20,
+                              child: Icon(Icons.inventory_2_rounded, color: colorScheme.primary, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('${item.marca} (${item.nombreCalibre})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  const SizedBox(height: 4),
+                                  Text('Lote: ${item.lote}', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13)),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${item.cantidadActual} ud.',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onPrimaryContainer, fontSize: 12),
+                              ),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          tooltip: 'Compra',
-                          icon: const Icon(Icons.add_circle_outline, color: Colors.green),
-                          onPressed: () => _registrarMovimiento(item, esCompra: true),
-                        ),
-                        IconButton(
-                          tooltip: 'Uso manual',
-                          icon: const Icon(Icons.remove_circle_outline, color: Colors.orange),
-                          onPressed: () => _registrarMovimiento(item, esCompra: false),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.teal),
-                          onPressed: () => _abrirFormulario(item.id),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () => _borrarMunicion(item),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Icon(Icons.local_fire_department_rounded, size: 14, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
+                            const SizedBox(width: 4),
+                            Text('Disparada: ${item.totalDisparada}', style: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8), fontSize: 12)),
+                            const Spacer(),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(8),
+                                  tooltip: 'Historial de uso',
+                                  icon: Icon(Icons.history_rounded, color: colorScheme.onSurfaceVariant, size: 20),
+                                  onPressed: () => _verDondeSeUso(item),
+                                ),
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(8),
+                                  tooltip: 'Comprar (+)',
+                                  icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.green, size: 20),
+                                  onPressed: () => _registrarMovimiento(item, esCompra: true),
+                                ),
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(8),
+                                  tooltip: 'Restar (-)',
+                                  icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.orange, size: 20),
+                                  onPressed: () => _registrarMovimiento(item, esCompra: false),
+                                ),
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(8),
+                                  icon: Icon(Icons.edit_rounded, color: colorScheme.primary, size: 20),
+                                  onPressed: () => _abrirFormulario(item.id),
+                                ),
+                                IconButton(
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(8),
+                                  icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 20),
+                                  onPressed: () => _borrarMunicion(item),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ),
+                  )
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.teal,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 4,
         onPressed: () => _abrirFormulario(),
-        child: const Icon(Icons.add, color: Colors.white),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text("Nueva Munición", style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }

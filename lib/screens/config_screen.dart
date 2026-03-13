@@ -25,7 +25,8 @@ class ConfigScreen extends StatefulWidget {
 class _ConfigScreenState extends State<ConfigScreen> {
   final AppUpdateService _updateService = const AppUpdateService();
   final LicenseService _licenseService = const LicenseService();
-  final LicensePermissionsService _permissions = const LicensePermissionsService();
+  final LicensePermissionsService _permissions =
+      const LicensePermissionsService();
   String _appVersion = '-';
   String _appBuild = '-';
   int? _dbUserVersion;
@@ -37,6 +38,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
   bool _refrescandoLicencia = false;
   LicenciaLocal? _licenciaActual;
   LicenseUpgradeStatus? _ultimoUpgrade;
+  String _planDevSeleccionado = 'basic';
 
   @override
   void initState() {
@@ -75,10 +77,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
     if (!mounted) return;
 
     final lic = result.licencia;
-    final fechaFin = lic?.fechaFin?.toLocal().toString().split(' ').first ?? '-';
+    final fechaFin =
+        lic?.fechaFin?.toLocal().toString().split(' ').first ?? '-';
     final ultimaValidacion =
         lic?.ultimaValidacion?.toLocal().toString().split('.').first ?? '-';
-    final estado = lic?.estado.toUpperCase() ?? (result.esValida ? 'OK' : 'NO ACTIVA');
+    final estado =
+        lic?.estado.toUpperCase() ?? (result.esValida ? 'OK' : 'NO ACTIVA');
 
     setState(() {
       _licenciaEstado = estado;
@@ -86,6 +90,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
           '${result.mensaje}\nVence: $fechaFin\nÚltima validación: $ultimaValidacion';
       _licenciaActual = lic;
       _ultimoUpgrade = ultimoUpgrade;
+      _planDevSeleccionado = _normalizarPlan(_licenciaActual?.plan);
     });
   }
 
@@ -107,7 +112,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo actualizar la licencia. Inténtalo más tarde.'),
+          content:
+              Text('No se pudo actualizar la licencia. Inténtalo más tarde.'),
         ),
       );
     } finally {
@@ -122,7 +128,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
     required VoidCallback onAllowed,
   }) {
     return () async {
-      final permitidoLocal = _permissions.canAccess(_licenciaActual, capability);
+      final permitidoLocal =
+          _permissions.canAccess(_licenciaActual, capability);
       if (!permitidoLocal) {
         await _mostrarDialogoUpgrade(capability: capability);
         return;
@@ -249,6 +256,23 @@ class _ConfigScreenState extends State<ConfigScreen> {
     }
   }
 
+  Future<void> _aplicarPlanDesarrollo() async {
+    final lic = await _licenseService.simularPlanDesarrollo(
+      planClave: _planDevSeleccionado,
+    );
+    if (!mounted) return;
+    setState(() => _licenciaActual = lic);
+    await _cargarEstadoLicencia();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Plan de desarrollo aplicado: ${_planLabelPorClave(_planDevSeleccionado)}',
+        ),
+      ),
+    );
+  }
+
   Future<void> _solicitarAmpliacionDesdeHistorial() async {
     if (!mounted) return;
     var planSolicitado = 'medio';
@@ -268,9 +292,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final screenSize = MediaQuery.sizeOf(ctx);
-          final dialogWidth = (screenSize.width - 32).clamp(280.0, 780.0).toDouble();
-          final dialogMaxHeight = (screenSize.height * 0.78).clamp(240.0, 560.0).toDouble();
-          final planActual = _permissions.currentPlanLabel(_licenciaActual?.plan);
+          final dialogWidth =
+              (screenSize.width - 32).clamp(280.0, 780.0).toDouble();
+          final dialogMaxHeight =
+              (screenSize.height * 0.78).clamp(240.0, 560.0).toDouble();
+          final planActual =
+              _permissions.currentPlanLabel(_licenciaActual?.plan);
           final planObjetivo = _planLabelPorClave(planSolicitado);
           final capability = 'solicitud_plan_$planSolicitado';
 
@@ -306,22 +333,26 @@ class _ConfigScreenState extends State<ConfigScreen> {
                               DataRow(cells: [
                                 DataCell(Text('Básico')),
                                 DataCell(Text('Inicio y entreno manual')),
-                                DataCell(Text('Entrenamiento base, sin competición ni analítica avanzada.')),
+                                DataCell(Text(
+                                    'Entrenamiento base, sin competición ni analítica avanzada.')),
                               ]),
                               DataRow(cells: [
                                 DataCell(Text('Medio')),
                                 DataCell(Text('Entrenamiento con más control')),
-                                DataCell(Text('Analítica avanzada y reglas de entrenamiento.')),
+                                DataCell(Text(
+                                    'Analítica avanzada y reglas de entrenamiento.')),
                               ]),
                               DataRow(cells: [
                                 DataCell(Text('Pro')),
                                 DataCell(Text('Tirador competitivo')),
-                                DataCell(Text('Competición, backup/export y gestión de catálogos.')),
+                                DataCell(Text(
+                                    'Competición, backup/export y gestión de catálogos.')),
                               ]),
                               DataRow(cells: [
                                 DataCell(Text('Completo')),
                                 DataCell(Text('Uso premium integral')),
-                                DataCell(Text('Todo lo de Pro + detección automática de tiros en diana.')),
+                                DataCell(Text(
+                                    'Todo lo de Pro + detección automática de tiros en diana.')),
                               ]),
                             ],
                           ),
@@ -377,7 +408,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
                           requiredPlan: planObjetivo,
                           currentPlan: planActual,
                         );
-                        final ultimo = await _licenseService.obtenerUltimoUpgradeStatus();
+                        final ultimo =
+                            await _licenseService.obtenerUltimoUpgradeStatus();
                         if (!mounted) return;
                         setState(() => _ultimoUpgrade = ultimo);
                         if (ctx.mounted) {
@@ -421,8 +453,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final screenSize = MediaQuery.sizeOf(ctx);
-          final dialogWidth = (screenSize.width - 32).clamp(280.0, 760.0).toDouble();
-          final listHeight = (screenSize.height * 0.45).clamp(170.0, 360.0).toDouble();
+          final dialogWidth =
+              (screenSize.width - 32).clamp(280.0, 760.0).toDouble();
+          final listHeight =
+              (screenSize.height * 0.45).clamp(170.0, 360.0).toDouble();
           final filtrado = filtrar(historial);
           return AlertDialog(
             title: const Text('Historial de solicitudes'),
@@ -441,11 +475,20 @@ class _ConfigScreenState extends State<ConfigScreen> {
                             isDense: true,
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'todos', child: Text('Todos')),
-                            DropdownMenuItem(value: 'backend_ok', child: Text('Backend registrado')),
-                            DropdownMenuItem(value: 'backend_pendiente', child: Text('Backend pendiente')),
-                            DropdownMenuItem(value: 'email_ok', child: Text('Email abierto')),
-                            DropdownMenuItem(value: 'email_no', child: Text('Email no abierto')),
+                            DropdownMenuItem(
+                                value: 'todos', child: Text('Todos')),
+                            DropdownMenuItem(
+                                value: 'backend_ok',
+                                child: Text('Backend registrado')),
+                            DropdownMenuItem(
+                                value: 'backend_pendiente',
+                                child: Text('Backend pendiente')),
+                            DropdownMenuItem(
+                                value: 'email_ok',
+                                child: Text('Email abierto')),
+                            DropdownMenuItem(
+                                value: 'email_no',
+                                child: Text('Email no abierto')),
                           ],
                           onChanged: (value) {
                             if (value == null) return;
@@ -474,18 +517,24 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                 )
                               : ListView.separated(
                                   itemCount: filtrado.length,
-                                  separatorBuilder: (_, __) => const Divider(height: 16),
+                                  separatorBuilder: (_, __) =>
+                                      const Divider(height: 16),
                                   itemBuilder: (_, i) {
                                     final item = filtrado[i];
                                     return ListTile(
                                       contentPadding: EdgeInsets.zero,
                                       leading: Icon(
-                                        item.backendRegistered ? Icons.check_circle : Icons.mark_email_read,
-                                        color: item.backendRegistered ? Colors.green : Colors.orange,
+                                        item.backendRegistered
+                                            ? Icons.check_circle
+                                            : Icons.mark_email_read,
+                                        color: item.backendRegistered
+                                            ? Colors.green
+                                            : Colors.orange,
                                       ),
                                       title: Text(
                                         '${item.requiredPlan} · ${item.capability}',
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600),
                                       ),
                                       subtitle: Text(
                                         '${item.at.toString().split('.').first}\n'
@@ -514,7 +563,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
               if (historial.isNotEmpty)
                 TextButton.icon(
                   onPressed: () async {
-                    final ok = await _licenseService.exportarHistorialUpgradePorEmail(
+                    final ok =
+                        await _licenseService.exportarHistorialUpgradePorEmail(
                       items: filtrado,
                     );
                     if (!mounted) return;
@@ -554,10 +604,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
                       ),
                     );
                     if (confirmar != true) return;
-                    final borradas = await _licenseService.limpiarHistorialUpgrade(
+                    final borradas =
+                        await _licenseService.limpiarHistorialUpgrade(
                       limpiarUltimoEstado: true,
                     );
-                    final ultimo = await _licenseService.obtenerUltimoUpgradeStatus();
+                    final ultimo =
+                        await _licenseService.obtenerUltimoUpgradeStatus();
                     if (!mounted) return;
                     setState(() => _ultimoUpgrade = ultimo);
                     if (!ctx.mounted) return;
@@ -643,372 +695,603 @@ class _ConfigScreenState extends State<ConfigScreen> {
     const dbEsperada = DatabaseProvider.schemaVersion;
     final dbReal = _dbUserVersion;
     final migracionOk = dbReal != null && dbReal >= dbEsperada;
-    final bloqueoReglas =
-        !_permissions.canAccess(_licenciaActual, LicenseCapability.settingsRules);
-    final bloqueoCatalogos =
-        !_permissions.canAccess(_licenciaActual, LicenseCapability.settingsCatalogs);
+    final bloqueoReglas = !_permissions.canAccess(
+        _licenciaActual, LicenseCapability.settingsRules);
+    final bloqueoCatalogos = !_permissions.canAccess(
+        _licenciaActual, LicenseCapability.settingsCatalogs);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Configuración del Sistema'),
-        backgroundColor: Colors.blueGrey,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: <Widget>[
-          // --- SECCIÓN A ---
-          _buildSectionHeader('A. Mi Equipo Personal'),
-          _buildConfigItem(
-            context,
-            'Mis Datos (Perfil)',
-            'Nombre, Licencia, Club...',
-            Icons.account_circle,
-            Colors.teal,
-            () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PerfilFormScreen())),
-          ),
-          _buildConfigItem(
-            context,
-            'Gestión de Armas (Equipos)',
-            'Añadir, modificar y borrar perfiles de armas.',
-            Icons.hardware,
-            Colors.teal,
-            () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const GestionEquiposScreen())),
-          ),
-          _buildConfigItem(
-            context,
-            'Gestión de Munición',
-            'Registro y seguimiento de lotes de munición.',
-            Icons.local_fire_department,
-            Colors.teal,
-            () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const GestionMunicionScreen())),
-          ),
-
-          const Divider(height: 30),
-
-          // --- SECCIÓN B ---
-          _buildSectionHeader('B. Reglas de Entrenamiento'),
-          _buildConfigItem(
-            context,
-            'Plantillas de Tiempos/Series',
-            'Crear reglas de Duelo (3s/7s), Precisión, Estándar.',
-            Icons.timer,
-            Colors.indigo,
-            locked: bloqueoReglas,
-            lockPlanLabel: _permissions.requiredPlanLabel(
-              LicenseCapability.settingsRules,
-            ),
-            _accionProtegida(
-              capability: LicenseCapability.settingsRules,
-              onAllowed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const GestionTiemposScreen()),
-              ),
+      backgroundColor: colorScheme.surface,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            pinned: true,
+            backgroundColor: colorScheme.surface,
+            foregroundColor: colorScheme.onSurface,
+            elevation: 0,
+            title: const Text(
+              'Configuración',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-
-          const Divider(height: 30),
-
-          // --- SECCIÓN C ---
-          _buildSectionHeader('C. Datos del Sistema (Catálogos)'),
-
-          _buildConfigItem(
-            context,
-            'Catálogo Tipos de Arma',
-            'Añadir/modificar categorías de armas.',
-            Icons.category,
-            Colors.blueGrey,
-            locked: bloqueoCatalogos,
-            lockPlanLabel: _permissions.requiredPlanLabel(
-              LicenseCapability.settingsCatalogs,
-            ),
-            _accionProtegida(
-              capability: LicenseCapability.settingsCatalogs,
-              onAllowed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CatalogoTiposScreen()),
-              ),
-            ),
-          ),
-
-          _buildConfigItem(
-            context,
-            'Catálogo de Calibres',
-            'Añadir/modificar calibres no estándar.',
-            Icons.straighten,
-            Colors.blueGrey,
-            locked: bloqueoCatalogos,
-            lockPlanLabel: _permissions.requiredPlanLabel(
-              LicenseCapability.settingsCatalogs,
-            ),
-            _accionProtegida(
-              capability: LicenseCapability.settingsCatalogs,
-              onAllowed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CatalogoCalibresScreen()),
-              ),
-            ),
-          ),
-
-          // 2. AQUÍ VA EL NUEVO BOTÓN (Justo al final de la sección C)
-          _buildConfigItem(
-            context,
-            'Catálogo de Dianas',
-            'Definir tipos de diana (Precisión, Duelo...).',
-            Icons.adjust, // Icono de diana
-            Colors.blueGrey,
-            locked: bloqueoCatalogos,
-            lockPlanLabel: _permissions.requiredPlanLabel(
-              LicenseCapability.settingsCatalogs,
-            ),
-            _accionProtegida(
-              capability: LicenseCapability.settingsCatalogs,
-              onAllowed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CatalogoDianasScreen()),
-              ),
-            ),
-          ),
-
-          const Divider(height: 30),
-          _buildSectionHeader('D. Estado de la Aplicación'),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(child: _buildSubSectionHeader('Licencia')),
-              TextButton.icon(
-                onPressed: _refrescandoLicencia ? null : _refrescarEstadoLicenciaManual,
-                icon: _refrescandoLicencia
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh),
-                label: Text(_refrescandoLicencia ? 'Refrescando...' : 'Refrescar'),
-              ),
-            ],
-          ),
-          _buildInfoCard(
-            leading: const Icon(Icons.key, color: Colors.deepPurple, size: 30),
-            title: 'Licencia: $_licenciaEstado',
-            subtitle: _licenciaDetalle,
-          ),
-          if (_ultimoUpgrade != null) ...[
-            const SizedBox(height: 6),
-            _buildSubSectionHeader('Última solicitud de mejora de plan'),
-            _buildInfoCard(
-              leading: Icon(
-                _ultimoUpgrade!.backendRegistered ? Icons.check_circle : Icons.mark_email_read,
-                color: _ultimoUpgrade!.backendRegistered ? Colors.green : Colors.orange,
-                size: 30,
-              ),
-              title:
-                  '${_ultimoUpgrade!.requiredPlan} (${_ultimoUpgrade!.capability}) · ${_ultimoUpgrade!.at.toString().split('.').first}',
-              subtitle:
-                  'Plan actual: ${_ultimoUpgrade!.currentPlan}\n'
-                  'Backend: ${_ultimoUpgrade!.backendRegistered ? 'registrado' : 'pendiente'} · '
-                  'Email: ${_ultimoUpgrade!.emailOpened ? 'abierto' : 'no abierto'}\n'
-                  '${_ultimoUpgrade!.message}',
-            ),
-          ],
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: _mostrarHistorialUpgrade,
-              icon: const Icon(Icons.history),
-              label: const Text('Ver historial de solicitudes'),
-            ),
-          ),
-          const SizedBox(height: 6),
-          _buildSubSectionHeader('Actualizaciones'),
-          _buildInfoCard(
-            leading: const Icon(Icons.system_update_alt,
-                color: Colors.deepPurple, size: 30),
-            title: _comprobandoActualizacion
-                ? 'Buscando actualización...'
-                : 'Buscar actualizaciones',
-            subtitle:
-                'Consulta versión remota y abre la descarga desde tu servidor.',
-            onTap: _buscarActualizacionesManual,
-            showChevron: true,
-          ),
-          const SizedBox(height: 6),
-          _buildSubSectionHeader('Información técnica'),
-          Card(
-            elevation: 2,
-            margin: const EdgeInsets.only(bottom: 10),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            child: _cargandoInfo
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        SizedBox(width: 10),
-                        Text('Cargando versiones...')
-                      ],
-                    ),
-                  )
-                : Column(
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _buildModernSectionHeader('A. Mi Equipo Personal', colorScheme),
+                Container(
+                  decoration: _modernContainerDecoration(colorScheme),
+                  child: Column(
                     children: [
-                      ListTile(
-                        leading: const Icon(Icons.phone_android,
-                            color: Colors.indigo),
-                        title: const Text('Versión App'),
-                        subtitle: Text('$_appVersion+$_appBuild'),
+                      _buildModernMenuItem(
+                        context: context,
+                        title: 'Mis Datos (Perfil)',
+                        subtitle: 'Nombre, Licencia, Club...',
+                        icon: Icons.account_circle_rounded,
+                        color: Colors.teal,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PerfilFormScreen())),
                       ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading:
-                            const Icon(Icons.storage, color: Colors.indigo),
-                        title: const Text('Versión Base de Datos'),
-                        subtitle: Text(
-                          'Actual: ${dbReal ?? '-'} | Esperada: $dbEsperada',
-                        ),
-                        trailing: Icon(
-                          migracionOk
-                              ? Icons.check_circle
-                              : Icons.warning_amber_rounded,
-                          color: migracionOk ? Colors.green : Colors.orange,
-                        ),
+                      _buildDivider(colorScheme),
+                      _buildModernMenuItem(
+                        context: context,
+                        title: 'Gestión de Armas (Equipos)',
+                        subtitle: 'Añadir, modificar y borrar.',
+                        icon: Icons.hardware_rounded,
+                        color: Colors.teal,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GestionEquiposScreen())),
                       ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading:
-                            const Icon(Icons.verified, color: Colors.indigo),
-                        title: const Text('Estado de Migración'),
-                        subtitle:
-                            Text(migracionOk ? 'OK' : 'Pendiente o parcial'),
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.folder, color: Colors.indigo),
-                        title: const Text('Ruta BD'),
-                        subtitle:
-                            Text(_dbPath, style: const TextStyle(fontSize: 11)),
+                      _buildDivider(colorScheme),
+                      _buildModernMenuItem(
+                        context: context,
+                        title: 'Gestión de Munición',
+                        subtitle: 'Registro y seguimiento de lotes.',
+                        icon: Icons.local_fire_department_rounded,
+                        color: Colors.teal,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GestionMunicionScreen())),
                       ),
                     ],
                   ),
+                ),
+
+                const SizedBox(height: 24),
+                _buildModernSectionHeader('B. Reglas de Entrenamiento', colorScheme),
+                Container(
+                  decoration: _modernContainerDecoration(colorScheme),
+                  child: Column(
+                    children: [
+                      _buildModernMenuItem(
+                        context: context,
+                        title: 'Plantillas de Tiempos/Series',
+                        subtitle: 'Crear reglas de Duelo (3s/7s), Precisión...',
+                        icon: Icons.timer_rounded,
+                        color: Colors.indigo,
+                        locked: bloqueoReglas,
+                        lockPlanLabel: _permissions.requiredPlanLabel(LicenseCapability.settingsRules),
+                        onTap: _accionProtegida(
+                          capability: LicenseCapability.settingsRules,
+                          onAllowed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const GestionTiemposScreen()),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                _buildModernSectionHeader('C. Datos del Sistema (Catálogos)', colorScheme),
+                Container(
+                  decoration: _modernContainerDecoration(colorScheme),
+                  child: Column(
+                    children: [
+                      _buildModernMenuItem(
+                        context: context,
+                        title: 'Catálogo Tipos de Arma',
+                        subtitle: 'Añadir categorías.',
+                        icon: Icons.category_rounded,
+                        color: Colors.blueGrey,
+                        locked: bloqueoCatalogos,
+                        lockPlanLabel: _permissions.requiredPlanLabel(LicenseCapability.settingsCatalogs),
+                        onTap: _accionProtegida(
+                          capability: LicenseCapability.settingsCatalogs,
+                          onAllowed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const CatalogoTiposScreen()),
+                          ),
+                        ),
+                      ),
+                      _buildDivider(colorScheme),
+                      _buildModernMenuItem(
+                        context: context,
+                        title: 'Catálogo de Calibres',
+                        subtitle: 'Añadir calibres no estándar.',
+                        icon: Icons.straighten_rounded,
+                        color: Colors.blueGrey,
+                        locked: bloqueoCatalogos,
+                        lockPlanLabel: _permissions.requiredPlanLabel(LicenseCapability.settingsCatalogs),
+                        onTap: _accionProtegida(
+                          capability: LicenseCapability.settingsCatalogs,
+                          onAllowed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const CatalogoCalibresScreen()),
+                          ),
+                        ),
+                      ),
+                      _buildDivider(colorScheme),
+                      _buildModernMenuItem(
+                        context: context,
+                        title: 'Catálogo de Dianas',
+                        subtitle: 'Definir tipos de diana.',
+                        icon: Icons.adjust_rounded,
+                        color: Colors.blueGrey,
+                        locked: bloqueoCatalogos,
+                        lockPlanLabel: _permissions.requiredPlanLabel(LicenseCapability.settingsCatalogs),
+                        onTap: _accionProtegida(
+                          capability: LicenseCapability.settingsCatalogs,
+                          onAllowed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const CatalogoDianasScreen()),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                _buildModernSectionHeader('D. Estado de la Aplicación', colorScheme),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSubSectionHeader('Licencia', colorScheme),
+                    TextButton.icon(
+                      onPressed: _refrescandoLicencia ? null : _refrescarEstadoLicenciaManual,
+                      icon: _refrescandoLicencia
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh, size: 18),
+                      label: Text(_refrescandoLicencia ? 'Refrescando...' : 'Refrescar'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  decoration: _modernContainerDecoration(colorScheme),
+                  child: _buildModernInfoItem(
+                    context: context,
+                    icon: Icons.key_rounded,
+                    color: Colors.deepPurple,
+                    title: 'Licencia: $_licenciaEstado',
+                    subtitle: _licenciaDetalle,
+                  ),
+                ),
+
+                if (LicenseService.devPlanSelectorEnabled) ...[
+                  const SizedBox(height: 16),
+                  _buildSubSectionHeader('Modo desarrollo (simulación)', colorScheme),
+                  Container(
+                    decoration: _modernContainerDecoration(colorScheme),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Permite probar permisos sin activar cuenta real.',
+                          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: _planDevSeleccionado,
+                          decoration: InputDecoration(
+                            labelText: 'Plan simulado',
+                            labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: colorScheme.outlineVariant),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: colorScheme.outlineVariant),
+                            ),
+                            isDense: true,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'basic', child: Text('Básico')),
+                            DropdownMenuItem(value: 'medio', child: Text('Medio')),
+                            DropdownMenuItem(value: 'pro', child: Text('Pro')),
+                            DropdownMenuItem(value: 'completo', child: Text('Completo')),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() => _planDevSeleccionado = value);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: FilledButton.icon(
+                            onPressed: _aplicarPlanDesarrollo,
+                            icon: const Icon(Icons.science_rounded, size: 18),
+                            label: const Text('Aplicar plan simulado'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: colorScheme.primaryContainer,
+                              foregroundColor: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                if (_ultimoUpgrade != null) ...[
+                  const SizedBox(height: 16),
+                  _buildSubSectionHeader('Última solicitud de mejora', colorScheme),
+                  Container(
+                    decoration: _modernContainerDecoration(colorScheme),
+                    child: _buildModernInfoItem(
+                      context: context,
+                      icon: _ultimoUpgrade!.backendRegistered ? Icons.check_circle_rounded : Icons.mark_email_read_rounded,
+                      color: _ultimoUpgrade!.backendRegistered ? Colors.green : Colors.orange,
+                      title: '${_ultimoUpgrade!.requiredPlan} (${_ultimoUpgrade!.capability})\n${_ultimoUpgrade!.at.toString().split('.').first}',
+                      subtitle: 'Plan actual: ${_ultimoUpgrade!.currentPlan}\n'
+                          'Backend: ${_ultimoUpgrade!.backendRegistered ? 'registrado' : 'pendiente'} · '
+                          'Email: ${_ultimoUpgrade!.emailOpened ? 'abierto' : 'no abierto'}\n'
+                          '${_ultimoUpgrade!.message}',
+                    ),
+                  ),
+                ],
+                
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _mostrarHistorialUpgrade,
+                    icon: const Icon(Icons.history_rounded, size: 18),
+                    label: const Text('Ver historial de solicitudes'),
+                    style: TextButton.styleFrom(
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+                _buildSubSectionHeader('Actualizaciones', colorScheme),
+                Container(
+                  decoration: _modernContainerDecoration(colorScheme),
+                  child: _buildModernMenuItem(
+                    context: context,
+                    icon: Icons.system_update_alt_rounded,
+                    color: Colors.deepPurple,
+                    title: _comprobandoActualizacion ? 'Buscando actualización...' : 'Buscar actualizaciones',
+                    subtitle: 'Consulta versión remota y actualiza.',
+                    onTap: _buscarActualizacionesManual,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+                _buildSubSectionHeader('Información técnica', colorScheme),
+                Container(
+                  decoration: _modernContainerDecoration(colorScheme),
+                  child: _cargandoInfo
+                      ? Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
+                              ),
+                              const SizedBox(width: 16),
+                              Text('Cargando versiones...', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            _buildTechInfoItem(
+                              context: context,
+                              icon: Icons.phone_android_rounded,
+                              color: Colors.indigo,
+                              title: 'Versión App',
+                              subtitle: '$_appVersion+$_appBuild',
+                            ),
+                            _buildDivider(colorScheme),
+                            _buildTechInfoItem(
+                              context: context,
+                              icon: Icons.storage_rounded,
+                              color: Colors.indigo,
+                              title: 'Versión Base de Datos',
+                              subtitle: 'Actual: ${dbReal ?? '-'} | Esperada: $dbEsperada',
+                              trailingIcon: migracionOk ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+                              trailingColor: migracionOk ? Colors.green : Colors.orange,
+                            ),
+                            _buildDivider(colorScheme),
+                            _buildTechInfoItem(
+                              context: context,
+                              icon: Icons.verified_user_rounded,
+                              color: Colors.indigo,
+                              title: 'Estado de Migración',
+                              subtitle: migracionOk ? 'OK' : 'Pendiente o parcial',
+                            ),
+                            _buildDivider(colorScheme),
+                            _buildTechInfoItem(
+                              context: context,
+                              icon: Icons.folder_rounded,
+                              color: Colors.indigo,
+                              title: 'Ruta BD',
+                              subtitle: _dbPath,
+                            ),
+                          ],
+                        ),
+                ),
+
+              ]),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard({
-    required Widget leading,
-    required String title,
-    required String subtitle,
-    VoidCallback? onTap,
-    bool showChevron = false,
-    bool locked = false,
-    String? lockPlanLabel,
-  }) {
-    final lockColor = LicenseUiHelper.lockColorForPlan(lockPlanLabel);
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: ListTile(
-        leading: leading,
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-        trailing: (showChevron || locked)
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (locked)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.lock, size: 16, color: lockColor),
-                          if (lockPlanLabel != null && lockPlanLabel.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 4),
-                              child: Text(
-                                lockPlanLabel.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: lockColor,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  if (showChevron)
-                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                ],
-              )
-            : null,
-        onTap: onTap,
+  BoxDecoration _modernContainerDecoration(ColorScheme colorScheme) {
+    return BoxDecoration(
+      color: colorScheme.surfaceContainer,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
       ),
     );
   }
 
-  Widget _buildSubSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: Colors.blueGrey.shade500,
-          letterSpacing: 0.2,
-        ),
-      ),
+  Widget _buildDivider(ColorScheme colorScheme) {
+    return Divider(
+      height: 1, 
+      indent: 52, 
+      color: colorScheme.outlineVariant.withValues(alpha: 0.5)
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildModernSectionHeader(String title, ColorScheme colorScheme) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
+      padding: const EdgeInsets.only(top: 8, bottom: 12),
       child: Text(
         title,
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: Colors.blueGrey.shade700,
+          color: colorScheme.primary,
+          letterSpacing: -0.2,
         ),
       ),
     );
   }
 
-  Widget _buildConfigItem(
-    BuildContext context,
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-    VoidCallback onTap, {
-    bool locked = false,
-    String? lockPlanLabel,
-  }) {
-    return _buildInfoCard(
-      leading: Icon(icon, color: color, size: 30),
-      title: title,
-      subtitle: subtitle,
-      onTap: onTap,
-      showChevron: true,
-      locked: locked,
-      lockPlanLabel: lockPlanLabel,
+  Widget _buildSubSectionHeader(String title, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8, left: 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: colorScheme.onSurfaceVariant,
+        ),
+      ),
     );
   }
 
+  Widget _buildModernMenuItem({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    VoidCallback? onTap,
+    bool locked = false,
+    String? lockPlanLabel,
+  }) {
+    final lockColor = LicenseUiHelper.lockColorForPlan(lockPlanLabel);
+    final themeInfo = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: isDark ? 0.2 : 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: locked ? themeInfo.onSurface.withValues(alpha: 0.6) : themeInfo.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: themeInfo.onSurfaceVariant,
+                      height: 1.2,
+                    ),
+                  )
+                ],
+              ),
+            ),
+            if (locked && lockPlanLabel != null)
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  margin: const EdgeInsets.only(right: 8, left: 4),
+                  decoration: BoxDecoration(
+                    color: lockColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_outline, size: 12, color: lockColor),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          lockPlanLabel.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: lockColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (onTap != null)
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: themeInfo.onSurface.withValues(alpha: 0.3),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernInfoItem({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
+    final themeInfo = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: themeInfo.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: themeInfo.onSurfaceVariant,
+                    height: 1.3,
+                  ),
+                )
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTechInfoItem({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    IconData? trailingIcon,
+    Color? trailingColor,
+  }) {
+    final themeInfo = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: themeInfo.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: themeInfo.onSurfaceVariant,
+                  ),
+                )
+              ],
+            ),
+          ),
+          if (trailingIcon != null)
+            Icon(trailingIcon, size: 18, color: trailingColor),
+        ],
+      ),
+    );
+  }
 }

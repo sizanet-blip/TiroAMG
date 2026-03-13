@@ -7,7 +7,8 @@ class EntrenamientoService {
   final dbProvider = DatabaseProvider.instance;
 
   // 1. Guardar Sesión
-  Future<void> guardarSesionCompleta(Sesion sesion, List<Disparo> disparos) async {
+  Future<void> guardarSesionCompleta(
+      Sesion sesion, List<Disparo> disparos) async {
     final db = await dbProvider.database;
     await db.transaction((txn) async {
       int idSesionGenerado = await txn.insert('Sesiones', sesion.toMap());
@@ -50,7 +51,7 @@ class EntrenamientoService {
       }
     });
   }
-  
+
   // 2. ACTUALIZAR SESIÓN (¡NUEVO!)
   Future<void> actualizarSesion({
     required int idSesion,
@@ -69,24 +70,23 @@ class EntrenamientoService {
   }) async {
     final db = await dbProvider.database;
     await db.update(
-      'Sesiones',
-      {
-        'id_equipo': nuevoIdEquipo,
-        'nota': nuevasNotas,
-        'lugar': nuevoLugar,
-        'distancia_m': distanciaMetros,
-        'posicion_tiro': posicionTiro,
-        'es_interior': esInterior == null ? null : (esInterior ? 1 : 0),
-        'temperatura_c': temperaturaC,
-        'humedad_pct': humedadPct,
-        'presion_hpa': presionHpa,
-        'viento_ms': vientoMs,
-        'viento_direccion': vientoDireccion,
-        'iluminacion': iluminacion,
-      },
-      where: 'id = ?',
-      whereArgs: [idSesion]
-    );
+        'Sesiones',
+        {
+          'id_equipo': nuevoIdEquipo,
+          'nota': nuevasNotas,
+          'lugar': nuevoLugar,
+          'distancia_m': distanciaMetros,
+          'posicion_tiro': posicionTiro,
+          'es_interior': esInterior == null ? null : (esInterior ? 1 : 0),
+          'temperatura_c': temperaturaC,
+          'humedad_pct': humedadPct,
+          'presion_hpa': presionHpa,
+          'viento_ms': vientoMs,
+          'viento_direccion': vientoDireccion,
+          'iluminacion': iluminacion,
+        },
+        where: 'id = ?',
+        whereArgs: [idSesion]);
   }
 
   // 3. Actualizar Torneo Completo
@@ -108,26 +108,25 @@ class EntrenamientoService {
   }) async {
     final db = await dbProvider.database;
     String fechaStr = fecha.toIso8601String().substring(0, 10);
-    
+
     await db.update(
-      'Sesiones',
-      {
-        'id_equipo': nuevoIdEquipo,
-        'nota': nuevasNotas,
-        'lugar': nuevoLugar,
-        'distancia_m': distanciaMetros,
-        'posicion_tiro': posicionTiro,
-        'es_interior': esInterior == null ? null : (esInterior ? 1 : 0),
-        'temperatura_c': temperaturaC,
-        'humedad_pct': humedadPct,
-        'presion_hpa': presionHpa,
-        'viento_ms': vientoMs,
-        'viento_direccion': vientoDireccion,
-        'iluminacion': iluminacion,
-      },
-      where: 'id_modalidad = ? AND fecha LIKE ?',
-      whereArgs: [idModalidad, '$fechaStr%']
-    );
+        'Sesiones',
+        {
+          'id_equipo': nuevoIdEquipo,
+          'nota': nuevasNotas,
+          'lugar': nuevoLugar,
+          'distancia_m': distanciaMetros,
+          'posicion_tiro': posicionTiro,
+          'es_interior': esInterior == null ? null : (esInterior ? 1 : 0),
+          'temperatura_c': temperaturaC,
+          'humedad_pct': humedadPct,
+          'presion_hpa': presionHpa,
+          'viento_ms': vientoMs,
+          'viento_direccion': vientoDireccion,
+          'iluminacion': iluminacion,
+        },
+        where: 'id_modalidad = ? AND fecha LIKE ?',
+        whereArgs: [idModalidad, '$fechaStr%']);
   }
 
   // --- LECTURAS ---
@@ -179,19 +178,20 @@ class EntrenamientoService {
       GROUP BY m.id, fecha_dia
       ORDER BY fecha_completa DESC
     ''');
-    
+
     return res.map((row) {
-        var map = Map<String, dynamic>.from(row);
-        map['id'] = row['id_modalidad'];
-        map['fecha'] = row['fecha_completa'];
-        map['nombre_equipo'] = row['nombre_equipo'];
-        map['nombre_disciplina'] = row['titulo_torneo'];
-        map['id_modalidad'] = 1;
-        return SesionResumen.fromMap(map);
+      var map = Map<String, dynamic>.from(row);
+      map['id'] = row['id_modalidad'];
+      map['fecha'] = row['fecha_completa'];
+      map['nombre_equipo'] = row['nombre_equipo'];
+      map['nombre_disciplina'] = row['titulo_torneo'];
+      map['id_modalidad'] = 1;
+      return SesionResumen.fromMap(map);
     }).toList();
   }
 
-  Future<List<SesionResumen>> obtenerFasesDeTorneoRealizado(int idModalidad, DateTime fecha) async {
+  Future<List<SesionResumen>> obtenerFasesDeTorneoRealizado(
+      int idModalidad, DateTime fecha) async {
     final db = await dbProvider.database;
     String fechaStr = fecha.toIso8601String().substring(0, 10);
 
@@ -217,10 +217,11 @@ class EntrenamientoService {
     return res.map((e) => SesionResumen.fromMap(e)).toList();
   }
 
-  Future<List<GrupoFaseInforme>> obtenerDatosInformeTorneo(int idModalidad, DateTime fecha) async {
+  Future<List<GrupoFaseInforme>> obtenerDatosInformeTorneo(
+      int idModalidad, DateTime fecha) async {
     final db = await dbProvider.database;
     String fechaStr = fecha.toIso8601String().substring(0, 10);
-    
+
     final sesionesRaw = await db.rawQuery('''
       SELECT 
         s.id as id_sesion, s.nota, s.lugar,
@@ -239,11 +240,13 @@ class EntrenamientoService {
       String nombre = row['nombre_disciplina'] as String;
       String nota = row['nota'] as String? ?? "";
       bool esEnsayo = nota.contains("Ensayo");
-      
+
       String claveGrupo = "$nombre-${esEnsayo ? 'ENSAYO' : 'COMPE'}";
       int idSesion = row['id_sesion'] as int;
-      final tirosRaw = await db.query('Disparos', where: 'id_sesion = ?', whereArgs: [idSesion]);
-      List<Disparo> nuevosTiros = tirosRaw.map((t) => Disparo.fromMap(t)).toList();
+      final tirosRaw = await db
+          .query('Disparos', where: 'id_sesion = ?', whereArgs: [idSesion]);
+      List<Disparo> nuevosTiros =
+          tirosRaw.map((t) => Disparo.fromMap(t)).toList();
 
       if (gruposMap.containsKey(claveGrupo)) {
         gruposMap[claveGrupo]!.disparos.addAll(nuevosTiros);
@@ -272,27 +275,63 @@ class EntrenamientoService {
       await txn.delete('Sesiones', where: 'id = ?', whereArgs: [id]);
     });
   }
-  
+
   Future<void> borrarTorneoDeFecha(int idModalidad, DateTime fecha) async {
     final db = await dbProvider.database;
     String fechaStr = fecha.toIso8601String().substring(0, 10);
-    final sesiones = await db.query('Sesiones', columns: ['id'], where: 'id_modalidad = ? AND fecha LIKE ?', whereArgs: [idModalidad, '$fechaStr%']);
+    final sesiones = await db.query('Sesiones',
+        columns: ['id'],
+        where: 'id_modalidad = ? AND fecha LIKE ?',
+        whereArgs: [idModalidad, '$fechaStr%']);
     await db.transaction((txn) async {
       for (var s in sesiones) {
-          int id = s['id'] as int;
-          await txn.delete('Disparos', where: 'id_sesion = ?', whereArgs: [id]);
-          await txn.delete('Sesiones', where: 'id = ?', whereArgs: [id]);
+        int id = s['id'] as int;
+        await txn.delete('Disparos', where: 'id_sesion = ?', whereArgs: [id]);
+        await txn.delete('Sesiones', where: 'id = ?', whereArgs: [id]);
       }
     });
   }
+
   Future<Sesion?> obtenerSesionPorId(int id) async {
     final db = await dbProvider.database;
     final res = await db.query('Sesiones', where: 'id = ?', whereArgs: [id]);
     return res.isNotEmpty ? Sesion.fromMap(res.first) : null;
   }
+
   Future<List<Disparo>> obtenerDisparosDeSesion(int idSesion) async {
     final db = await dbProvider.database;
-    final res = await db.query('Disparos', where: 'id_sesion = ?', whereArgs: [idSesion]);
+    final res = await db
+        .query('Disparos', where: 'id_sesion = ?', whereArgs: [idSesion]);
     return res.map((e) => Disparo.fromMap(e)).toList();
+  }
+
+  Future<void> actualizarDisparosSesion({
+    required int idSesion,
+    required List<Disparo> disparos,
+  }) async {
+    final db = await dbProvider.database;
+    await db.transaction((txn) async {
+      for (final disparo in disparos) {
+        final payload = {
+          'id_sesion': idSesion,
+          'numero_disparo': disparo.numero,
+          'coordenada_x': disparo.x,
+          'coordenada_y': disparo.y,
+          'puntuacion': disparo.puntuacion,
+          'es_mosca': disparo.esMosca ? 1 : 0,
+        };
+
+        if (disparo.id != null) {
+          await txn.update(
+            'Disparos',
+            payload,
+            where: 'id = ? AND id_sesion = ?',
+            whereArgs: [disparo.id, idSesion],
+          );
+        } else {
+          await txn.insert('Disparos', payload);
+        }
+      }
+    });
   }
 }

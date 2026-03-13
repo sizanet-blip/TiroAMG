@@ -26,11 +26,12 @@ class SesionDisparoScreen extends StatefulWidget {
   final double? vientoMs;
   final String? vientoDireccion;
   final String? iluminacion;
-  
+
   final String? tituloSerie;
   final int? numeroSerie;
   final int? totalSeries;
-  final Function(List<Disparo> disparos, int puntos)? onCompletar;
+  final Function(List<Disparo> disparos, double puntos)? onCompletar;
+  final bool usarPuntuacionDecimal;
 
   const SesionDisparoScreen({
     super.key,
@@ -47,6 +48,7 @@ class SesionDisparoScreen extends StatefulWidget {
     this.vientoMs,
     this.vientoDireccion,
     this.iluminacion,
+    this.usarPuntuacionDecimal = false,
     this.tituloSerie,
     this.numeroSerie,
     this.totalSeries,
@@ -60,13 +62,12 @@ class SesionDisparoScreen extends StatefulWidget {
 class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   final _catalogoService = CatalogoService();
   final _entrenamientoService = EntrenamientoService();
-  final _audioService = AudioService(); 
+  final _audioService = AudioService();
 
   final List<Disparo> _listaDisparos = [];
-  final List<Offset> _puntosVisuales = [];
-  
-  int _puntosTotal = 0;
-  
+
+  double _puntosTotal = 0;
+
   // Configuración Diana
   int _valorMinimo = 1;
   int _anilloNegroInicio = 7;
@@ -74,6 +75,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   bool _tieneMosca = true;
   bool _tieneGuias = false;
   bool _esEstiloDuelo = false;
+  double? _dianaAnchoExteriorMm;
+  double? _calibreMm;
   bool _cargando = true;
 
   // Estado Crono
@@ -83,15 +86,104 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   int _segundosRestantes = 0;
   Color _colorEstado = Colors.grey;
   bool _haIniciado = false;
-  
+
   // Control de Duelo
   int _contadorSeriesDuelo = 0;
-  
+
   // Lupa
   Offset? _posicionDedo;
   bool _mostrandoLupa = false;
+  int? _indiceTiroEnAjuste;
+  double _pasoAjuste = 0.01;
+  bool _recalcularPuntosAjuste = false;
 
-  bool get _enCurso => _faseActual != FaseSesion.stop && _faseActual != FaseSesion.fin;
+  bool get _enCurso =>
+      _faseActual != FaseSesion.stop && _faseActual != FaseSesion.fin;
+
+  String _formatearPuntos(double value) {
+    if (!widget.usarPuntuacionDecimal) {
+      return value.round().toString();
+    }
+    return value.toStringAsFixed(1);
+  }
+
+  double? _resolverCalibreMm(String? calibreMunicion, String? calibreEquipo) {
+    final fromMunicion = _extraerCalibreMm(calibreMunicion);
+    if (fromMunicion != null) {
+      return fromMunicion;
+    }
+    return _extraerCalibreMm(calibreEquipo);
+  }
+
+  double? _extraerCalibreMm(String? texto) {
+    if (texto == null || texto.trim().isEmpty) {
+      return null;
+    }
+    final source = texto.toLowerCase().replaceAll(',', '.');
+
+    final mmMatch = RegExp(r'(\d+(?:\.\d+)?)\s*mm').firstMatch(source);
+    if (mmMatch != null) {
+      final value = double.tryParse(mmMatch.group(1)!);
+      if (value != null && value >= 2.0 && value <= 20.0) {
+        return value;
+      }
+    }
+
+    final inchMatch = RegExp(r'(?<!\d)\.(\d{2,3})(?!\d)').firstMatch(source);
+    if (inchMatch != null) {
+      final raw = inchMatch.group(1)!;
+      final inches =
+          raw.length == 2 ? int.parse(raw) / 100.0 : int.parse(raw) / 1000.0;
+      final mm = inches * 25.4;
+      if (mm >= 2.0 && mm <= 20.0) {
+        return mm;
+      }
+    }
+
+    return null;
+  }
+
+  double _calcularPuntuacionDesdeXY(double x, double y) {
+    final distNorm = sqrt((x * x) + (y * y));
+    if (distNorm > 1.0) {
+      return 0;
+    }
+
+    // Compensación por calibre: si el borde del impacto toca la línea del anillo,
+    // debe contar como el anillo superior.
+    final radioCalibreNorm = _radioCalibreNormalizado();
+    final distCompensada = (distNorm - radioCalibreNorm).clamp(0.0, 1.0);
+
+    int totalZonas = 11 - _valorMinimo;
+    double calculo = 11 - (distCompensada * totalZonas);
+    if (widget.usarPuntuacionDecimal) {
+      if (calculo < _valorMinimo) {
+        return 0;
+      }
+      final decimal = (calculo.clamp(0, 10.9) * 10).round() / 10.0;
+      return decimal;
+    }
+
+    int entero = calculo.floor();
+    if (entero < _valorMinimo) {
+      entero = 0;
+    }
+    if (entero > 10) {
+      entero = 10;
+    }
+    return entero.toDouble();
+  }
+
+  double _radioCalibreNormalizado() {
+    if (_calibreMm == null ||
+        _dianaAnchoExteriorMm == null ||
+        _calibreMm! <= 0 ||
+        _dianaAnchoExteriorMm! <= 0) {
+      return 0.0;
+    }
+    // radioNorm = (diamImpacto/2) / (diamDiana/2) = diamImpacto/diamDiana
+    return (_calibreMm! / _dianaAnchoExteriorMm!).clamp(0.0, 0.2);
+  }
 
   @override
   void initState() {
@@ -112,14 +204,20 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     if (widget.plantilla.idTipoDiana != null) {
       final dianas = await _catalogoService.obtenerTiposDiana();
       try {
-        final dianaConfig = dianas.firstWhere((d) => d.id == widget.plantilla.idTipoDiana);
+        final dianaConfig =
+            dianas.firstWhere((d) => d.id == widget.plantilla.idTipoDiana);
         setState(() {
           _valorMinimo = dianaConfig.valorMinimo;
           _anilloNegroInicio = dianaConfig.anilloNegroInicio;
           _esFondoNegro = dianaConfig.esFondoNegro;
           _tieneMosca = dianaConfig.tieneMosca;
           _tieneGuias = dianaConfig.tieneGuias;
-          _esEstiloDuelo = _valorMinimo >= 5; 
+          _esEstiloDuelo = _valorMinimo >= 5;
+          _dianaAnchoExteriorMm = dianaConfig.anchoExteriorMm;
+          _calibreMm = _resolverCalibreMm(
+            widget.municion?.nombreCalibre,
+            widget.equipo.nombreCalibre,
+          );
           _cargando = false;
         });
       } catch (e) {
@@ -135,14 +233,16 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     _mensajeEstado = "LISTO";
     _colorEstado = Colors.grey;
     _contadorSeriesDuelo = 0;
-    _segundosRestantes = widget.plantilla.tiempoPreparacion > 0 ? widget.plantilla.tiempoPreparacion : widget.plantilla.tiempoExposicion;
+    _segundosRestantes = widget.plantilla.tiempoPreparacion > 0
+        ? widget.plantilla.tiempoPreparacion
+        : widget.plantilla.tiempoExposicion;
   }
 
   // --- LÓGICA DEL CRONÓMETRO AVANZADA ---
 
   void _iniciarSecuencia() {
     if (!_haIniciado) setState(() => _haIniciado = true);
-    
+
     if (_enCurso) {
       _pausar();
       return;
@@ -169,7 +269,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     setState(() {
       _faseActual = fase;
       _segundosRestantes = tiempo;
-      
+
       if (fase == FaseSesion.preparacion) {
         _mensajeEstado = "PREPARACIÓN";
         _colorEstado = Colors.amber[800]!;
@@ -219,10 +319,10 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
           // En Duelo, se repite espera->fuego por cada disparo (o serie de 5)
           // Si queremos simular 5 apariciones:
           if (_contadorSeriesDuelo < widget.plantilla.disparosPorSerie) {
-             _cambiarFase(FaseSesion.espera, widget.plantilla.tiempoOcultacion);
+            _cambiarFase(FaseSesion.espera, widget.plantilla.tiempoOcultacion);
           } else {
-             _cambiarFase(FaseSesion.fin, 0);
-             _timer?.cancel();
+            _cambiarFase(FaseSesion.fin, 0);
+            _timer?.cancel();
           }
         } else {
           // En Precisión (fijo), al acabar el tiempo de fuego se acaba la serie
@@ -255,82 +355,88 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     if (!_haIniciado) return;
 
     // Bloqueo en fases de espera/preparación
-    if (_faseActual == FaseSesion.espera || _faseActual == FaseSesion.preparacion) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Alto! Diana cerrada.'), duration: Duration(milliseconds: 500), backgroundColor: Colors.red));
-        return;
+    if (_faseActual == FaseSesion.espera ||
+        _faseActual == FaseSesion.preparacion) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('¡Alto! Diana cerrada.'),
+          duration: Duration(milliseconds: 500),
+          backgroundColor: Colors.red));
+      return;
     }
 
     setState(() {
-      _puntosVisuales.add(localPosition);
-      
       Offset centro = Offset(tamanoDiana.width / 2, tamanoDiana.height / 2);
       double distancia = (localPosition - centro).distance;
       double radioMax = tamanoDiana.width / 2;
       double distNorm = distancia / radioMax;
 
       if (distNorm <= 1.0) {
-        int totalZonas = 11 - _valorMinimo;
-        double calculo = 11 - (distNorm * totalZonas);
-        int valor = calculo.floor();
-        
-        if (valor < _valorMinimo) valor = 0;
-        if (valor > 10) valor = 10;
-        
+        final valor = _calcularPuntuacionDesdeXY(
+          (localPosition.dx - centro.dx) / radioMax,
+          (localPosition.dy - centro.dy) / radioMax,
+        );
+
         _puntosTotal += valor;
-        
+
         _listaDisparos.add(Disparo(
-          numero: _listaDisparos.length + 1,
-          x: (localPosition.dx - centro.dx) / radioMax,
-          y: (localPosition.dy - centro.dy) / radioMax,
-          puntuacion: valor.toDouble(),
-          esMosca: false 
-        ));
+            numero: _listaDisparos.length + 1,
+            x: (localPosition.dx - centro.dx) / radioMax,
+            y: (localPosition.dy - centro.dy) / radioMax,
+            puntuacion: valor,
+            esMosca: false));
       }
     });
   }
 
   void _borrarUltimo() {
-    if (_puntosVisuales.isNotEmpty) {
+    if (_listaDisparos.isNotEmpty) {
       setState(() {
-        _puntosVisuales.removeLast();
-        if (_listaDisparos.isNotEmpty) {
-          _puntosTotal -= _listaDisparos.last.puntuacion.toInt();
-          _listaDisparos.removeLast();
+        _puntosTotal -= _listaDisparos.last.puntuacion;
+        _listaDisparos.removeLast();
+        if (_indiceTiroEnAjuste != null) {
+          if (_listaDisparos.isEmpty) {
+            _indiceTiroEnAjuste = null;
+          } else if (_indiceTiroEnAjuste! >= _listaDisparos.length) {
+            _indiceTiroEnAjuste = _listaDisparos.length - 1;
+          }
         }
       });
     }
   }
 
   void _guardarYSalir() async {
-     if (widget.onCompletar != null) {
-       widget.onCompletar!(_listaDisparos, _puntosTotal);
-       Navigator.pop(context);
-       return;
-     }
-     
-     final sesion = Sesion(
-        fecha: DateTime.now(),
-        idEquipo: widget.equipo.id,
-        idPlantilla: widget.plantilla.id!,
-        idMunicion: widget.municion?.id,
-        nota: widget.municion != null ? "${widget.municion!.marca} (${widget.municion!.lote})" : null,
-        lugar: widget.lugar,
-        distanciaMetros: widget.distanciaMetros,
-        posicionTiro: widget.posicionTiro,
-        esInterior: widget.esInterior,
-        temperaturaC: widget.temperaturaC,
-        humedadPct: widget.humedadPct,
-        presionHpa: widget.presionHpa,
-        vientoMs: widget.vientoMs,
-        vientoDireccion: widget.vientoDireccion,
-        iluminacion: widget.iluminacion,
-     );
-     
-     await _entrenamientoService.guardarSesionCompleta(sesion, _listaDisparos);
-     if (mounted) {
-       Navigator.pop(context);
-       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Guardado")));
-     }
+    if (widget.onCompletar != null) {
+      widget.onCompletar!(_listaDisparos, _puntosTotal);
+      Navigator.pop(context);
+      return;
+    }
+
+    final sesion = Sesion(
+      fecha: DateTime.now(),
+      idEquipo: widget.equipo.id,
+      idPlantilla: widget.plantilla.id!,
+      idMunicion: widget.municion?.id,
+      nota: widget.municion != null
+          ? "${widget.municion!.marca} (${widget.municion!.lote})"
+          : null,
+      lugar: widget.lugar,
+      distanciaMetros: widget.distanciaMetros,
+      posicionTiro: widget.posicionTiro,
+      esInterior: widget.esInterior,
+      temperaturaC: widget.temperaturaC,
+      humedadPct: widget.humedadPct,
+      presionHpa: widget.presionHpa,
+      vientoMs: widget.vientoMs,
+      vientoDireccion: widget.vientoDireccion,
+      iluminacion: widget.iluminacion,
+    );
+
+    await _entrenamientoService.guardarSesionCompleta(sesion, _listaDisparos);
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Guardado")));
+    }
   }
 
   void _reiniciarSerie() {
@@ -338,9 +444,12 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Reiniciar Serie?'),
-        content: const Text('Se borrarán los disparos actuales y el cronómetro volverá al inicio.'),
+        content: const Text(
+            'Se borrarán los disparos actuales y el cronómetro volverá al inicio.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
@@ -348,12 +457,13 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
               _pausar();
               setState(() {
                 _listaDisparos.clear();
-                _puntosVisuales.clear();
-                _puntosTotal = 0;
+                _puntosTotal = 0.0;
+                _indiceTiroEnAjuste = null;
                 _resetearValoresTiempo();
               });
             },
-            child: const Text('Reiniciar', style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Reiniciar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -361,147 +471,565 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   }
 
   // Gestos Lupa
-  void _onPanStart(DragStartDetails d, Offset offset, Size size) { setState(() { _mostrandoLupa = true; _posicionDedo = d.localPosition - offset; }); }
-  void _onPanUpdate(DragUpdateDetails d, Offset offset) { setState(() { _posicionDedo = d.localPosition - offset; }); }
-  void _onPanEnd(DragEndDetails d, Offset offset, Size size) { 
-    setState(() { _mostrandoLupa = false; });
+  void _onPanStart(DragStartDetails d, Offset offset, Size size) {
+    setState(() {
+      _mostrandoLupa = true;
+      _posicionDedo = d.localPosition - offset;
+    });
+  }
+
+  void _onPanUpdate(DragUpdateDetails d, Offset offset) {
+    setState(() {
+      _posicionDedo = d.localPosition - offset;
+    });
+  }
+
+  void _onPanEnd(DragEndDetails d, Offset offset, Size size) {
+    setState(() {
+      _mostrandoLupa = false;
+    });
     if (_posicionDedo != null) _registrarImpacto(_posicionDedo!, size);
   }
-  void _onTapUp(TapUpDetails d, Offset offset, Size size) { _registrarImpacto(d.localPosition - offset, size); }
 
+  void _onTapUp(TapUpDetails d, Offset offset, Size size) {
+    _registrarImpacto(d.localPosition - offset, size);
+  }
+
+  Future<void> _seleccionarTiroParaAjuste() async {
+    if (_listaDisparos.isEmpty) {
+      return;
+    }
+
+    var tiroSeleccionadoNumero = _listaDisparos.last.numero;
+    final elegido = await showDialog<int>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Seleccionar tiro a ajustar'),
+          content: DropdownButtonFormField<int>(
+            initialValue: tiroSeleccionadoNumero,
+            decoration: const InputDecoration(
+              labelText: 'Tiro',
+              border: OutlineInputBorder(),
+            ),
+            items: _listaDisparos.reversed
+                .map(
+                  (d) => DropdownMenuItem<int>(
+                    value: d.numero,
+                    child: Text(
+                        '#${d.numero} · ${_formatearPuntos(d.puntuacion)} pts'),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) {
+              if (v == null) {
+                return;
+              }
+              setDialogState(() => tiroSeleccionadoNumero = v);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, tiroSeleccionadoNumero),
+              child: const Text('Ajustar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (elegido == null) {
+      return;
+    }
+    final index = _listaDisparos.indexWhere((d) => d.numero == elegido);
+    if (index < 0) {
+      return;
+    }
+    setState(() => _indiceTiroEnAjuste = index);
+  }
+
+  void _ajustarUltimoTiroDirecto() {
+    if (_listaDisparos.isEmpty) {
+      return;
+    }
+    setState(() => _indiceTiroEnAjuste = _listaDisparos.length - 1);
+  }
+
+  void _moverTiroEnAjuste(double dx, double dy) {
+    final idx = _indiceTiroEnAjuste;
+    if (idx == null || idx < 0 || idx >= _listaDisparos.length) {
+      return;
+    }
+    final tiro = _listaDisparos[idx];
+    var x = tiro.x + dx;
+    var y = tiro.y + dy;
+    final dist = sqrt((x * x) + (y * y));
+    if (dist > 1.0) {
+      x = x / dist;
+      y = y / dist;
+    }
+    final nuevaPuntuacion = _recalcularPuntosAjuste
+        ? _calcularPuntuacionDesdeXY(x, y)
+        : tiro.puntuacion;
+    setState(() {
+      _listaDisparos[idx] = Disparo(
+        id: tiro.id,
+        idSesion: tiro.idSesion,
+        numero: tiro.numero,
+        x: x,
+        y: y,
+        puntuacion: nuevaPuntuacion,
+        esMosca: tiro.esMosca,
+      );
+      _puntosTotal += (nuevaPuntuacion - tiro.puntuacion);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (_cargando) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_cargando) {
+      return Scaffold(
+        backgroundColor: Colors.grey[900],
+        body: const Center(child: CircularProgressIndicator(color: Colors.amber)),
+      );
+    }
+    
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: Colors.grey[800],
+      backgroundColor: Colors.black, // Fondo ultra oscuro para contraste con la diana
       appBar: AppBar(
-        title: Text(widget.tituloSerie ?? widget.plantilla.nombreDisciplina),
-        backgroundColor: Colors.black,
+        title: Text(widget.tituloSerie ?? widget.plantilla.nombreDisciplina, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
         actions: [
-          TextButton(onPressed: _guardarYSalir, child: const Text('FIN', style: TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold)))
+          Container(
+            margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+            child: FilledButton.icon(
+              onPressed: _guardarYSalir,
+              icon: const Icon(Icons.stop_circle_rounded, size: 18),
+              label: const Text('FINALIZAR', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
         ],
       ),
-      body: Column(
-        children: [
-          // INFO
-          Container(
-            padding: const EdgeInsets.all(12), color: Colors.grey[900],
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(widget.equipo.nombre, style: const TextStyle(color: Colors.white)),
-                Text('$_puntosTotal pts', style: const TextStyle(color: Colors.amber, fontSize: 24, fontWeight: FontWeight.bold))
-            ])
-          ),
-          
-          // CRONO + BOTÓN DE SALTAR (SKIP)
-          Container(
-            color: _colorEstado, 
-            width: double.infinity, 
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                 const Expanded(child: SizedBox()), // Spacer
-                 Text("$_mensajeEstado: $_segundosRestantes s", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                 const Expanded(child: SizedBox()), // Spacer
-                 
-                 // BOTÓN SALTAR FASE (Solo visible si está corriendo)
-                 if (_enCurso)
-                   IconButton(
-                     icon: const Icon(Icons.skip_next, color: Colors.white, size: 30),
-                     onPressed: _avanzarFaseManual,
-                     tooltip: "Saltar tiempo de espera",
-                   )
-              ],
-            )
-          ),
-          
-          // DIANA
-          Expanded(
-            child: LayoutBuilder(builder: (context, constraints) {
-               double diametro = min(constraints.maxWidth, constraints.maxHeight);
-               double offX = (constraints.maxWidth - diametro) / 2;
-               double offY = (constraints.maxHeight - diametro) / 2;
-               Offset offsetCorrection = Offset(offX, offY);
-               Size size = Size(diametro, diametro);
-
-               return GestureDetector(
-                 behavior: HitTestBehavior.opaque,
-                 onPanStart: (d) => _onPanStart(d, offsetCorrection, size),
-                 onPanUpdate: (d) => _onPanUpdate(d, offsetCorrection),
-                 onPanEnd: (d) => _onPanEnd(d, offsetCorrection, size),
-                 onTapUp: (d) => _onTapUp(d, offsetCorrection, size),
-                 child: Stack(
-                   children: [
-                     Center(
-                       child: CustomPaint(
-                         size: size,
-                         painter: DianaPainter(
-                           impactos: _puntosVisuales,
-                           valorMinimo: _valorMinimo,
-                           anilloNegroInicio: _anilloNegroInicio,
-                           esFondoNegro: _esFondoNegro,
-                           tieneMosca: _tieneMosca,
-                           tieneGuias: _tieneGuias,
-                           esEstiloDuelo: _esEstiloDuelo,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // BARRA SUPERIOR DE INFO (PUNTOS Y ARMA)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.shade900.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                   Expanded(
+                     child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.start,
+                       children: [
+                         const Text('ARMA ACTUAL', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                         const SizedBox(height: 2),
+                         Text(
+                           widget.equipo.nombre,
+                           style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                           maxLines: 1, overflow: TextOverflow.ellipsis,
                          ),
-                       ),
+                       ],
                      ),
-                     
-                     // LUPA
-                     if (_mostrandoLupa && _posicionDedo != null)
-                        Positioned(
-                          left: _posicionDedo!.dx + offX - 50,
-                          top: _posicionDedo!.dy + offY - 120,
+                   ),
+                   Container(
+                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                     decoration: BoxDecoration(
+                       color: Colors.amber.withValues(alpha: 0.15),
+                       borderRadius: BorderRadius.circular(16),
+                       border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                     ),
+                     child: Row(
+                       mainAxisSize: MainAxisSize.min,
+                       children: [
+                         const Icon(Icons.stars_rounded, color: Colors.amber, size: 20),
+                         const SizedBox(width: 8),
+                         Text(
+                           '${_formatearPuntos(_puntosTotal)} pts',
+                           style: const TextStyle(
+                             color: Colors.amber,
+                             fontSize: 22,
+                             fontWeight: FontWeight.w900,
+                             letterSpacing: -0.5,
+                           ),
+                         ),
+                       ],
+                     ),
+                   )
+                ]
+              )
+            ),
+
+            // BARRA DEL CRONÓMETRO Y ESTADO M3
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: _colorEstado.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: _colorEstado.withValues(alpha: 0.5), width: 2),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: _colorEstado, shape: BoxShape.circle),
+                    child: Icon(
+                      _faseActual == FaseSesion.fuego ? Icons.whatshot_rounded : 
+                      _faseActual == FaseSesion.preparacion ? Icons.build_rounded :
+                      _faseActual == FaseSesion.espera ? Icons.pan_tool_rounded : Icons.timer_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_mensajeEstado, style: TextStyle(color: _colorEstado, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.5)),
+                        Text(
+                          '$_segundosRestantes s',
+                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, height: 1.0),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // BOTÓN SALTAR FASE
+                  if (_enCurso)
+                    IconButton(
+                      icon: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 32),
+                      onPressed: _avanzarFaseManual,
+                      tooltip: "Saltar tiempo actual",
+                      style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.1)),
+                    )
+                ],
+              ),
+            ),
+            
+            // ESPACIO DE LA DIANA
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: LayoutBuilder(builder: (context, constraints) {
+                  double diametro = min(constraints.maxWidth, constraints.maxHeight);
+                  double offX = (constraints.maxWidth - diametro) / 2;
+                  double offY = (constraints.maxHeight - diametro) / 2;
+                  Offset offsetCorrection = Offset(offX, offY);
+                  Size size = Size(diametro, diametro);
+                  final radio = size.width / 2;
+                  final cx = size.width / 2;
+                  final cy = size.height / 2;
+                  final impactosPixels = _listaDisparos
+                      .map((d) => Offset((d.x * radio) + cx, (d.y * radio) + cy))
+                      .toList();
+
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onPanStart: (d) => _onPanStart(d, offsetCorrection, size),
+                    onPanUpdate: (d) => _onPanUpdate(d, offsetCorrection),
+                    onPanEnd: (d) => _onPanEnd(d, offsetCorrection, size),
+                    onTapUp: (d) => _onTapUp(d, offsetCorrection, size),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        Center(
                           child: Container(
-                            width: 100, height: 100,
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle, color: Colors.black,
-                              border: Border.all(color: Colors.white, width: 2),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  blurRadius: 30, spreadRadius: 10
+                                )
+                              ]
                             ),
-                            child: ClipOval(
-                              child: Transform(
-                                transform: Matrix4.identity()
-                                  ..translateByDouble(-_posicionDedo!.dx * 2 + 50, -_posicionDedo!.dy * 2 + 50, 0, 1)
-                                  ..scaleByDouble(2.0, 2.0, 1.0, 1.0),
-                                child: CustomPaint(
-                                  size: size,
-                                  painter: DianaPainter(
-                                    impactos: _puntosVisuales,
-                                    valorMinimo: _valorMinimo,
-                                    anilloNegroInicio: _anilloNegroInicio,
-                                    esFondoNegro: _esFondoNegro,
-                                    tieneMosca: _tieneMosca,
-                                    tieneGuias: _tieneGuias,
-                                    esEstiloDuelo: _esEstiloDuelo,
+                            child: CustomPaint(
+                              size: size,
+                              painter: DianaPainter(
+                                impactos: impactosPixels,
+                                valorMinimo: _valorMinimo,
+                                anilloNegroInicio: _anilloNegroInicio,
+                                esFondoNegro: _esFondoNegro,
+                                tieneMosca: _tieneMosca,
+                                tieneGuias: _tieneGuias,
+                                esEstiloDuelo: _esEstiloDuelo,
+                                diametroImpactoMm: _calibreMm,
+                                diametroDianaMm: _dianaAnchoExteriorMm,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // LUPA
+                        if (_mostrandoLupa && _posicionDedo != null)
+                          Positioned(
+                            left: _posicionDedo!.dx + offX - 60,
+                            top: _posicionDedo!.dy + offY - 140,
+                            child: Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black,
+                                border: Border.all(color: Colors.tealAccent, width: 3),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.tealAccent.withValues(alpha: 0.3), blurRadius: 20, spreadRadius: 5)
+                                ]
+                              ),
+                              child: ClipOval(
+                                child: Transform(
+                                  transform: Matrix4.identity()
+                                    ..translateByDouble(-_posicionDedo!.dx * 2 + 60, -_posicionDedo!.dy * 2 + 60, 0, 1)
+                                    ..scaleByDouble(2.0, 2.0, 1.0, 1.0),
+                                  child: CustomPaint(
+                                    size: size,
+                                    painter: DianaPainter(
+                                      impactos: impactosPixels,
+                                      valorMinimo: _valorMinimo,
+                                      anilloNegroInicio: _anilloNegroInicio,
+                                      esFondoNegro: _esFondoNegro,
+                                      tieneMosca: _tieneMosca,
+                                      tieneGuias: _tieneGuias,
+                                      esEstiloDuelo: _esEstiloDuelo,
+                                      diametroImpactoMm: _calibreMm,
+                                      diametroDianaMm: _dianaAnchoExteriorMm,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
+
+                        if (_mostrandoLupa && _posicionDedo != null)
+                          Positioned(
+                              left: _posicionDedo!.dx + offX - 60,
+                              top: _posicionDedo!.dy + offY - 140,
+                              child: const SizedBox(
+                                  width: 120,
+                                  height: 120,
+                                  child: Center(
+                                      child: Icon(Icons.add, color: Colors.redAccent, size: 24))))
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ),
+
+            // PANEL DE LUPA ESTÁTICO DE AJUSTE
+            if (_indiceTiroEnAjuste != null && _indiceTiroEnAjuste! >= 0 && _indiceTiroEnAjuste! < _listaDisparos.length)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.shade900,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.tealAccent.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(text: 'Ajustando Tiro ', style: TextStyle(color: Colors.white70)),
+                              TextSpan(text: '#${_listaDisparos[_indiceTiroEnAjuste!].numero}', style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+                            ]
+                          )
                         ),
-                        
-                      if (_mostrandoLupa && _posicionDedo != null)
-                        Positioned(
-                           left: _posicionDedo!.dx + offX - 50, top: _posicionDedo!.dy + offY - 120,
-                           child: const SizedBox(width: 100, height: 100, child: Center(child: Icon(Icons.add, color: Colors.red, size: 20)))
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(8)),
+                          child: Text(
+                            '${_formatearPuntos(_listaDisparos[_indiceTiroEnAjuste!].puntuacion)} pts',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber, fontSize: 16),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => setState(() => _indiceTiroEnAjuste = null),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                          visualDensity: VisualDensity.compact,
                         )
-                   ],
-                 ),
-               );
-            }),
-          ),
-          
-          // BOTONES INFERIORES
-          Container(
-            padding: const EdgeInsets.all(20), color: Colors.grey[900],
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                IconButton(icon: const Icon(Icons.refresh, color: Colors.red), onPressed: _reiniciarSerie),
-                ElevatedButton(onPressed: _iniciarSecuencia, child: Text(_enCurso ? "PAUSA" : "INICIAR")),
-                IconButton(icon: const Icon(Icons.undo, color: Colors.white), onPressed: _borrarUltimo),
-            ]),
-          )
-        ],
+                      ],
+                    ),
+                    const Divider(color: Colors.white24),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      activeColor: Colors.tealAccent,
+                      checkColor: Colors.black,
+                      title: const Text('Autocalcular puntos al mover', style: TextStyle(fontSize: 13, color: Colors.white)),
+                      value: _recalcularPuntosAjuste,
+                      onChanged: (v) => setState(() => _recalcularPuntosAjuste = v ?? false),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    const SizedBox(height: 8),
+                    // Controles de ajuste integrados (DPad)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _buildStepButton('2%', 0.02),
+                              _buildStepButton('1%', 0.01),
+                              _buildStepButton('0.5%', 0.005),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(16)),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => _moverTiroEnAjuste(0, -_pasoAjuste),
+                                icon: const Icon(Icons.arrow_drop_up_rounded, color: Colors.white, size: 32),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => _moverTiroEnAjuste(-_pasoAjuste, 0),
+                                    icon: const Icon(Icons.arrow_left_rounded, color: Colors.white, size: 32),
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => _moverTiroEnAjuste(_pasoAjuste, 0),
+                                    icon: const Icon(Icons.arrow_right_rounded, color: Colors.white, size: 32),
+                                  ),
+                                ],
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => _moverTiroEnAjuste(0, _pasoAjuste),
+                                icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.white, size: 32),
+                              ),
+                            ]
+                          ),
+                        )
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+            // BOTONERA INFERIOR (CONTROLES DE SESIÓN)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.shade900.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildBottomButton(
+                    icon: Icons.refresh_rounded, 
+                    color: Colors.redAccent, 
+                    onPressed: _reiniciarSerie,
+                    tooltip: 'Reiniciar'
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: FilledButton.icon(
+                        onPressed: _iniciarSecuencia,
+                        icon: Icon(_enCurso ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                        label: Text(_enCurso ? "PAUSA" : "INICIAR", style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _enCurso ? Colors.orange.shade700 : colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  _buildBottomButton(
+                    icon: Icons.my_location_rounded, 
+                    color: Colors.amberAccent, 
+                    onPressed: _listaDisparos.isEmpty ? null : _ajustarUltimoTiroDirecto,
+                    tooltip: "Ajustar último tiro"
+                  ),
+                  _buildBottomButton(
+                    icon: Icons.format_list_bulleted_rounded,
+                    color: const Color(0xFF00E5FF),
+                    onPressed: _listaDisparos.isEmpty ? null : _seleccionarTiroParaAjuste,
+                    tooltip: "Lista de tiros a ajustar"
+                  ),
+                  _buildBottomButton(
+                    icon: Icons.undo_rounded, 
+                    color: Colors.white, 
+                    onPressed: _borrarUltimo,
+                    tooltip: 'Deshacer último tiro'
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepButton(String text, double value) {
+    final isSelected = _pasoAjuste == value;
+    return InkWell(
+      onTap: () => setState(() => _pasoAjuste = value),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.tealAccent.withValues(alpha: 0.2) : Colors.transparent,
+          border: Border.all(color: isSelected ? Colors.tealAccent : Colors.white24),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(text, style: TextStyle(color: isSelected ? Colors.tealAccent : Colors.white70, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      ),
+    );
+  }
+
+  Widget _buildBottomButton({required IconData icon, required Color color, required VoidCallback? onPressed, required String tooltip}) {
+    return IconButton(
+      icon: Icon(icon, color: onPressed == null ? Colors.white24 : color),
+      onPressed: onPressed,
+      tooltip: tooltip,
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white.withValues(alpha: 0.05),
+        padding: const EdgeInsets.all(12),
       ),
     );
   }
@@ -515,6 +1043,8 @@ class DianaPainter extends CustomPainter {
   final bool tieneMosca;
   final bool tieneGuias;
   final bool esEstiloDuelo;
+  final double? diametroImpactoMm;
+  final double? diametroDianaMm;
 
   DianaPainter({
     required this.impactos,
@@ -524,6 +1054,8 @@ class DianaPainter extends CustomPainter {
     required this.tieneMosca,
     required this.tieneGuias,
     required this.esEstiloDuelo,
+    this.diametroImpactoMm,
+    this.diametroDianaMm,
   });
 
   @override
@@ -532,36 +1064,51 @@ class DianaPainter extends CustomPainter {
     final radius = size.width / 2;
 
     // 1. Fondo
-    final paintFondo = Paint()..color = esFondoNegro ? const Color(0xFF1A1A1A) : const Color(0xFFF5F3E0)..style = PaintingStyle.fill;
+    final paintFondo = Paint()
+      ..color = esFondoNegro ? const Color(0xFF1A1A1A) : const Color(0xFFF5F3E0)
+      ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, paintFondo);
 
     // 2. Anillos y Números
-    int totalZonas = 11 - valorMinimo; 
+    int totalZonas = 11 - valorMinimo;
     double anchoZona = radius / totalZonas;
-    
-    final paintNegro = Paint()..color = Colors.black..style = PaintingStyle.fill;
-    final paintLineaClara = Paint()..color = Colors.grey[400]!..style = PaintingStyle.stroke..strokeWidth = 1.0;
-    final paintLineaBlanca = Paint()..color = Colors.white70..style = PaintingStyle.stroke..strokeWidth = 1.0;
+
+    final paintNegro = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.fill;
+    final paintLineaClara = Paint()
+      ..color = Colors.grey[400]!
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    final paintLineaBlanca = Paint()
+      ..color = Colors.white70
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
 
     for (int i = 0; i < totalZonas; i++) {
       int numeroAnillo = valorMinimo + i;
       double r = radius - (i * anchoZona);
-      
+
       // Zona Negra
       if (numeroAnillo >= anilloNegroInicio) {
         canvas.drawCircle(center, r, paintNegro);
         canvas.drawCircle(center, r, paintLineaBlanca);
         // NÚMEROS BLANCOS EN ZONA NEGRA
         if (numeroAnillo < 10) {
-           _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (anchoZona / 2), Colors.white);
+          _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center,
+              r - (anchoZona / 2), Colors.white);
         }
-      } 
+      }
       // Zona Clara
       else {
-        if (i > 0) canvas.drawCircle(center, r, esFondoNegro ? paintLineaBlanca : paintLineaClara);
+        if (i > 0) {
+          canvas.drawCircle(
+              center, r, esFondoNegro ? paintLineaBlanca : paintLineaClara);
+        }
         // NÚMEROS NEGROS EN ZONA CLARA (O BLANCOS SI FONDO NEGRO)
         Color colorNum = esFondoNegro ? Colors.white : Colors.black;
-        _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (anchoZona / 2), colorNum);
+        _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center,
+            r - (anchoZona / 2), colorNum);
       }
     }
 
@@ -570,37 +1117,63 @@ class DianaPainter extends CustomPainter {
       double radioMosca = (radius / totalZonas) / 2;
       canvas.drawCircle(center, radioMosca, paintLineaBlanca);
     }
-    
+
     // 4. Guías
     if (tieneGuias) {
-      Paint guia = Paint()..color = Colors.white..strokeWidth = 2.0;
+      Paint guia = Paint()
+        ..color = Colors.white
+        ..strokeWidth = 2.0;
       double largo = radius * 0.3;
-      canvas.drawLine(Offset(center.dx - radius, center.dy), Offset(center.dx - radius + largo, center.dy), guia);
-      canvas.drawLine(Offset(center.dx + radius, center.dy), Offset(center.dx + radius - largo, center.dy), guia);
+      canvas.drawLine(Offset(center.dx - radius, center.dy),
+          Offset(center.dx - radius + largo, center.dy), guia);
+      canvas.drawLine(Offset(center.dx + radius, center.dy),
+          Offset(center.dx + radius - largo, center.dy), guia);
     }
-    
+
     // 5. Impactos
-    final paintImpacto = Paint()..color = Colors.greenAccent;
-    for(var p in impactos) {
-       canvas.drawCircle(p, anchoZona * 0.3, paintImpacto);
+    final paintImpacto = Paint()
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.85)
+      ..style = PaintingStyle.fill;
+    final paintBordeOscuro = Paint()
+      ..color = Colors.black.withValues(alpha: 0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+    final paintBordeClaro = Paint()
+      ..color = Colors.white.withValues(alpha: 0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6;
+    double radioImpacto = anchoZona * 0.3;
+    if (diametroImpactoMm != null &&
+        diametroDianaMm != null &&
+        diametroImpactoMm! > 0 &&
+        diametroDianaMm! > 0) {
+      radioImpacto = radius * (diametroImpactoMm! / diametroDianaMm!);
+      radioImpacto = radioImpacto.clamp(1.4, radius * 0.14);
+    }
+    for (var p in impactos) {
+      canvas.drawCircle(p, radioImpacto + 0.8, paintBordeOscuro);
+      canvas.drawCircle(p, radioImpacto + 0.2, paintBordeClaro);
+      canvas.drawCircle(p, radioImpacto, paintImpacto);
     }
   }
 
-  void _dibujarNumeros4Ejes(Canvas canvas, String texto, Offset center, double dist, Color color) {
+  void _dibujarNumeros4Ejes(
+      Canvas canvas, String texto, Offset center, double dist, Color color) {
     _texto(canvas, texto, Offset(center.dx, center.dy - dist), color); // Arriba
     _texto(canvas, texto, Offset(center.dx, center.dy + dist), color); // Abajo
-    _texto(canvas, texto, Offset(center.dx + dist, center.dy), color); // Derecha
-    _texto(canvas, texto, Offset(center.dx - dist, center.dy), color); // Izquierda
+    _texto(
+        canvas, texto, Offset(center.dx + dist, center.dy), color); // Derecha
+    _texto(
+        canvas, texto, Offset(center.dx - dist, center.dy), color); // Izquierda
   }
 
   void _texto(Canvas canvas, String texto, Offset pos, Color color) {
     final tp = TextPainter(
-      text: TextSpan(
-        text: texto, 
-        style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold) 
-      ),
-      textDirection: TextDirection.ltr
-    );
+        text: TextSpan(
+            text: texto,
+            style: TextStyle(
+                color: color, fontSize: 14, fontWeight: FontWeight.bold)),
+        textDirection: TextDirection.ltr);
     tp.layout();
     tp.paint(canvas, Offset(pos.dx - tp.width / 2, pos.dy - tp.height / 2));
   }

@@ -70,54 +70,68 @@ class _GestionEquiposScreenState extends State<GestionEquiposScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Mis Armas'), 
-        backgroundColor: Colors.teal,
+        title: const Text('Mis Armas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: 0,
+        centerTitle: true,
       ),
       body: _lista.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.hardware, size: 60, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text('No tienes armas registradas', style: TextStyle(color: Colors.grey)),
+                children: [
+                  Icon(Icons.hardware_rounded, size: 64, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                  const SizedBox(height: 16),
+                  Text('No tienes armas registradas', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16, fontWeight: FontWeight.w500)),
                 ],
               ),
             )
           : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               itemCount: _lista.length,
               itemBuilder: (context, index) {
                 final item = _lista[index];
-                // Lógica visual simple para el icono
                 final esAire = item.nombreTipo.toLowerCase().contains('aire');
                 
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
                   child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     leading: CircleAvatar(
-                      backgroundColor: Colors.teal.withValues(alpha: 0.1),
+                      backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                      radius: 24,
                       child: Icon(
-                        esAire ? Icons.air : Icons.local_fire_department, 
-                        color: Colors.teal,
+                        esAire ? Icons.air_rounded : Icons.local_fire_department_rounded, 
+                        color: colorScheme.primary,
                       ),
                     ),
-                    title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('${item.nombreTipo} • ${item.nombreCalibre}\n${item.marca ?? ""}'),
+                    title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text('${item.nombreTipo} • ${item.nombreCalibre}\n${item.marca ?? ""}', style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.3)),
+                    ),
                     isThreeLine: true,
-                    
                     onLongPress: () => _confirmarBorrado(item),
-
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.teal),
+                          icon: Icon(Icons.edit_rounded, color: colorScheme.primary),
                           onPressed: () => _abrirFormulario(item.id),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error),
                           onPressed: () => _confirmarBorrado(item),
                         ),
                       ],
@@ -126,10 +140,13 @@ class _GestionEquiposScreenState extends State<GestionEquiposScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.teal,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 4,
         onPressed: () => _abrirFormulario(),
-        child: const Icon(Icons.add, color: Colors.white),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text("Nueva Arma", style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
