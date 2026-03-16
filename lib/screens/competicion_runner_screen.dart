@@ -25,6 +25,7 @@ class CompeticionRunnerScreen extends StatefulWidget {
   final String? vientoDireccion;
   final String? iluminacion;
   final bool usarPuntuacionDecimal;
+  final bool usarEntradaManualPuntos;
 
   const CompeticionRunnerScreen({
     super.key,
@@ -42,6 +43,7 @@ class CompeticionRunnerScreen extends StatefulWidget {
     this.vientoDireccion,
     this.iluminacion,
     this.usarPuntuacionDecimal = false,
+    this.usarEntradaManualPuntos = false,
   });
 
   @override
@@ -154,6 +156,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
             _procesarResultadosSerie(disparos, puntos, faseActual, plantilla);
           },
           usarPuntuacionDecimal: widget.usarPuntuacionDecimal,
+          usarEntradaManualPuntos: widget.usarEntradaManualPuntos,
         ),
       ),
     );
@@ -179,7 +182,8 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
       iluminacion: widget.iluminacion,
       // Añadimos metadatos del torneo en la nota para identificarlo luego
       nota:
-          'Torneo: ${widget.modalidad.nombre} | ${fase.fase.descripcionFase} | Serie ${_indiceRepeticion + 1}',
+          'Torneo: ${widget.modalidad.nombre} | ${fase.fase.descripcionFase} | Serie ${_indiceRepeticion + 1}'
+          '${widget.usarEntradaManualPuntos ? ' | Entrada: Manual' : ''}',
     );
     await _entrenamientoService.guardarSesionCompleta(nuevaSesion, disparos);
 

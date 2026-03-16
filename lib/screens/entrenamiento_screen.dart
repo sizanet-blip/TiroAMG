@@ -43,6 +43,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
   String? _iluminacion;
   bool _esInterior = true;
   bool _usarPuntuacionDecimal = false;
+  bool _usarEntradaManualPuntos = false;
   bool _mostrarCondicionesTiro = false;
 
   bool _cargando = true;
@@ -100,6 +101,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
           vientoDireccion: _textOrNull(_vientoDirController.text),
           iluminacion: _iluminacion,
           usarPuntuacionDecimal: _usarPuntuacionDecimal,
+          usarEntradaManualPuntos: _usarEntradaManualPuntos,
         ),
       ),
     );
@@ -265,6 +267,24 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                           onChanged: (v) => setState(() => _usarPuntuacionDecimal = v),
                         ),
                       ),
+                      _buildDivider(colorScheme),
+                      _buildModernSelectionCard(
+                        context: context,
+                        title: '4. Cómo introducir los puntos',
+                        icon: Icons.touch_app_rounded,
+                        color: Colors.cyan.shade700,
+                        child: SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Usar teclado de puntuación (X, 10 a 0)', style: TextStyle(fontSize: 15)),
+                          subtitle: const Text(
+                            'Activado: introduces cada tiro con botones.\n'
+                            'Desactivado: puntúas tocando la diana.',
+                          ),
+                          value: _usarEntradaManualPuntos,
+                          activeThumbColor: Colors.cyan.shade700,
+                          onChanged: (v) => setState(() => _usarEntradaManualPuntos = v),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -277,7 +297,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                     children: [
                       _buildModernSelectionCard(
                         context: context,
-                        title: '4. Munición (Opcional)',
+                        title: '5. Munición (Opcional)',
                         icon: Icons.local_fire_department_rounded,
                         color: Colors.deepOrange,
                         child: DropdownButtonFormField<MunicionDetalle>(
@@ -304,7 +324,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                       _buildDivider(colorScheme),
                       _buildModernSelectionCard(
                         context: context,
-                        title: '5. Condiciones del entorno',
+                        title: '6. Condiciones del entorno',
                         icon: Icons.thermostat_rounded,
                         color: Colors.amber.shade800,
                         child: Column(

@@ -32,6 +32,7 @@ class SesionDisparoScreen extends StatefulWidget {
   final int? totalSeries;
   final Function(List<Disparo> disparos, double puntos)? onCompletar;
   final bool usarPuntuacionDecimal;
+  final bool usarEntradaManualPuntos;
 
   const SesionDisparoScreen({
     super.key,
@@ -49,6 +50,7 @@ class SesionDisparoScreen extends StatefulWidget {
     this.vientoDireccion,
     this.iluminacion,
     this.usarPuntuacionDecimal = false,
+    this.usarEntradaManualPuntos = false,
     this.tituloSerie,
     this.numeroSerie,
     this.totalSeries,
@@ -86,6 +88,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   int _segundosRestantes = 0;
   Color _colorEstado = Colors.grey;
   bool _haIniciado = false;
+  bool _estaPausado = false;
 
   // Control de Duelo
   int _contadorSeriesDuelo = 0;
@@ -95,10 +98,20 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   bool _mostrandoLupa = false;
   int? _indiceTiroEnAjuste;
   double _pasoAjuste = 0.01;
-  bool _recalcularPuntosAjuste = false;
+  bool _recalcularPuntosAjuste = true;
 
   bool get _enCurso =>
-      _faseActual != FaseSesion.stop && _faseActual != FaseSesion.fin;
+      !_estaPausado &&
+      _faseActual != FaseSesion.stop &&
+      _faseActual != FaseSesion.fin;
+  bool get _puedeReanudar =>
+      _estaPausado &&
+      _faseActual != FaseSesion.stop &&
+      _faseActual != FaseSesion.fin;
+  bool get _ajusteActivo =>
+      _indiceTiroEnAjuste != null &&
+      _indiceTiroEnAjuste! >= 0 &&
+      _indiceTiroEnAjuste! < _listaDisparos.length;
 
   String _formatearPuntos(double value) {
     if (!widget.usarPuntuacionDecimal) {
@@ -232,6 +245,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     _faseActual = FaseSesion.stop;
     _mensajeEstado = "LISTO";
     _colorEstado = Colors.grey;
+    _estaPausado = false;
     _contadorSeriesDuelo = 0;
     _segundosRestantes = widget.plantilla.tiempoPreparacion > 0
         ? widget.plantilla.tiempoPreparacion
@@ -248,6 +262,11 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       return;
     }
 
+    if (_puedeReanudar) {
+      _reanudar();
+      return;
+    }
+
     if (widget.plantilla.tiempoPreparacion > 0) {
       _cambiarFase(FaseSesion.preparacion, widget.plantilla.tiempoPreparacion);
     } else {
@@ -259,10 +278,28 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   void _pausar() {
     _timer?.cancel();
     setState(() {
-      _faseActual = FaseSesion.stop;
+      _estaPausado = true;
       _mensajeEstado = "PAUSADO";
       _colorEstado = Colors.orange;
     });
+  }
+
+  void _reanudar() {
+    if (!_puedeReanudar) return;
+    setState(() {
+      _estaPausado = false;
+      if (_faseActual == FaseSesion.preparacion) {
+        _mensajeEstado = "PREPARACIÓN";
+        _colorEstado = Colors.amber[800]!;
+      } else if (_faseActual == FaseSesion.espera) {
+        _mensajeEstado = "ATENCIÓN (ESPERA)";
+        _colorEstado = Colors.red[700]!;
+      } else if (_faseActual == FaseSesion.fuego) {
+        _mensajeEstado = "¡FUEGO!";
+        _colorEstado = Colors.green[600]!;
+      }
+    });
+    _iniciarTicker();
   }
 
   void _cambiarFase(FaseSesion fase, int tiempo) {
@@ -292,6 +329,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
   void _iniciarTicker() {
     _timer?.cancel();
+    _estaPausado = false;
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       setState(() {
@@ -351,18 +389,41 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   }
 
   // --- REGISTRO DE IMPACTOS ---
-  void _registrarImpacto(Offset localPosition, Size tamanoDiana) {
-    if (!_haIniciado) return;
-
-    // Bloqueo en fases de espera/preparación
-    if (_faseActual == FaseSesion.espera ||
-        _faseActual == FaseSesion.preparacion) {
+  bool _puedeRegistrarDisparoConFeedback() {
+    if (!_haIniciado) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('¡Alto! Diana cerrada.'),
+        content: Text('Inicia la serie para poder puntuar.'),
+        duration: Duration(milliseconds: 700),
+      ));
+      return false;
+    }
+
+    // En pausa se permite puntuar para cargar impactos manualmente.
+    if (_estaPausado) {
+      return true;
+    }
+
+    if (_faseActual != FaseSesion.fuego) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Ahora no se puede puntuar.'),
           duration: Duration(milliseconds: 500),
           backgroundColor: Colors.red));
+      return false;
+    }
+
+    return true;
+  }
+
+  void _registrarImpacto(Offset localPosition, Size tamanoDiana) {
+    if (widget.usarEntradaManualPuntos) return;
+    if (_ajusteActivo) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Finaliza el ajuste para poder registrar nuevos impactos.'),
+        duration: Duration(milliseconds: 700),
+      ));
       return;
     }
+    if (!_puedeRegistrarDisparoConFeedback()) return;
 
     setState(() {
       Offset centro = Offset(tamanoDiana.width / 2, tamanoDiana.height / 2);
@@ -388,6 +449,27 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     });
   }
 
+  void _agregarDisparoManual(double puntuacion, {bool esMosca = false}) {
+    if (!_puedeRegistrarDisparoConFeedback()) return;
+    final valor = puntuacion.clamp(0.0, 10.0);
+    setState(() {
+      _puntosTotal += valor;
+      _listaDisparos.add(Disparo(
+        numero: _listaDisparos.length + 1,
+        x: 0,
+        y: 0,
+        puntuacion: valor,
+        esMosca: esMosca,
+      ));
+    });
+  }
+
+  String _formatearMarcaDisparo(Disparo disparo) {
+    if (disparo.esMosca) return 'X';
+    if (disparo.puntuacion % 1 == 0) return disparo.puntuacion.toInt().toString();
+    return disparo.puntuacion.toStringAsFixed(1);
+  }
+
   void _borrarUltimo() {
     if (_listaDisparos.isNotEmpty) {
       setState(() {
@@ -411,14 +493,21 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       return;
     }
 
+    final notaBase = widget.municion != null
+        ? "${widget.municion!.marca} (${widget.municion!.lote})"
+        : null;
+    final notaFinal = widget.usarEntradaManualPuntos
+        ? (notaBase == null || notaBase.isEmpty
+            ? 'Entrada: Manual'
+            : '$notaBase | Entrada: Manual')
+        : notaBase;
+
     final sesion = Sesion(
       fecha: DateTime.now(),
       idEquipo: widget.equipo.id,
       idPlantilla: widget.plantilla.id!,
       idMunicion: widget.municion?.id,
-      nota: widget.municion != null
-          ? "${widget.municion!.marca} (${widget.municion!.lote})"
-          : null,
+      nota: notaFinal,
       lugar: widget.lugar,
       distanciaMetros: widget.distanciaMetros,
       posicionTiro: widget.posicionTiro,
@@ -471,28 +560,57 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   }
 
   // Gestos Lupa
-  void _onPanStart(DragStartDetails d, Offset offset, Size size) {
-    setState(() {
-      _mostrandoLupa = true;
-      _posicionDedo = d.localPosition - offset;
-    });
+  Offset _normalizarPosicionEnDiana(Offset p, Size size) {
+    final x = p.dx.clamp(0.0, size.width);
+    final y = p.dy.clamp(0.0, size.height);
+    return Offset(x, y);
   }
 
-  void _onPanUpdate(DragUpdateDetails d, Offset offset) {
+  void _onPanStart(DragStartDetails d, Offset offset, Size size) {
+    if (widget.usarEntradaManualPuntos) return;
+    final pos = _normalizarPosicionEnDiana(d.localPosition - offset, size);
     setState(() {
-      _posicionDedo = d.localPosition - offset;
+      _mostrandoLupa = true;
+      _posicionDedo = pos;
     });
+    if (_ajusteActivo) {
+      _ajustarTiroEnAjusteDesdePosicion(pos, size);
+    }
+  }
+
+  void _onPanUpdate(DragUpdateDetails d, Offset offset, Size size) {
+    if (widget.usarEntradaManualPuntos) return;
+    final pos = _normalizarPosicionEnDiana(d.localPosition - offset, size);
+    setState(() {
+      _posicionDedo = pos;
+    });
+    if (_ajusteActivo) {
+      _ajustarTiroEnAjusteDesdePosicion(pos, size);
+    }
   }
 
   void _onPanEnd(DragEndDetails d, Offset offset, Size size) {
+    if (widget.usarEntradaManualPuntos) return;
+    final pos = _posicionDedo;
     setState(() {
       _mostrandoLupa = false;
     });
-    if (_posicionDedo != null) _registrarImpacto(_posicionDedo!, size);
+    if (pos == null) return;
+    if (_ajusteActivo) {
+      _ajustarTiroEnAjusteDesdePosicion(pos, size);
+      return;
+    }
+    _registrarImpacto(pos, size);
   }
 
   void _onTapUp(TapUpDetails d, Offset offset, Size size) {
-    _registrarImpacto(d.localPosition - offset, size);
+    if (widget.usarEntradaManualPuntos) return;
+    final pos = _normalizarPosicionEnDiana(d.localPosition - offset, size);
+    if (_ajusteActivo) {
+      _ajustarTiroEnAjusteDesdePosicion(pos, size);
+      return;
+    }
+    _registrarImpacto(pos, size);
   }
 
   Future<void> _seleccionarTiroParaAjuste() async {
@@ -589,6 +707,41 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     });
   }
 
+  void _ajustarTiroEnAjusteDesdePosicion(Offset localPosition, Size tamanoDiana) {
+    final idx = _indiceTiroEnAjuste;
+    if (idx == null || idx < 0 || idx >= _listaDisparos.length) {
+      return;
+    }
+
+    final centro = Offset(tamanoDiana.width / 2, tamanoDiana.height / 2);
+    final radioMax = tamanoDiana.width / 2;
+    var x = (localPosition.dx - centro.dx) / radioMax;
+    var y = (localPosition.dy - centro.dy) / radioMax;
+    final dist = sqrt((x * x) + (y * y));
+    if (dist > 1.0) {
+      x = x / dist;
+      y = y / dist;
+    }
+
+    final tiro = _listaDisparos[idx];
+    final nuevaPuntuacion = _recalcularPuntosAjuste
+        ? _calcularPuntuacionDesdeXY(x, y)
+        : tiro.puntuacion;
+
+    setState(() {
+      _listaDisparos[idx] = Disparo(
+        id: tiro.id,
+        idSesion: tiro.idSesion,
+        numero: tiro.numero,
+        x: x,
+        y: y,
+        puntuacion: nuevaPuntuacion,
+        esMosca: tiro.esMosca,
+      );
+      _puntosTotal += (nuevaPuntuacion - tiro.puntuacion);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_cargando) {
@@ -628,7 +781,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         child: Column(
           children: [
             // BARRA SUPERIOR DE INFO (PUNTOS Y ARMA)
-            Container(
+            if (!_ajusteActivo)
+              Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
@@ -682,7 +836,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
             ),
 
             // BARRA DEL CRONÓMETRO Y ESTADO M3
-            Container(
+            if (!_ajusteActivo)
+              Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -697,6 +852,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(color: _colorEstado, shape: BoxShape.circle),
                     child: Icon(
+                      _estaPausado ? Icons.pause_rounded :
                       _faseActual == FaseSesion.fuego ? Icons.whatshot_rounded : 
                       _faseActual == FaseSesion.preparacion ? Icons.build_rounded :
                       _faseActual == FaseSesion.espera ? Icons.pan_tool_rounded : Icons.timer_rounded,
@@ -729,82 +885,46 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
               ),
             ),
             
-            // ESPACIO DE LA DIANA
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: LayoutBuilder(builder: (context, constraints) {
-                  double diametro = min(constraints.maxWidth, constraints.maxHeight);
-                  double offX = (constraints.maxWidth - diametro) / 2;
-                  double offY = (constraints.maxHeight - diametro) / 2;
-                  Offset offsetCorrection = Offset(offX, offY);
-                  Size size = Size(diametro, diametro);
-                  final radio = size.width / 2;
-                  final cx = size.width / 2;
-                  final cy = size.height / 2;
-                  final impactosPixels = _listaDisparos
-                      .map((d) => Offset((d.x * radio) + cx, (d.y * radio) + cy))
-                      .toList();
+              child: widget.usarEntradaManualPuntos
+                  ? _buildAreaPuntuacionManual()
+                  : Padding(
+                      padding: EdgeInsets.all(_ajusteActivo ? 6.0 : 16.0),
+                      child: LayoutBuilder(builder: (context, constraints) {
+                        double diametro =
+                            min(constraints.maxWidth, constraints.maxHeight);
+                        double offX = (constraints.maxWidth - diametro) / 2;
+                        double offY = (constraints.maxHeight - diametro) / 2;
+                        Offset offsetCorrection = Offset(offX, offY);
+                        Size size = Size(diametro, diametro);
+                        final radio = size.width / 2;
+                        final cx = size.width / 2;
+                        final cy = size.height / 2;
+                        final impactosPixels = _listaDisparos
+                            .map((d) => Offset((d.x * radio) + cx, (d.y * radio) + cy))
+                            .toList();
 
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onPanStart: (d) => _onPanStart(d, offsetCorrection, size),
-                    onPanUpdate: (d) => _onPanUpdate(d, offsetCorrection),
-                    onPanEnd: (d) => _onPanEnd(d, offsetCorrection, size),
-                    onTapUp: (d) => _onTapUp(d, offsetCorrection, size),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      alignment: Alignment.center,
-                      children: [
-                        Center(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                  blurRadius: 30, spreadRadius: 10
-                                )
-                              ]
-                            ),
-                            child: CustomPaint(
-                              size: size,
-                              painter: DianaPainter(
-                                impactos: impactosPixels,
-                                valorMinimo: _valorMinimo,
-                                anilloNegroInicio: _anilloNegroInicio,
-                                esFondoNegro: _esFondoNegro,
-                                tieneMosca: _tieneMosca,
-                                tieneGuias: _tieneGuias,
-                                esEstiloDuelo: _esEstiloDuelo,
-                                diametroImpactoMm: _calibreMm,
-                                diametroDianaMm: _dianaAnchoExteriorMm,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // LUPA
-                        if (_mostrandoLupa && _posicionDedo != null)
-                          Positioned(
-                            left: _posicionDedo!.dx + offX - 60,
-                            top: _posicionDedo!.dy + offY - 140,
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.black,
-                                border: Border.all(color: Colors.tealAccent, width: 3),
-                                boxShadow: [
-                                  BoxShadow(color: Colors.tealAccent.withValues(alpha: 0.3), blurRadius: 20, spreadRadius: 5)
-                                ]
-                              ),
-                              child: ClipOval(
-                                child: Transform(
-                                  transform: Matrix4.identity()
-                                    ..translateByDouble(-_posicionDedo!.dx * 2 + 60, -_posicionDedo!.dy * 2 + 60, 0, 1)
-                                    ..scaleByDouble(2.0, 2.0, 1.0, 1.0),
+                        return GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onPanStart: (d) => _onPanStart(d, offsetCorrection, size),
+                          onPanUpdate: (d) => _onPanUpdate(d, offsetCorrection, size),
+                          onPanEnd: (d) => _onPanEnd(d, offsetCorrection, size),
+                          onTapUp: (d) => _onTapUp(d, offsetCorrection, size),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            alignment: Alignment.center,
+                            children: [
+                              Center(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.05),
+                                            blurRadius: 30,
+                                            spreadRadius: 10)
+                                      ]),
                                   child: CustomPaint(
                                     size: size,
                                     painter: DianaPainter(
@@ -821,27 +941,98 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
 
-                        if (_mostrandoLupa && _posicionDedo != null)
-                          Positioned(
-                              left: _posicionDedo!.dx + offX - 60,
-                              top: _posicionDedo!.dy + offY - 140,
-                              child: const SizedBox(
-                                  width: 120,
-                                  height: 120,
-                                  child: Center(
-                                      child: Icon(Icons.add, color: Colors.redAccent, size: 24))))
-                      ],
+                              // LUPA
+                              if (_mostrandoLupa && _posicionDedo != null)
+                                Positioned(
+                                  left: _posicionDedo!.dx + offX - 60,
+                                  top: _posicionDedo!.dy + offY - 140,
+                                  child: Container(
+                                    width: 120,
+                                    height: 120,
+                                    decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.black,
+                                        border: Border.all(
+                                            color: Colors.tealAccent, width: 3),
+                                        boxShadow: [
+                                          BoxShadow(
+                                              color: Colors.tealAccent
+                                                  .withValues(alpha: 0.3),
+                                              blurRadius: 20,
+                                              spreadRadius: 5)
+                                        ]),
+                                    child: ClipOval(
+                                      child: OverflowBox(
+                                        minWidth: 0,
+                                        minHeight: 0,
+                                        maxWidth: size.width,
+                                        maxHeight: size.height,
+                                        alignment: Alignment.topLeft,
+                                        child: Transform(
+                                          transform: Matrix4.identity()
+                                            ..translate(60.0, 60.0)
+                                            ..scale(2.0, 2.0)
+                                            ..translate(
+                                                -_posicionDedo!.dx, -_posicionDedo!.dy),
+                                          child: SizedBox(
+                                            width: size.width,
+                                            height: size.height,
+                                            child: CustomPaint(
+                                              size: size,
+                                              painter: DianaPainter(
+                                                impactos: impactosPixels,
+                                                valorMinimo: _valorMinimo,
+                                                anilloNegroInicio: _anilloNegroInicio,
+                                                esFondoNegro: _esFondoNegro,
+                                                tieneMosca: _tieneMosca,
+                                                tieneGuias: _tieneGuias,
+                                                esEstiloDuelo: _esEstiloDuelo,
+                                                diametroImpactoMm: _calibreMm,
+                                                diametroDianaMm: _dianaAnchoExteriorMm,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                              if (_mostrandoLupa && _posicionDedo != null)
+                                Positioned(
+                                    left: _posicionDedo!.dx + offX - 60,
+                                    top: _posicionDedo!.dy + offY - 140,
+                                    child: const SizedBox(
+                                        width: 120,
+                                        height: 120,
+                                        child: Center(
+                                            child: Icon(Icons.add,
+                                                color: Colors.redAccent,
+                                                size: 24))))
+                              ,
+                              if (_mostrandoLupa && _posicionDedo != null)
+                                Positioned(
+                                  left: _posicionDedo!.dx + offX - 10,
+                                  top: _posicionDedo!.dy + offY - 10,
+                                  child: const Icon(
+                                    Icons.add,
+                                    color: Colors.redAccent,
+                                    size: 20,
+                                  ),
+                                )
+                            ],
+                          ),
+                        );
+                      }),
                     ),
-                  );
-                }),
-              ),
             ),
 
             // PANEL DE LUPA ESTÁTICO DE AJUSTE
-            if (_indiceTiroEnAjuste != null && _indiceTiroEnAjuste! >= 0 && _indiceTiroEnAjuste! < _listaDisparos.length)
+            if (!widget.usarEntradaManualPuntos &&
+                _indiceTiroEnAjuste != null &&
+                _indiceTiroEnAjuste! >= 0 &&
+                _indiceTiroEnAjuste! < _listaDisparos.length)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -946,7 +1137,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
               ),
 
             // BOTONERA INFERIOR (CONTROLES DE SESIÓN)
-            Container(
+            if (!_ajusteActivo)
+              Container(
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -968,9 +1160,14 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                       child: FilledButton.icon(
                         onPressed: _iniciarSecuencia,
                         icon: Icon(_enCurso ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                        label: Text(_enCurso ? "PAUSA" : "INICIAR", style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                        label: Text(
+                          _enCurso ? "PAUSA" : (_puedeReanudar ? "CONTINUAR" : "INICIAR"),
+                          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                        ),
                         style: FilledButton.styleFrom(
-                          backgroundColor: _enCurso ? Colors.orange.shade700 : colorScheme.primary,
+                          backgroundColor: _enCurso
+                              ? Colors.orange.shade700
+                              : (_puedeReanudar ? Colors.green.shade700 : colorScheme.primary),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -981,13 +1178,17 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                   _buildBottomButton(
                     icon: Icons.my_location_rounded, 
                     color: Colors.amberAccent, 
-                    onPressed: _listaDisparos.isEmpty ? null : _ajustarUltimoTiroDirecto,
+                    onPressed: widget.usarEntradaManualPuntos
+                        ? null
+                        : (_listaDisparos.isEmpty ? null : _ajustarUltimoTiroDirecto),
                     tooltip: "Ajustar último tiro"
                   ),
                   _buildBottomButton(
                     icon: Icons.format_list_bulleted_rounded,
                     color: const Color(0xFF00E5FF),
-                    onPressed: _listaDisparos.isEmpty ? null : _seleccionarTiroParaAjuste,
+                    onPressed: widget.usarEntradaManualPuntos
+                        ? null
+                        : (_listaDisparos.isEmpty ? null : _seleccionarTiroParaAjuste),
                     tooltip: "Lista de tiros a ajustar"
                   ),
                   _buildBottomButton(
@@ -1001,6 +1202,136 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
             )
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAreaPuntuacionManual() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.shade900.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Puntuación por números',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              Text(
+                'Tiros: ${_listaDisparos.length}',
+                style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 12, // X + 10..0
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              mainAxisExtent: 56, // alto fijo para evitar overflow en horizontal
+            ),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _buildManualScoreButton(
+                  label: 'X',
+                  background: Colors.amber.shade700,
+                  onTap: () => _agregarDisparoManual(10, esMosca: true),
+                );
+              }
+              final score = 11 - index; // 10..0
+              return _buildManualScoreButton(
+                label: '$score',
+                background: Colors.blueGrey.shade700,
+                onTap: () => _agregarDisparoManual(score.toDouble()),
+              );
+            },
+          ),
+          const SizedBox(height: 6),
+          Container(
+            height: 92,
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: _listaDisparos.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Sin marcas todavía',
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  )
+                : Scrollbar(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _listaDisparos.map((disparo) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Text(
+                              '${disparo.numero}: ${_formatearMarcaDisparo(disparo)}',
+                              style: TextStyle(
+                                color: disparo.esMosca
+                                    ? Colors.amberAccent
+                                    : Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildManualScoreButton({
+    required String label,
+    required Color background,
+    required VoidCallback onTap,
+  }) {
+    return FilledButton(
+      style: FilledButton.styleFrom(
+        backgroundColor: background,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      onPressed: onTap,
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
       ),
     );
   }

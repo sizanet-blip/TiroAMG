@@ -34,6 +34,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
   String? _iluminacion;
   bool _esInterior = true;
   bool _usarPuntuacionDecimal = false;
+  bool _usarEntradaManualPuntos = false;
   bool _mostrarCondicionesTiro = false;
   bool _cargando = true;
 
@@ -75,6 +76,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
           vientoDireccion: _textOrNull(_vientoDirController.text),
           iluminacion: _iluminacion,
           usarPuntuacionDecimal: _usarPuntuacionDecimal,
+          usarEntradaManualPuntos: _usarEntradaManualPuntos,
         ),
       ),
     );
@@ -176,6 +178,16 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
             subtitle: const Text('Por defecto se usa puntuación entera'),
             value: _usarPuntuacionDecimal,
             onChanged: (v) => setState(() => _usarPuntuacionDecimal = v),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Usar teclado de puntuación (X, 10 a 0)'),
+            subtitle: const Text(
+              'Activado: introduces cada tiro con botones.\n'
+              'Desactivado: puntúas tocando la diana.',
+            ),
+            value: _usarEntradaManualPuntos,
+            onChanged: (v) => setState(() => _usarEntradaManualPuntos = v),
           ),
           const SizedBox(height: 4),
           SizedBox(
