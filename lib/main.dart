@@ -1,5 +1,6 @@
 import 'dart:io'; 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -8,6 +9,12 @@ import 'screens/home_screen.dart';
 void main() {
   // 1. Inicializar bindings de Flutter
   WidgetsFlutterBinding.ensureInitialized();
+  // 1.1 Permitir rotación en móvil/tablet (vertical + horizontal)
+  SystemChrome.setPreferredOrientations(const [
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
 
   // 2. Inicializar BD para Windows/Linux/Mac
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {

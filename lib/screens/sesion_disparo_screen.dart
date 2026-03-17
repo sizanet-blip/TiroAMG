@@ -752,6 +752,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     }
     
     final colorScheme = Theme.of(context).colorScheme;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: Colors.black, // Fondo ultra oscuro para contraste con la diana
@@ -781,7 +782,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         child: Column(
           children: [
             // BARRA SUPERIOR DE INFO (PUNTOS Y ARMA)
-            if (!_ajusteActivo)
+            if (!_ajusteActivo && !isLandscape)
               Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -836,7 +837,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
             ),
 
             // BARRA DEL CRONÓMETRO Y ESTADO M3
-            if (!_ajusteActivo)
+            if (!_ajusteActivo && !isLandscape)
               Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               width: double.infinity,
@@ -1028,6 +1029,53 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                     ),
             ),
 
+            if (!_ajusteActivo && isLandscape && !widget.usarEntradaManualPuntos)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.shade900.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${widget.equipo.nombre} · $_mensajeEstado · $_segundosRestantes s',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${_formatearPuntos(_puntosTotal)} pts',
+                      style: const TextStyle(
+                        color: Colors.amber,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                    if (_enCurso) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: _avanzarFaseManual,
+                        tooltip: "Saltar tiempo actual",
+                        icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ]
+                  ],
+                ),
+              ),
+
             // PANEL DE LUPA ESTÁTICO DE AJUSTE
             if (!widget.usarEntradaManualPuntos &&
                 _indiceTiroEnAjuste != null &&
@@ -1140,7 +1188,10 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
             if (!_ajusteActivo)
               Container(
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: isLandscape ? 8 : 12,
+              ),
               decoration: BoxDecoration(
                 color: Colors.blueGrey.shade900.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(24),
