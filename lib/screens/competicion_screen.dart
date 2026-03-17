@@ -33,13 +33,20 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            16,
+            24,
+            16 + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -134,8 +141,9 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
           ],
+          ),
         ),
       ),
     );

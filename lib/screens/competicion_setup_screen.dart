@@ -4,6 +4,7 @@ import '../models/equipo_model.dart';
 import '../models/municion_model.dart';
 import '../services/equipo_service.dart';
 import '../services/municion_service.dart';
+import '../utils/responsive_layout.dart';
 import 'competicion_runner_screen.dart'; // El Director de Orquesta
 
 class CompeticionSetupScreen extends StatefulWidget {
@@ -113,20 +114,38 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final compactLandscape = ResponsiveLayout.isCompactLandscape(context);
+    final contentPadding = ResponsiveLayout.pagePadding(context);
+    final maxContentWidth = ResponsiveLayout.maxContentWidth(context);
+
     if (_cargando) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
       appBar: AppBar(
+          toolbarHeight: compactLandscape ? 56 : 64,
           title: Text(widget.modalidad.nombre),
           backgroundColor: Colors.amber[700]),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          contentPadding + 4,
+          compactLandscape ? 10 : 16,
+          contentPadding + 4,
+          compactLandscape ? 16 : 20,
+        ),
         children: [
-          const Text('Prepara tu equipo',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
+          Text(
+            'Prepara tu equipo',
+            style: TextStyle(
+              fontSize: compactLandscape ? 20 : 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: compactLandscape ? 14 : 20),
 
           // Selector Arma
           DropdownButtonFormField<EquipoDetalle>(
@@ -143,7 +162,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
                 .toList(),
             onChanged: (v) => setState(() => _equipoSeleccionado = v),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: compactLandscape ? 14 : 20),
 
           // Selector Munición
           DropdownButtonFormField<MunicionDetalle>(
@@ -170,7 +189,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
             ],
             onChanged: (v) => setState(() => _municionSeleccionada = v),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: compactLandscape ? 14 : 20),
 
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -295,19 +314,23 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
             ),
           ],
 
-          const SizedBox(height: 20),
+          SizedBox(height: compactLandscape ? 14 : 20),
 
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.all(15)),
-            icon: const Icon(Icons.play_circle_filled, size: 30),
-            label:
-                const Text('COMENZAR TORNEO', style: TextStyle(fontSize: 18)),
+                padding: EdgeInsets.all(compactLandscape ? 12 : 15)),
+            icon: Icon(Icons.play_circle_filled, size: compactLandscape ? 24 : 30),
+            label: Text(
+              'COMENZAR TORNEO',
+              style: TextStyle(fontSize: compactLandscape ? 16 : 18),
+            ),
             onPressed: _empezar,
           )
         ],
+          ),
+        ),
       ),
     );
   }

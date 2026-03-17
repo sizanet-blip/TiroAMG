@@ -7,6 +7,7 @@ import '../models/municion_model.dart';
 import '../services/equipo_service.dart';
 import '../services/plantilla_tiempos_service.dart';
 import '../services/municion_service.dart';
+import '../utils/responsive_layout.dart';
 // Pantalla de Destino (La Diana)
 import 'sesion_disparo_screen.dart';
 
@@ -139,6 +140,9 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final compactLandscape = ResponsiveLayout.isCompactLandscape(context);
+    final contentPadding = ResponsiveLayout.pagePadding(context);
+    final maxContentWidth = ResponsiveLayout.maxContentWidth(context);
 
     if (_cargando) {
       return Scaffold(
@@ -190,24 +194,38 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            floating: true,
-            pinned: true,
-            backgroundColor: colorScheme.surface,
-            foregroundColor: colorScheme.onSurface,
-            elevation: 0,
-            title: const Text(
-              'Configurar Sesión',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 120), // Padding extra abajo para el botón flotante
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _buildModernSectionHeader('Selección principal', colorScheme),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                floating: true,
+                pinned: true,
+                toolbarHeight: compactLandscape ? 56 : 64,
+                titleSpacing: compactLandscape ? 8 : 12,
+                backgroundColor: colorScheme.surface,
+                foregroundColor: colorScheme.onSurface,
+                elevation: 0,
+                title: const Text(
+                  'Configurar Sesión',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  contentPadding,
+                  compactLandscape ? 6 : 8,
+                  contentPadding,
+                  compactLandscape ? 108 : 120,
+                ), // Padding extra abajo para el botón flotante
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                _buildModernSectionHeader(
+                  'Selección principal',
+                  colorScheme,
+                  compact: compactLandscape,
+                ),
                 Container(
                   decoration: _modernContainerDecoration(colorScheme),
                   child: Column(
@@ -217,6 +235,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                         title: '1. Elige tu Arma',
                         icon: Icons.hardware_rounded,
                         color: Colors.teal,
+                        dense: compactLandscape,
                         child: DropdownButtonFormField<EquipoDetalle>(
                           decoration: _dropdownDecoration(colorScheme),
                           initialValue: _equipoSeleccionado,
@@ -236,6 +255,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                         title: '2. Reglas / Disciplina',
                         icon: Icons.timer_rounded,
                         color: Colors.indigo,
+                        dense: compactLandscape,
                         child: DropdownButtonFormField<PlantillaTiempos>(
                           decoration: _dropdownDecoration(colorScheme),
                           initialValue: _plantillaSeleccionada,
@@ -258,6 +278,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                         title: '3. Sistema de puntuación',
                         icon: Icons.calculate_rounded,
                         color: Colors.blueGrey,
+                        dense: compactLandscape,
                         child: SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           title: const Text('Usar puntuación decimal', style: TextStyle(fontSize: 15)),
@@ -273,6 +294,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                         title: '4. Cómo introducir los puntos',
                         icon: Icons.touch_app_rounded,
                         color: Colors.cyan.shade700,
+                        dense: compactLandscape,
                         child: SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           title: const Text('Usar teclado de puntuación (X, 10 a 0)', style: TextStyle(fontSize: 15)),
@@ -289,8 +311,12 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
-                _buildModernSectionHeader('Opciones Adicionales', colorScheme),
+                SizedBox(height: compactLandscape ? 18 : 24),
+                _buildModernSectionHeader(
+                  'Opciones Adicionales',
+                  colorScheme,
+                  compact: compactLandscape,
+                ),
                 Container(
                   decoration: _modernContainerDecoration(colorScheme),
                   child: Column(
@@ -300,6 +326,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                         title: '5. Munición (Opcional)',
                         icon: Icons.local_fire_department_rounded,
                         color: Colors.deepOrange,
+                        dense: compactLandscape,
                         child: DropdownButtonFormField<MunicionDetalle>(
                           decoration: _dropdownDecoration(colorScheme).copyWith(
                             labelText: 'Seleccionar lote...',
@@ -327,6 +354,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                         title: '6. Condiciones del entorno',
                         icon: Icons.thermostat_rounded,
                         color: Colors.amber.shade800,
+                        dense: compactLandscape,
                         child: Column(
                           children: [
                             SizedBox(
@@ -409,29 +437,40 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                   ),
                 ),
               ]),
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: SizedBox(
+        padding: EdgeInsets.symmetric(horizontal: contentPadding + 4),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: SizedBox(
           width: double.infinity,
-          height: 60,
+          height: compactLandscape ? 54 : 60,
           child: FilledButton.icon(
             onPressed: _iniciarSesion,
-            icon: const Icon(Icons.play_arrow_rounded, size: 28),
-            label: const Text(
+            icon: Icon(Icons.play_arrow_rounded, size: compactLandscape ? 24 : 28),
+            label: Text(
               'EMPEZAR ENTRENAMIENTO',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+              style: TextStyle(
+                fontSize: compactLandscape ? 14 : 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: compactLandscape ? 0.9 : 1.2,
+              ),
             ),
             style: FilledButton.styleFrom(
               backgroundColor: Colors.teal,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(compactLandscape ? 16 : 20),
+              ),
               elevation: 4,
             ),
+          ),
           ),
         ),
       ),
@@ -456,13 +495,21 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
     );
   }
 
-  Widget _buildModernSectionHeader(String title, ColorScheme colorScheme) {
+  Widget _buildModernSectionHeader(
+    String title,
+    ColorScheme colorScheme, {
+    bool compact = false,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 16, left: 4),
+      padding: EdgeInsets.only(
+        top: compact ? 8 : 12,
+        bottom: compact ? 12 : 16,
+        left: 4,
+      ),
       child: Text(
         title,
         style: TextStyle(
-          fontSize: 16,
+          fontSize: compact ? 15 : 16,
           fontWeight: FontWeight.bold,
           color: colorScheme.primary,
           letterSpacing: -0.2,
@@ -522,31 +569,32 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
     required IconData icon,
     required Color color,
     required Widget child,
+    bool dense = false,
   }) {
     final themeInfo = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(dense ? 14 : 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(dense ? 7 : 8),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 20, color: color),
+                child: Icon(icon, size: dense ? 18 : 20, color: color),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: dense ? 12 : 16),
               Expanded(
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: dense ? 15 : 16,
                     fontWeight: FontWeight.bold,
                     color: themeInfo.onSurface,
                   ),
@@ -554,7 +602,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: dense ? 12 : 16),
           child,
         ],
       ),

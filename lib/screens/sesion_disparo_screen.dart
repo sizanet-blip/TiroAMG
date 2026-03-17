@@ -753,6 +753,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     
     final colorScheme = Theme.of(context).colorScheme;
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final usarControlesSuperpuestos =
+        isLandscape && !widget.usarEntradaManualPuntos && !_ajusteActivo;
 
     return Scaffold(
       backgroundColor: Colors.black, // Fondo ultra oscuro para contraste con la diana
@@ -889,9 +891,16 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
             Expanded(
               child: widget.usarEntradaManualPuntos
                   ? _buildAreaPuntuacionManual()
-                  : Padding(
-                      padding: EdgeInsets.all(_ajusteActivo ? 6.0 : 16.0),
-                      child: LayoutBuilder(builder: (context, constraints) {
+                  : Stack(
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            isLandscape ? 6.0 : 16.0,
+                            isLandscape ? 4.0 : 16.0,
+                            isLandscape ? 6.0 : 16.0,
+                            usarControlesSuperpuestos ? 86.0 : (_ajusteActivo ? 6.0 : 16.0),
+                          ),
+                          child: LayoutBuilder(builder: (context, constraints) {
                         double diametro =
                             min(constraints.maxWidth, constraints.maxHeight);
                         double offX = (constraints.maxWidth - diametro) / 2;
@@ -972,10 +981,10 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                                         alignment: Alignment.topLeft,
                                         child: Transform(
                                           transform: Matrix4.identity()
-                                            ..translate(60.0, 60.0)
-                                            ..scale(2.0, 2.0)
-                                            ..translate(
-                                                -_posicionDedo!.dx, -_posicionDedo!.dy),
+                                            ..translateByDouble(60.0, 60.0, 0, 1)
+                                            ..scaleByDouble(2.0, 2.0, 1.0, 1.0)
+                                            ..translateByDouble(
+                                                -_posicionDedo!.dx, -_posicionDedo!.dy, 0, 1),
                                           child: SizedBox(
                                             width: size.width,
                                             height: size.height,
@@ -1026,55 +1035,21 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                           ),
                         );
                       }),
+                        ),
+                        if (usarControlesSuperpuestos)
+                          Positioned(
+                            left: 10,
+                            right: 10,
+                            bottom: 8,
+                            child: _buildBottomControlsBar(
+                              colorScheme,
+                              compact: true,
+                              superpuesto: true,
+                            ),
+                          ),
+                      ],
                     ),
             ),
-
-            if (!_ajusteActivo && isLandscape && !widget.usarEntradaManualPuntos)
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.blueGrey.shade900.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${widget.equipo.nombre} · $_mensajeEstado · $_segundosRestantes s',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      '${_formatearPuntos(_puntosTotal)} pts',
-                      style: const TextStyle(
-                        color: Colors.amber,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
-                    ),
-                    if (_enCurso) ...[
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: _avanzarFaseManual,
-                        tooltip: "Saltar tiempo actual",
-                        icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.1),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    ]
-                  ],
-                ),
-              ),
 
             // PANEL DE LUPA ESTÁTICO DE AJUSTE
             if (!widget.usarEntradaManualPuntos &&
@@ -1185,74 +1160,94 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
               ),
 
             // BOTONERA INFERIOR (CONTROLES DE SESIÓN)
-            if (!_ajusteActivo)
-              Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              padding: EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: isLandscape ? 8 : 12,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.blueGrey.shade900.withValues(alpha: 0.8),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildBottomButton(
-                    icon: Icons.refresh_rounded, 
-                    color: Colors.redAccent, 
-                    onPressed: _reiniciarSerie,
-                    tooltip: 'Reiniciar'
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: FilledButton.icon(
-                        onPressed: _iniciarSecuencia,
-                        icon: Icon(_enCurso ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                        label: Text(
-                          _enCurso ? "PAUSA" : (_puedeReanudar ? "CONTINUAR" : "INICIAR"),
-                          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _enCurso
-                              ? Colors.orange.shade700
-                              : (_puedeReanudar ? Colors.green.shade700 : colorScheme.primary),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                      ),
-                    ),
-                  ),
-                  _buildBottomButton(
-                    icon: Icons.my_location_rounded, 
-                    color: Colors.amberAccent, 
-                    onPressed: widget.usarEntradaManualPuntos
-                        ? null
-                        : (_listaDisparos.isEmpty ? null : _ajustarUltimoTiroDirecto),
-                    tooltip: "Ajustar último tiro"
-                  ),
-                  _buildBottomButton(
-                    icon: Icons.format_list_bulleted_rounded,
-                    color: const Color(0xFF00E5FF),
-                    onPressed: widget.usarEntradaManualPuntos
-                        ? null
-                        : (_listaDisparos.isEmpty ? null : _seleccionarTiroParaAjuste),
-                    tooltip: "Lista de tiros a ajustar"
-                  ),
-                  _buildBottomButton(
-                    icon: Icons.undo_rounded, 
-                    color: Colors.white, 
-                    onPressed: _borrarUltimo,
-                    tooltip: 'Deshacer último tiro'
-                  ),
-                ],
-              ),
-            )
+            if (!_ajusteActivo && !usarControlesSuperpuestos)
+              _buildBottomControlsBar(
+                colorScheme,
+                compact: isLandscape,
+              )
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBottomControlsBar(
+    ColorScheme colorScheme, {
+    required bool compact,
+    bool superpuesto = false,
+  }) {
+    return Container(
+      margin: superpuesto
+          ? EdgeInsets.zero
+          : EdgeInsets.fromLTRB(16, compact ? 4 : 8, 16, compact ? 8 : 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: compact ? 6 : 12,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.shade900.withValues(alpha: superpuesto ? 0.9 : 0.8),
+        borderRadius: BorderRadius.circular(24),
+        border: superpuesto
+            ? Border.all(color: Colors.white.withValues(alpha: 0.08))
+            : null,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildBottomButton(
+            icon: Icons.refresh_rounded,
+            color: Colors.redAccent,
+            onPressed: _reiniciarSerie,
+            tooltip: 'Reiniciar',
+            compact: compact,
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: FilledButton.icon(
+                onPressed: _iniciarSecuencia,
+                icon: Icon(_enCurso ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                label: Text(
+                  _enCurso ? "PAUSA" : (_puedeReanudar ? "CONTINUAR" : "INICIAR"),
+                  style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _enCurso
+                      ? Colors.orange.shade700
+                      : (_puedeReanudar ? Colors.green.shade700 : colorScheme.primary),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: compact ? 10 : 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+          ),
+          _buildBottomButton(
+            icon: Icons.my_location_rounded,
+            color: Colors.amberAccent,
+            onPressed: widget.usarEntradaManualPuntos
+                ? null
+                : (_listaDisparos.isEmpty ? null : _ajustarUltimoTiroDirecto),
+            tooltip: "Ajustar último tiro",
+            compact: compact,
+          ),
+          _buildBottomButton(
+            icon: Icons.format_list_bulleted_rounded,
+            color: const Color(0xFF00E5FF),
+            onPressed: widget.usarEntradaManualPuntos
+                ? null
+                : (_listaDisparos.isEmpty ? null : _seleccionarTiroParaAjuste),
+            tooltip: "Lista de tiros a ajustar",
+            compact: compact,
+          ),
+          _buildBottomButton(
+            icon: Icons.undo_rounded,
+            color: Colors.white,
+            onPressed: _borrarUltimo,
+            tooltip: 'Deshacer último tiro',
+            compact: compact,
+          ),
+        ],
       ),
     );
   }
@@ -1404,14 +1399,20 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     );
   }
 
-  Widget _buildBottomButton({required IconData icon, required Color color, required VoidCallback? onPressed, required String tooltip}) {
+  Widget _buildBottomButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback? onPressed,
+    required String tooltip,
+    bool compact = false,
+  }) {
     return IconButton(
       icon: Icon(icon, color: onPressed == null ? Colors.white24 : color),
       onPressed: onPressed,
       tooltip: tooltip,
       style: IconButton.styleFrom(
         backgroundColor: Colors.white.withValues(alpha: 0.05),
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(compact ? 8 : 12),
       ),
     );
   }

@@ -282,7 +282,9 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
         builder: (ctx, setVisualState) {
           final auto = _calcularDesdePosicion(x: xTemp, y: yTemp);
           final screen = MediaQuery.sizeOf(ctx);
-          final side = (screen.width * 0.72).clamp(220.0, 360.0).toDouble();
+          final maxByHeight = screen.height * 0.34;
+          final side = min(screen.width * 0.62, maxByHeight).clamp(170.0, 300.0).toDouble();
+          final contentMaxHeight = (screen.height * 0.60).clamp(260.0, 520.0).toDouble();
           final radio = side / 2;
           final cx = side / 2;
           final cy = side / 2;
@@ -292,113 +294,118 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
             title: Text('Posición del tiro #${row.numero}'),
             content: SizedBox(
               width: side,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Toca o arrastra sobre la diana para colocar el impacto.',
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 10),
-                  Center(
-                    child: GestureDetector(
-                      onTapDown: (details) => updateFromLocal(
-                        details.localPosition,
-                        Size(side, side),
-                        setVisualState,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: contentMaxHeight),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Toca o arrastra sobre la diana para colocar el impacto.',
+                        style: TextStyle(fontSize: 12, color: Colors.black54),
                       ),
-                      onPanUpdate: (details) => updateFromLocal(
-                        details.localPosition,
-                        Size(side, side),
-                        setVisualState,
-                      ),
-                      child: SizedBox(
-                        width: side,
-                        height: side,
-                        child: CustomPaint(
-                          painter: DianaPainter(
-                            impactos: [marker],
-                            valorMinimo: _valorMinimo,
-                            anilloNegroInicio: _anilloNegroInicio,
-                            esFondoNegro: _esFondoNegro,
-                            tieneMosca: _tieneMosca,
-                            tieneGuias: _tieneGuias,
-                            esEstiloDuelo: _esEstiloDuelo,
-                            diametroImpactoMm: _calibreMm,
-                            diametroDianaMm: _dianaAnchoExteriorMm,
+                      const SizedBox(height: 10),
+                      Center(
+                        child: GestureDetector(
+                          onTapDown: (details) => updateFromLocal(
+                            details.localPosition,
+                            Size(side, side),
+                            setVisualState,
+                          ),
+                          onPanUpdate: (details) => updateFromLocal(
+                            details.localPosition,
+                            Size(side, side),
+                            setVisualState,
+                          ),
+                          child: SizedBox(
+                            width: side,
+                            height: side,
+                            child: CustomPaint(
+                              painter: DianaPainter(
+                                impactos: [marker],
+                                valorMinimo: _valorMinimo,
+                                anilloNegroInicio: _anilloNegroInicio,
+                                esFondoNegro: _esFondoNegro,
+                                tieneMosca: _tieneMosca,
+                                tieneGuias: _tieneGuias,
+                                esEstiloDuelo: _esEstiloDuelo,
+                                diametroImpactoMm: _calibreMm,
+                                diametroDianaMm: _dianaAnchoExteriorMm,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(
-                          label: Text(
-                              'Auto: ${auto.puntuacion}${auto.esMosca ? 'X' : ''}')),
-                      Chip(label: Text('X: ${xTemp.toStringAsFixed(3)}')),
-                      Chip(label: Text('Y: ${yTemp.toStringAsFixed(3)}')),
-                      Chip(
-                          label: Text(
-                              'Paso: ${paso.toStringAsFixed(3)} (${(paso * 100).toStringAsFixed(1)}%)')),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SegmentedButton<double>(
-                        segments: const [
-                          ButtonSegment<double>(value: 0.02, label: Text('2%')),
-                          ButtonSegment<double>(value: 0.01, label: Text('1%')),
-                          ButtonSegment<double>(
-                              value: 0.005, label: Text('0.5%')),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          Chip(
+                              label: Text(
+                                  'Auto: ${auto.puntuacion}${auto.esMosca ? 'X' : ''}')),
+                          Chip(label: Text('X: ${xTemp.toStringAsFixed(3)}')),
+                          Chip(label: Text('Y: ${yTemp.toStringAsFixed(3)}')),
+                          Chip(
+                              label: Text(
+                                  'Paso: ${paso.toStringAsFixed(3)} (${(paso * 100).toStringAsFixed(1)}%)')),
                         ],
-                        selected: {paso},
-                        onSelectionChanged: (values) {
-                          setVisualState(() => paso = values.first);
-                        },
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SegmentedButton<double>(
+                            segments: const [
+                              ButtonSegment<double>(value: 0.02, label: Text('2%')),
+                              ButtonSegment<double>(value: 0.01, label: Text('1%')),
+                              ButtonSegment<double>(
+                                  value: 0.005, label: Text('0.5%')),
+                            ],
+                            selected: {paso},
+                            onSelectionChanged: (values) {
+                              setVisualState(() => paso = values.first);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            tooltip: 'Arriba',
+                            onPressed: () => nudge(0, -paso, setVisualState),
+                            icon: const Icon(Icons.keyboard_arrow_up),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            tooltip: 'Izquierda',
+                            onPressed: () => nudge(-paso, 0, setVisualState),
+                            icon: const Icon(Icons.keyboard_arrow_left),
+                          ),
+                          const SizedBox(width: 14),
+                          IconButton(
+                            tooltip: 'Abajo',
+                            onPressed: () => nudge(0, paso, setVisualState),
+                            icon: const Icon(Icons.keyboard_arrow_down),
+                          ),
+                          const SizedBox(width: 14),
+                          IconButton(
+                            tooltip: 'Derecha',
+                            onPressed: () => nudge(paso, 0, setVisualState),
+                            icon: const Icon(Icons.keyboard_arrow_right),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        tooltip: 'Arriba',
-                        onPressed: () => nudge(0, -paso, setVisualState),
-                        icon: const Icon(Icons.keyboard_arrow_up),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        tooltip: 'Izquierda',
-                        onPressed: () => nudge(-paso, 0, setVisualState),
-                        icon: const Icon(Icons.keyboard_arrow_left),
-                      ),
-                      const SizedBox(width: 14),
-                      IconButton(
-                        tooltip: 'Abajo',
-                        onPressed: () => nudge(0, paso, setVisualState),
-                        icon: const Icon(Icons.keyboard_arrow_down),
-                      ),
-                      const SizedBox(width: 14),
-                      IconButton(
-                        tooltip: 'Derecha',
-                        onPressed: () => nudge(paso, 0, setVisualState),
-                        icon: const Icon(Icons.keyboard_arrow_right),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
             actions: [
@@ -896,6 +903,10 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final media = MediaQuery.of(context);
+    final isLandscape = media.orientation == Orientation.landscape;
+    final screenWidth = media.size.width;
+    final compactLandscape = isLandscape && screenWidth < 920;
 
     if (_cargando) {
       return Scaffold(
@@ -981,298 +992,507 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
           )
         ],
       ),
-      body: Column(
-        children: [
-          // CONTENEDOR DE INFORMACIÓN SUPERIOR
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _plantilla?.nombreDisciplina ?? 'Desconocido',
-                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: colorScheme.primary, letterSpacing: -0.5)
+      body: SafeArea(
+        top: false,
+        child: isLandscape
+            ? Padding(
+                padding: EdgeInsets.fromLTRB(
+                  compactLandscape ? 8 : 12,
+                  compactLandscape ? 6 : 8,
+                  compactLandscape ? 8 : 12,
+                  compactLandscape ? 8 : 10,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: compactLandscape ? 5 : 3,
+                      child: _buildDianaPanel(
+                        colorScheme,
+                        isDark,
+                        compact: true,
                       ),
-                      const SizedBox(height: 8),
-                      if (_equipoDetalle != null)
-                        Row(children: [
-                          Icon(Icons.hardware_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(_equipoDetalle!.nombre,
-                                style: TextStyle(color: colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.w600),
-                                overflow: TextOverflow.ellipsis),
-                          )
-                        ]),
-                      if (_municionDetalle != null)
-                        Row(children: [
-                          Icon(Icons.local_fire_department_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text('${_municionDetalle!.marca} (${_municionDetalle!.lote})',
-                                style: TextStyle(color: colorScheme.onSurface, fontSize: 13),
-                                overflow: TextOverflow.ellipsis),
-                          )
-                        ]),
-                      if (_sesion?.lugar != null && _sesion!.lugar!.isNotEmpty)
-                        Row(children: [
-                          Icon(Icons.place_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(_sesion!.lugar!, style: TextStyle(color: colorScheme.onSurface, fontSize: 13), overflow: TextOverflow.ellipsis),
-                          )
-                        ]),
-                      if (_sesion?.distanciaMetros != null)
-                        Row(children: [
-                          Icon(Icons.straighten_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                          const SizedBox(width: 8),
-                          Text('${_sesion!.distanciaMetros} m', style: TextStyle(color: colorScheme.onSurface, fontSize: 13))
-                        ]),
-                      if (_sesion?.temperaturaC != null || _sesion?.humedadPct != null || _sesion?.vientoMs != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Met: ${_sesion?.temperaturaC?.toStringAsFixed(1) ?? '-'}°C | '
-                          'Hum: ${_sesion?.humedadPct?.toStringAsFixed(0) ?? '-'}% | '
-                          'Viento: ${_sesion?.vientoMs?.toStringAsFixed(1) ?? '-'} m/s ${_sesion?.vientoDireccion ?? ''}',
-                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
-                        ),
-                      ],
-                      if (_sesion?.nota != null && _sesion!.nota!.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainer,
-                            borderRadius: BorderRadius.circular(8)
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.notes_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _sesion!.nota!,
-                                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12, fontStyle: FontStyle.italic),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      ],
-                      const SizedBox(height: 12),
-                      Row(
+                    ),
+                    SizedBox(width: compactLandscape ? 8 : 10),
+                    Expanded(
+                      flex: compactLandscape ? 4 : 2,
+                      child: Column(
                         children: [
-                          Icon(Icons.calendar_today_rounded, size: 12, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
-                          const SizedBox(width: 6),
-                          Text(
-                            "${_sesion!.fecha.day.toString().padLeft(2, '0')}/${_sesion!.fecha.month.toString().padLeft(2, '0')}/${_sesion!.fecha.year} ${_sesion!.fecha.hour.toString().padLeft(2, '0')}:${_sesion!.fecha.minute.toString().padLeft(2, '0')}",
-                            style: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.w600)
+                          _buildInfoCard(
+                            colorScheme,
+                            isDark,
+                            puntos,
+                            moscas,
+                            compact: true,
+                          ),
+                          SizedBox(height: compactLandscape ? 6 : 8),
+                          Expanded(
+                            child: _buildSecuenciaPanel(
+                              colorScheme,
+                              isDark,
+                              compact: true,
+                            ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+              )
+            : Column(
+                children: [
+                  _buildInfoCard(colorScheme, isDark, puntos, moscas),
+                  Expanded(
+                    child: _buildDianaPanel(
+                      colorScheme,
+                      isDark,
+                    ),
+                  ),
+                  _buildSecuenciaPanel(colorScheme, isDark),
+                ],
+              ),
+        ),
+    );
+  }
+
+  Widget _buildInfoCard(
+    ColorScheme colorScheme,
+    bool isDark,
+    int puntos,
+    int moscas, {
+    bool compact = false,
+  }) {
+    final totalTiros = _disparos.length;
+    final mediaPuntos = totalTiros > 0 ? puntos / totalTiros : 0.0;
+
+    return Container(
+      margin: EdgeInsets.fromLTRB(
+        compact ? 2 : 16,
+        compact ? 2 : 8,
+        compact ? 2 : 16,
+        compact ? 6 : 16,
+      ),
+      padding: EdgeInsets.all(compact ? 12 : 20),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _plantilla?.nombreDisciplina ?? 'Desconocido',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: compact ? 16 : 18,
+                    color: colorScheme.primary,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                SizedBox(height: compact ? 6 : 8),
+                if (_equipoDetalle != null)
+                  Row(children: [
+                    Icon(Icons.hardware_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _equipoDetalle!.nombre,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: compact ? 12 : 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )
+                  ]),
+                if (_municionDetalle != null)
+                  Row(children: [
+                    Icon(Icons.local_fire_department_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${_municionDetalle!.marca} (${_municionDetalle!.lote})',
+                        style: TextStyle(color: colorScheme.onSurface, fontSize: compact ? 12 : 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )
+                  ]),
+                if (_sesion?.lugar != null && _sesion!.lugar!.isNotEmpty)
+                  Row(children: [
+                    Icon(Icons.place_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _sesion!.lugar!,
+                        style: TextStyle(color: colorScheme.onSurface, fontSize: compact ? 12 : 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )
+                  ]),
+                if (_sesion?.distanciaMetros != null)
+                  Row(children: [
+                    Icon(Icons.straighten_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_sesion!.distanciaMetros} m',
+                      style: TextStyle(color: colorScheme.onSurface, fontSize: compact ? 12 : 13),
+                    )
+                  ]),
+                if (_sesion?.temperaturaC != null ||
+                    _sesion?.humedadPct != null ||
+                    _sesion?.vientoMs != null) ...[
+                  SizedBox(height: compact ? 6 : 8),
+                  Text(
+                    'Met: ${_sesion?.temperaturaC?.toStringAsFixed(1) ?? '-'}°C | '
+                    'Hum: ${_sesion?.humedadPct?.toStringAsFixed(0) ?? '-'}% | '
+                    'Viento: ${_sesion?.vientoMs?.toStringAsFixed(1) ?? '-'} m/s ${_sesion?.vientoDireccion ?? ''}',
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: compact ? 11 : 12),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        '$puntos',
-                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 36, letterSpacing: -1.5, color: colorScheme.primary, height: 1.0)
-                      ),
-                      Text(
-                        "PUNTOS",
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5, color: colorScheme.onSurfaceVariant)
-                      ),
-                      if (moscas > 0) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
+                ],
+                if (_sesion?.nota != null && _sesion!.nota!.isNotEmpty) ...[
+                  SizedBox(height: compact ? 6 : 8),
+                  Container(
+                    padding: EdgeInsets.all(compact ? 6 : 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(compact ? 6 : 8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.notes_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _sesion!.nota!,
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: compact ? 11 : 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            maxLines: compact ? 2 : 3,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.star_rounded, size: 12, color: Colors.orange),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$moscas (x)',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.orange.shade300 : Colors.orange.shade800, fontSize: 12)
-                              ),
-                            ],
-                          ),
-                        )
+                        ),
                       ],
-                    ],
+                    ),
+                  )
+                ],
+                SizedBox(height: compact ? 6 : 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 12,
+                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        "${_sesion!.fecha.day.toString().padLeft(2, '0')}/${_sesion!.fecha.month.toString().padLeft(2, '0')}/${_sesion!.fecha.year} ${_sesion!.fecha.hour.toString().padLeft(2, '0')}:${_sesion!.fecha.minute.toString().padLeft(2, '0')}",
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: compact ? 8 : 12),
+          Container(
+            padding: EdgeInsets.all(compact ? 10 : 16),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(compact ? 16 : 20),
+              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  '$puntos',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: compact ? 28 : 36,
+                    letterSpacing: -1.5,
+                    color: colorScheme.primary,
+                    height: 1.0,
+                  ),
+                ),
+                Text(
+                  "PUNTOS",
+                  style: TextStyle(
+                    fontSize: compact ? 9 : 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: compact ? 1.2 : 1.5,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compact ? 8 : 10,
+                    vertical: compact ? 3 : 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: isDark ? 0.16 : 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Text(
+                    'Media ${mediaPuntos.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: compact ? 10 : 11,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+                if (moscas > 0) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star_rounded, size: 12, color: Colors.orange),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$moscas X',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.orange.shade300 : Colors.orange.shade800,
+                            fontSize: compact ? 11 : 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDianaPanel(
+    ColorScheme colorScheme,
+    bool isDark, {
+    bool compact = false,
+  }) {
+    return Center(
+      child: Padding(
+        padding: _esFondoNegro
+            ? EdgeInsets.all(compact ? 3.0 : 4.0)
+            : EdgeInsets.all(compact ? 8.0 : 20.0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final diametro = min(constraints.maxWidth, constraints.maxHeight);
+            final size = Size(diametro, diametro);
+            final impactosPixels = _disparos.map((d) {
+              final radio = size.width / 2;
+              final cx = size.width / 2;
+              final cy = size.height / 2;
+              return Offset((d.x * radio) + cx, (d.y * radio) + cy);
+            }).toList();
+
+            return Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 10),
+                  )
+                ],
+              ),
+              child: CustomPaint(
+                size: size,
+                painter: DianaPainter(
+                  impactos: impactosPixels,
+                  valorMinimo: _valorMinimo,
+                  anilloNegroInicio: _anilloNegroInicio,
+                  esFondoNegro: _esFondoNegro,
+                  tieneMosca: _tieneMosca,
+                  tieneGuias: _tieneGuias,
+                  esEstiloDuelo: _esEstiloDuelo,
+                  diametroImpactoMm: _calibreMm,
+                  diametroDianaMm: _dianaAnchoExteriorMm,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecuenciaPanel(
+    ColorScheme colorScheme,
+    bool isDark, {
+    bool compact = false,
+  }) {
+    final lowHeight = MediaQuery.of(context).size.height < 760;
+    final ultraCompact = compact && lowHeight;
+
+    return Container(
+      height: compact ? null : 112 + MediaQuery.of(context).padding.bottom,
+      margin: EdgeInsets.only(top: compact ? 0 : 16),
+      padding: EdgeInsets.only(top: ultraCompact ? 6 : (compact ? 10 : 16)),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+        borderRadius: compact
+            ? BorderRadius.circular(ultraCompact ? 20 : 24)
+            : const BorderRadius.vertical(top: Radius.circular(32)),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: ultraCompact ? 12 : (compact ? 16 : 24)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "SECUENCIA DE TIROS",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: ultraCompact ? 9 : (compact ? 10 : 11),
+                      letterSpacing: compact ? 1.2 : 1.5,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: ultraCompact ? 7 : (compact ? 8 : 10),
+                    vertical: ultraCompact ? 2 : (compact ? 3 : 4),
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  child: Text(
+                    '${_disparos.length} tiros',
+                    style: TextStyle(
+                      fontSize: ultraCompact ? 9 : (compact ? 10 : 11),
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          
-          // DIANA
+          SizedBox(height: ultraCompact ? 4 : 8),
           Expanded(
-            child: Center(
-              child: Padding(
-                padding: _esFondoNegro
-                    ? const EdgeInsets.all(4.0)
-                    : const EdgeInsets.all(24.0),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    double diametro = min(constraints.maxWidth, constraints.maxHeight);
-                    Size size = Size(diametro, diametro);
-                    List<Offset> impactosPixels = _disparos.map((d) {
-                      double radio = size.width / 2;
-                      double cx = size.width / 2;
-                      double cy = size.height / 2;
-                      return Offset((d.x * radio) + cx, (d.y * radio) + cy);
-                    }).toList();
-
-                    return Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
-                            blurRadius: 30,
-                            spreadRadius: 5,
-                            offset: const Offset(0, 10),
-                          )
-                        ]
-                      ),
-                      child: CustomPaint(
-                        size: size,
-                        painter: DianaPainter(
-                          impactos: impactosPixels,
-                          valorMinimo: _valorMinimo,
-                          anilloNegroInicio: _anilloNegroInicio,
-                          esFondoNegro: _esFondoNegro,
-                          tieneMosca: _tieneMosca,
-                          tieneGuias: _tieneGuias,
-                          esEstiloDuelo: _esEstiloDuelo,
-                          diametroImpactoMm: _calibreMm,
-                          diametroDianaMm: _dianaAnchoExteriorMm,
-                        ),
-                      ),
-                    );
-                  },
+            child: Scrollbar(
+              controller: _scrollController,
+              thumbVisibility: true,
+              child: ListView.builder(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(
+                  horizontal: ultraCompact ? 10 : (compact ? 12 : 16),
+                  vertical: ultraCompact ? 1 : (compact ? 2 : 0),
                 ),
+                itemCount: _disparos.length,
+                itemBuilder: (context, index) {
+                  final tiro = _disparos[index];
+                  final esAlto = tiro.puntuacion >= 9;
+                  return Container(
+                    width: ultraCompact ? 54 : (compact ? 58 : 64),
+                    margin: EdgeInsets.symmetric(
+                      horizontal: ultraCompact ? 4 : (compact ? 5 : 6),
+                      vertical: ultraCompact ? 1 : (compact ? 2 : 4),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: ultraCompact ? 3 : (compact ? 4 : 8)),
+                    decoration: BoxDecoration(
+                      color: tiro.esMosca
+                          ? Colors.amber.withValues(alpha: isDark ? 0.2 : 0.1)
+                          : esAlto
+                              ? colorScheme.primary.withValues(alpha: isDark ? 0.18 : 0.10)
+                          : colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(ultraCompact ? 14 : 16),
+                      border: Border.all(
+                        color: tiro.esMosca
+                            ? Colors.amber.withValues(alpha: 0.5)
+                            : esAlto
+                                ? colorScheme.primary.withValues(alpha: 0.45)
+                            : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: ultraCompact
+                          ? MainAxisAlignment.center
+                          : MainAxisAlignment.spaceEvenly,
+                      children: [
+                        if (!ultraCompact)
+                          FittedBox(
+                              child: Text('#${tiro.numero}',
+                                  style: TextStyle(
+                                      fontSize: compact ? 9 : 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onSurfaceVariant))),
+                        if (!ultraCompact) const SizedBox(height: 1),
+                        Text(
+                          '${tiro.puntuacion.toInt()}',
+                          style: TextStyle(
+                            fontSize: ultraCompact ? 15 : (compact ? 17 : 22),
+                            fontWeight: FontWeight.w900,
+                            color: tiro.esMosca
+                                ? (isDark
+                                    ? Colors.amber.shade200
+                                    : Colors.amber.shade800)
+                                : colorScheme.onSurface,
+                            height: 1.0,
+                          ),
+                        ),
+                        if (tiro.esMosca)
+                          Icon(Icons.star_rounded,
+                              size: ultraCompact ? 11 : (compact ? 12 : 14),
+                              color: isDark
+                                  ? Colors.orange.shade300
+                                  : Colors.orange.shade700)
+                        else if (!ultraCompact)
+                          SizedBox(height: compact ? 10 : 14),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ),
-          
-          // SECUENCIA INFERIOR
-          Container(
-            height: 110,
-            margin: const EdgeInsets.only(top: 16),
-            padding: const EdgeInsets.only(top: 16),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerLowest,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-              border: Border(top: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5))),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10, offset: const Offset(0, -5)
-                )
-              ]
-            ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text(
-                      "SECUENCIA DE TIROS",
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.5, color: colorScheme.primary)
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Scrollbar(
-                      controller: _scrollController,
-                      thumbVisibility: true,
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _disparos.length,
-                        itemBuilder: (context, index) {
-                          final tiro = _disparos[index];
-                          return Container(
-                            width: 64,
-                            margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                                color: tiro.esMosca
-                                    ? Colors.amber.withValues(alpha: isDark ? 0.2 : 0.1)
-                                    : colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: tiro.esMosca
-                                    ? Colors.amber.withValues(alpha: 0.5)
-                                    : colorScheme.outlineVariant.withValues(alpha: 0.5)
-                                ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                FittedBox(
-                                    child: Text('#${tiro.numero}',
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: colorScheme.onSurfaceVariant))),
-                                const SizedBox(height: 4),
-                                Expanded(
-                                    child: Center(
-                                        child: FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            child: Text(
-                                                '${tiro.puntuacion.toInt()}',
-                                                style: TextStyle(
-                                                    fontSize: 22,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: tiro.esMosca ? (isDark ? Colors.amber.shade200 : Colors.amber.shade800) : colorScheme.onSurface))))),
-                                if (tiro.esMosca)
-                                  Icon(Icons.star_rounded, size: 14, color: isDark ? Colors.orange.shade300 : Colors.orange.shade700)
-                                else
-                                  const SizedBox(height: 14),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
         ],
       ),
     );

@@ -7,6 +7,7 @@ import 'competicion_historial_detalle_screen.dart';
 import 'estadisticas_screen.dart'; 
 import '../services/license_permissions_service.dart';
 import '../utils/license_ui_helper.dart';
+import '../utils/responsive_layout.dart';
 
 class HistorialScreen extends StatefulWidget {
   final bool puedeVerEstadisticas;
@@ -189,11 +190,14 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final compactLandscape =
+        ResponsiveLayout.isCompactLandscape(context, maxWidth: 980);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: const Text('Historial', style: TextStyle(fontWeight: FontWeight.bold)),
+        toolbarHeight: compactLandscape ? 56 : null,
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
         elevation: 0,
@@ -237,12 +241,28 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
           unselectedLabelColor: colorScheme.onSurfaceVariant,
           indicatorColor: colorScheme.primary,
           indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          labelStyle: TextStyle(
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+            fontSize: compactLandscape ? 12 : 14,
+          ),
           dividerColor: colorScheme.outlineVariant.withValues(alpha: 0.5),
           tabs: [
-            const Tab(text: 'ENTRENOS', icon: Icon(Icons.sports_baseball_rounded)),
+            Tab(
+              text: 'ENTRENOS',
+              icon: Icon(
+                Icons.sports_baseball_rounded,
+                size: compactLandscape ? 18 : 22,
+              ),
+            ),
             if (widget.puedeVerCompeticiones)
-              const Tab(text: 'COMPETICIÓN', icon: Icon(Icons.emoji_events_rounded)),
+              Tab(
+                text: 'COMPETICIÓN',
+                icon: Icon(
+                  Icons.emoji_events_rounded,
+                  size: compactLandscape ? 18 : 22,
+                ),
+              ),
           ],
         ),
       ),
@@ -250,8 +270,11 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
         children: [
           // --- BARRA DE FILTROS ---
           Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            margin: EdgeInsets.all(compactLandscape ? 12 : 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: compactLandscape ? 12 : 16,
+              vertical: compactLandscape ? 2 : 4,
+            ),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(16),
@@ -262,16 +285,20 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                 Icon(
                   _filtroSeleccionado == 5 ? Icons.date_range_rounded : Icons.filter_list_rounded, 
                   color: colorScheme.primary, 
-                  size: 20
+                  size: compactLandscape ? 18 : 20
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: compactLandscape ? 8 : 12),
                 Expanded(
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<int>(
                       value: _filtroSeleccionado,
                       isExpanded: true,
                       icon: Icon(Icons.expand_more_rounded, color: colorScheme.primary),
-                      style: TextStyle(color: colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: compactLandscape ? 14 : 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       dropdownColor: colorScheme.surfaceContainer,
                       borderRadius: BorderRadius.circular(16),
                       onChanged: (int? newValue) {
@@ -326,44 +353,58 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
   }
 
   Widget _construirLista(List<SesionResumen> lista, bool esCompe, ColorScheme colorScheme, bool isDark) {
+    final compactLandscape =
+        ResponsiveLayout.isCompactLandscape(context, maxWidth: 980);
+
     if (lista.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                shape: BoxShape.circle,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: compactLandscape ? 16 : 24,
+            vertical: compactLandscape ? 12 : 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(compactLandscape ? 18 : 24),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  esCompe ? Icons.emoji_events_rounded : Icons.sports_baseball_rounded, 
+                  size: compactLandscape ? 48 : 64, 
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+                ),
               ),
-              child: Icon(
-                esCompe ? Icons.emoji_events_rounded : Icons.sports_baseball_rounded, 
-                size: 64, 
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+              SizedBox(height: compactLandscape ? 14 : 24),
+              Text(
+                'Aún no hay registros aquí', 
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant, 
+                  fontSize: compactLandscape ? 16 : 18, 
+                  fontWeight: FontWeight.bold
+                )
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Aún no hay registros aquí', 
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant, 
-                fontSize: 18, 
-                fontWeight: FontWeight.bold
-              )
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Cambia el filtro temporal o empieza una sesión.', 
-              style: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8))
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Cambia el filtro temporal o empieza una sesión.', 
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8))
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: compactLandscape ? 12 : 16,
+        vertical: compactLandscape ? 6 : 8,
+      ),
       itemCount: lista.length,
       itemBuilder: (context, index) {
         final item = lista[index];
@@ -377,7 +418,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
             : Colors.teal.withValues(alpha: isDark ? 0.2 : 0.1);
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: EdgeInsets.only(bottom: compactLandscape ? 8 : 12),
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(20),
@@ -409,27 +450,42 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
             },
             onLongPress: () => _borrarItem(item, esCompe),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: EdgeInsets.all(compactLandscape ? 12 : 16),
               child: Row(
                 children: [
                   // CUADRO DE FECHA
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: compactLandscape ? 52 : 60,
+                    height: compactLandscape ? 52 : 60,
                     decoration: BoxDecoration(
                       color: dateBgColor,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(compactLandscape ? 12 : 16),
                       border: Border.all(color: esCompe ? Colors.amber.withValues(alpha: 0.4) : Colors.teal.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("${item.fecha.day}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, height: 1.1, color: iconColor)),
-                        Text(_obtenerMes(item.fecha.month), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: iconColor)),
+                        Text(
+                          "${item.fecha.day}",
+                          style: TextStyle(
+                            fontSize: compactLandscape ? 18 : 22,
+                            fontWeight: FontWeight.bold,
+                            height: 1.1,
+                            color: iconColor,
+                          ),
+                        ),
+                        Text(
+                          _obtenerMes(item.fecha.month),
+                          style: TextStyle(
+                            fontSize: compactLandscape ? 10 : 12,
+                            fontWeight: FontWeight.bold,
+                            color: iconColor,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: compactLandscape ? 10 : 16),
                   
                   // INFO CENTRAL
                   Expanded(
@@ -440,36 +496,57 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                           item.nombreTitulo, 
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colorScheme.onSurface)
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: compactLandscape ? 14 : 16,
+                            color: colorScheme.onSurface,
+                          ),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: compactLandscape ? 2 : 4),
                         Text(
                           item.nombreEquipo, 
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500)
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: compactLandscape ? 12 : 13,
+                            fontWeight: FontWeight.w500,
+                          )
                         ),
                         if (item.marcaMunicion != null && item.marcaMunicion!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                          SizedBox(height: compactLandscape ? 3 : 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: compactLandscape ? 5 : 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.deepOrange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               '${item.marcaMunicion}${(item.loteMunicion != null && item.loteMunicion!.isNotEmpty) ? ' · ${item.loteMunicion}' : ''}',
-                              style: TextStyle(fontSize: 10, color: isDark ? Colors.orange.shade300 : Colors.deepOrange.shade700, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: compactLandscape ? 9 : 10,
+                                color: isDark
+                                    ? Colors.orange.shade300
+                                    : Colors.deepOrange.shade700,
+                                fontWeight: FontWeight.bold,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                         if (!esCompe && item.nota != null) ...[
-                           const SizedBox(height: 4),
+                           SizedBox(height: compactLandscape ? 3 : 4),
                            Text(
                              item.nota!.replaceAll('Torneo: ', ''), 
-                             style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
+                             style: TextStyle(
+                               fontSize: compactLandscape ? 11 : 12,
+                               fontStyle: FontStyle.italic,
+                               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                             ),
                              maxLines: 1, overflow: TextOverflow.ellipsis
                            ),
                         ],
@@ -479,7 +556,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                   
                   // PUNTOS Y MOSCAS
                   Container(
-                    padding: const EdgeInsets.only(left: 12),
+                    padding: EdgeInsets.only(left: compactLandscape ? 8 : 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -487,7 +564,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                         Text(
                           '${item.totalPuntos}', 
                           style: TextStyle(
-                            fontSize: 26, 
+                            fontSize: compactLandscape ? 22 : 26, 
                             fontWeight: FontWeight.w900,
                             letterSpacing: -1, 
                             color: iconColor
@@ -496,7 +573,10 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                         if (item.totalMoscas > 0) 
                           Container(
                             margin: const EdgeInsets.only(top: 2),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: compactLandscape ? 5 : 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: colorScheme.onSurface.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(10),
@@ -504,9 +584,20 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.stars_rounded, size: 12, color: iconColor),
+                                Icon(
+                                  Icons.stars_rounded,
+                                  size: compactLandscape ? 11 : 12,
+                                  color: iconColor,
+                                ),
                                 const SizedBox(width: 4),
-                                Text('${item.totalMoscas}x', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+                                Text(
+                                  '${item.totalMoscas}x',
+                                  style: TextStyle(
+                                    fontSize: compactLandscape ? 10 : 11,
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ],
                             ),
                           ),

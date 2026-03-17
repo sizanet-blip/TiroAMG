@@ -15,6 +15,7 @@ import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
 import '../utils/license_ui_helper.dart';
+import '../utils/responsive_layout.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -321,7 +322,19 @@ class _HomeScreenState extends State<HomeScreen> {
     final veryNarrow = screenWidth < 340;
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
-    final landscapeColumns = screenWidth >= 900 ? 3 : 2;
+    final landscapeColumns =
+        ResponsiveLayout.actionGridColumns(context, landscape: true);
+    final landscapeCompactCards =
+        ResponsiveLayout.isCompactLandscape(context, maxWidth: 1100);
+    final compactTopBar = isLandscape && screenWidth < 900;
+    final mainCardsAspect = !isLandscape
+        ? 2.0
+        : (screenWidth < 700 ? 2.7 : (screenWidth < 1100 ? 3.0 : 3.25));
+    final moreCardsAspect = !isLandscape
+        ? 2.4
+        : (screenWidth < 700 ? 2.9 : (screenWidth < 1100 ? 3.2 : 3.5));
+    final contentPadding = ResponsiveLayout.pagePadding(context);
+    final maxContentWidth = ResponsiveLayout.maxContentWidth(context);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -330,6 +343,8 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverAppBar(
             floating: true,
             pinned: true,
+            toolbarHeight: compactTopBar ? 56 : 64,
+            titleSpacing: compactTopBar ? 8 : 12,
             backgroundColor: colorScheme.surface,
             foregroundColor: colorScheme.onSurface,
             elevation: 0,
@@ -355,30 +370,37 @@ class _HomeScreenState extends State<HomeScreen> {
                         )
                       : Image.asset(
                           'assets/logo.png',
-                          height: 36,
+                          height: compactTopBar ? 30 : 36,
                           fit: BoxFit.contain,
                         ),
                 ),
                 if (_licenciaActual != null) ...[
-                  const SizedBox(width: 8),
+                  SizedBox(width: compactTopBar ? 6 : 8),
                   Flexible(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compactTopBar ? 8 : 10,
+                        vertical: compactTopBar ? 4 : 6,
+                      ),
                       decoration: BoxDecoration(
                         color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(compactTopBar ? 14 : 16),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.verified, size: 14, color: colorScheme.onPrimaryContainer),
+                          Icon(
+                            Icons.verified,
+                            size: compactTopBar ? 12 : 14,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
                           if (!veryNarrow) ...[
-                            const SizedBox(width: 4),
+                            SizedBox(width: compactTopBar ? 3 : 4),
                             Flexible(
                               child: Text(
                                 _permissions.currentPlanLabel(_licenciaActual?.plan).toUpperCase(),
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: compactTopBar ? 9 : 10,
                                   fontWeight: FontWeight.bold,
                                   color: colorScheme.onPrimaryContainer,
                                 ),
@@ -395,299 +417,324 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+            padding: EdgeInsets.fromLTRB(
+              contentPadding,
+              isLandscape ? 14 : 24,
+              contentPadding,
+              isLandscape ? 24 : 32,
+            ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                Text(
-                  'Panel de Control',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (isLandscape)
-                  _buildGroupedButtonsGrid(
-                    crossAxisCount: landscapeColumns,
-                    childAspectRatio: screenWidth < 700 ? 1.35 : 1.6,
-                    children: [
-                      _buildModernActionCard(
-                        context: context,
-                        title: 'Entrenamiento',
-                        subtitle: 'Registra series y mejora tu técnica.',
-                        icon: Icons.track_changes,
-                        color: Colors.teal,
-                        isDark: isDark,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const EntrenamientoScreen()),
-                        ),
-                      ),
-                      _buildModernActionCard(
-                        context: context,
-                        title: 'Competición',
-                        subtitle: 'Gestiona tiradas oficiales y resultados.',
-                        icon: Icons.emoji_events,
-                        color: Colors.amber.shade700,
-                        isDark: isDark,
-                        locked: bloqueoCompeticion,
-                        lockPlanLabel: _permissions.requiredPlanLabel(
-                          LicenseCapability.competition,
-                        ),
-                        onTap: () => _abrirSiPermitido(
-                          context: context,
-                          capability: LicenseCapability.competition,
-                          onAllowed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const CompeticionScreen()),
-                          ),
-                        ),
-                      ),
-                      _buildModernActionCard(
-                        context: context,
-                        title: 'Historial y análisis',
-                        subtitle: 'Consulta tu progreso y estadísticas.',
-                        icon: Icons.analytics,
-                        color: Colors.indigo,
-                        isDark: isDark,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => HistorialScreen(
-                              puedeVerEstadisticas: _permissions.canAccess(
-                                _licenciaActual,
-                                LicenseCapability.analytics,
-                              ),
-                              puedeVerCompeticiones: _permissions.canAccess(
-                                _licenciaActual,
-                                LicenseCapability.competition,
-                              ),
-                              requiredPlanEstadisticas:
-                                  _permissions.requiredPlanLabel(
-                                LicenseCapability.analytics,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                else ...[
-                  _buildModernActionCard(
-                    context: context,
-                    title: 'Entrenamiento',
-                    subtitle: 'Registra series y mejora tu técnica.',
-                    icon: Icons.track_changes,
-                    color: Colors.teal,
-                    isDark: isDark,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const EntrenamientoScreen()),
-                    ),
-                  ),
-                  _buildModernActionCard(
-                    context: context,
-                    title: 'Competición',
-                    subtitle: 'Gestiona tiradas oficiales y resultados.',
-                    icon: Icons.emoji_events,
-                    color: Colors.amber.shade700,
-                    isDark: isDark,
-                    locked: bloqueoCompeticion,
-                    lockPlanLabel: _permissions.requiredPlanLabel(
-                      LicenseCapability.competition,
-                    ),
-                    onTap: () => _abrirSiPermitido(
-                      context: context,
-                      capability: LicenseCapability.competition,
-                      onAllowed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const CompeticionScreen()),
-                      ),
-                    ),
-                  ),
-                  _buildModernActionCard(
-                    context: context,
-                    title: 'Historial y análisis',
-                    subtitle: 'Consulta tu progreso y estadísticas.',
-                    icon: Icons.analytics,
-                    color: Colors.indigo,
-                    isDark: isDark,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => HistorialScreen(
-                          puedeVerEstadisticas: _permissions.canAccess(
-                            _licenciaActual,
-                            LicenseCapability.analytics,
-                          ),
-                          puedeVerCompeticiones: _permissions.canAccess(
-                            _licenciaActual,
-                            LicenseCapability.competition,
-                          ),
-                          requiredPlanEstadisticas: _permissions.requiredPlanLabel(
-                            LicenseCapability.analytics,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 32),
-                Text(
-                  'Más opciones',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (isLandscape)
-                  _buildGroupedButtonsGrid(
-                    crossAxisCount: landscapeColumns,
-                    childAspectRatio: screenWidth < 700 ? 2.4 : 3.0,
-                    children: [
-                      _buildModernMenuCard(
-                        child: _buildModernMenuItem(
-                          context: context,
-                          title: 'Copia de seguridad',
-                          icon: Icons.cloud_sync_rounded,
-                          color: Colors.blueGrey,
-                          locked: bloqueoBackup,
-                          lockPlanLabel: _permissions.requiredPlanLabel(
-                            LicenseCapability.backup,
-                          ),
-                          onTap: () => _abrirSiPermitido(
-                            context: context,
-                            capability: LicenseCapability.backup,
-                            onAllowed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const BackupScreen()),
-                            ),
-                          ),
-                        ),
-                      ),
-                      _buildModernMenuCard(
-                        child: _buildModernMenuItem(
-                          context: context,
-                          title: 'Configuración',
-                          icon: Icons.settings_rounded,
-                          color: Colors.grey.shade700,
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const ConfigScreen()),
-                            );
-                            if (!mounted) return;
-                            final refreshed = await _licenseService.revisarLicencia(
-                              forzarServidor: true,
-                            );
-                            if (!mounted) return;
-                            _actualizarLicencia(refreshed.licencia);
-                          },
-                        ),
-                      ),
-                      if (kDebugMode)
-                        _buildModernMenuCard(
-                          child: _buildModernMenuItem(
-                            context: context,
-                            title: 'Recorte Diana (pruebas)',
-                            icon: Icons.camera_alt_rounded,
-                            color: Colors.deepOrange,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RecorteDianaScreen(),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  )
-                else
-                  Container(
-                    decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                        )),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildModernMenuItem(
-                          context: context,
-                          title: 'Copia de seguridad',
-                          icon: Icons.cloud_sync_rounded,
-                          color: Colors.blueGrey,
-                          locked: bloqueoBackup,
-                          lockPlanLabel: _permissions.requiredPlanLabel(
-                            LicenseCapability.backup,
-                          ),
-                          onTap: () => _abrirSiPermitido(
-                            context: context,
-                            capability: LicenseCapability.backup,
-                            onAllowed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const BackupScreen()),
-                            ),
+                        Text(
+                          'Panel de Control',
+                          style: TextStyle(
+                            fontSize: isLandscape ? 20 : 22,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                            letterSpacing: -0.5,
                           ),
                         ),
-                        Divider(
-                            height: 1,
-                            indent: 56,
-                            color:
-                                colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                        _buildModernMenuItem(
-                          context: context,
-                          title: 'Configuración',
-                          icon: Icons.settings_rounded,
-                          color: Colors.grey.shade700,
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const ConfigScreen()),
-                            );
-                            if (!mounted) return;
-                            final refreshed = await _licenseService.revisarLicencia(
-                              forzarServidor: true,
-                            );
-                            if (!mounted) return;
-                            _actualizarLicencia(refreshed.licencia);
-                          },
-                        ),
-                        if (kDebugMode) ...[
-                          Divider(
-                              height: 1,
-                              indent: 56,
-                              color: colorScheme.outlineVariant
-                                  .withValues(alpha: 0.5)),
-                          _buildModernMenuItem(
+                        SizedBox(height: isLandscape ? 12 : 16),
+                        if (isLandscape)
+                          _buildGroupedButtonsGrid(
+                            crossAxisCount: landscapeColumns,
+                            childAspectRatio: mainCardsAspect,
+                            children: [
+                              _buildModernActionCard(
+                                context: context,
+                                title: 'Entrenamiento',
+                                subtitle: 'Registra series y mejora tu técnica.',
+                                icon: Icons.track_changes,
+                                color: Colors.teal,
+                                isDark: isDark,
+                                dense: landscapeCompactCards,
+                                inGrid: true,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => const EntrenamientoScreen()),
+                                ),
+                              ),
+                              _buildModernActionCard(
+                                context: context,
+                                title: 'Competición',
+                                subtitle: 'Gestiona tiradas oficiales y resultados.',
+                                icon: Icons.emoji_events,
+                                color: Colors.amber.shade700,
+                                isDark: isDark,
+                                dense: landscapeCompactCards,
+                                inGrid: true,
+                                locked: bloqueoCompeticion,
+                                lockPlanLabel: _permissions.requiredPlanLabel(
+                                  LicenseCapability.competition,
+                                ),
+                                onTap: () => _abrirSiPermitido(
+                                  context: context,
+                                  capability: LicenseCapability.competition,
+                                  onAllowed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => const CompeticionScreen()),
+                                  ),
+                                ),
+                              ),
+                              _buildModernActionCard(
+                                context: context,
+                                title: 'Historial y análisis',
+                                subtitle: 'Consulta tu progreso y estadísticas.',
+                                icon: Icons.analytics,
+                                color: Colors.indigo,
+                                isDark: isDark,
+                                dense: landscapeCompactCards,
+                                inGrid: true,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => HistorialScreen(
+                                      puedeVerEstadisticas: _permissions.canAccess(
+                                        _licenciaActual,
+                                        LicenseCapability.analytics,
+                                      ),
+                                      puedeVerCompeticiones: _permissions.canAccess(
+                                        _licenciaActual,
+                                        LicenseCapability.competition,
+                                      ),
+                                      requiredPlanEstadisticas:
+                                          _permissions.requiredPlanLabel(
+                                        LicenseCapability.analytics,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        else ...[
+                          _buildModernActionCard(
                             context: context,
-                            title: 'Recorte Diana (pruebas)',
-                            icon: Icons.camera_alt_rounded,
-                            color: Colors.deepOrange,
+                            title: 'Entrenamiento',
+                            subtitle: 'Registra series y mejora tu técnica.',
+                            icon: Icons.track_changes,
+                            color: Colors.teal,
+                            isDark: isDark,
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const RecorteDianaScreen(),
+                                  builder: (_) => const EntrenamientoScreen()),
+                            ),
+                          ),
+                          _buildModernActionCard(
+                            context: context,
+                            title: 'Competición',
+                            subtitle: 'Gestiona tiradas oficiales y resultados.',
+                            icon: Icons.emoji_events,
+                            color: Colors.amber.shade700,
+                            isDark: isDark,
+                            locked: bloqueoCompeticion,
+                            lockPlanLabel: _permissions.requiredPlanLabel(
+                              LicenseCapability.competition,
+                            ),
+                            onTap: () => _abrirSiPermitido(
+                              context: context,
+                              capability: LicenseCapability.competition,
+                              onAllowed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const CompeticionScreen()),
+                              ),
+                            ),
+                          ),
+                          _buildModernActionCard(
+                            context: context,
+                            title: 'Historial y análisis',
+                            subtitle: 'Consulta tu progreso y estadísticas.',
+                            icon: Icons.analytics,
+                            color: Colors.indigo,
+                            isDark: isDark,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => HistorialScreen(
+                                  puedeVerEstadisticas: _permissions.canAccess(
+                                    _licenciaActual,
+                                    LicenseCapability.analytics,
+                                  ),
+                                  puedeVerCompeticiones: _permissions.canAccess(
+                                    _licenciaActual,
+                                    LicenseCapability.competition,
+                                  ),
+                                  requiredPlanEstadisticas:
+                                      _permissions.requiredPlanLabel(
+                                    LicenseCapability.analytics,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ],
+                        const SizedBox(height: 32),
+                        Text(
+                          'Más opciones',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (isLandscape)
+                          _buildGroupedButtonsGrid(
+                            crossAxisCount: landscapeColumns,
+                            childAspectRatio: moreCardsAspect,
+                            children: [
+                              _buildModernMenuCard(
+                                child: _buildModernMenuItem(
+                                  context: context,
+                                  title: 'Copia de seguridad',
+                                  icon: Icons.cloud_sync_rounded,
+                                  color: Colors.blueGrey,
+                                  dense: landscapeCompactCards,
+                                  locked: bloqueoBackup,
+                                  lockPlanLabel: _permissions.requiredPlanLabel(
+                                    LicenseCapability.backup,
+                                  ),
+                                  onTap: () => _abrirSiPermitido(
+                                    context: context,
+                                    capability: LicenseCapability.backup,
+                                    onAllowed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => const BackupScreen()),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              _buildModernMenuCard(
+                                child: _buildModernMenuItem(
+                                  context: context,
+                                  title: 'Configuración',
+                                  icon: Icons.settings_rounded,
+                                  color: Colors.grey.shade700,
+                                  dense: landscapeCompactCards,
+                                  onTap: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => const ConfigScreen()),
+                                    );
+                                    if (!mounted) return;
+                                    final refreshed = await _licenseService.revisarLicencia(
+                                      forzarServidor: true,
+                                    );
+                                    if (!mounted) return;
+                                    _actualizarLicencia(refreshed.licencia);
+                                  },
+                                ),
+                              ),
+                              if (kDebugMode)
+                                _buildModernMenuCard(
+                                  child: _buildModernMenuItem(
+                                    context: context,
+                                    title: 'Recorte Diana (pruebas)',
+                                    icon: Icons.camera_alt_rounded,
+                                    color: Colors.deepOrange,
+                                    dense: landscapeCompactCards,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const RecorteDianaScreen(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
+                        else
+                          Container(
+                            decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainer,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                )),
+                            child: Column(
+                              children: [
+                                _buildModernMenuItem(
+                                  context: context,
+                                  title: 'Copia de seguridad',
+                                  icon: Icons.cloud_sync_rounded,
+                                  color: Colors.blueGrey,
+                                  locked: bloqueoBackup,
+                                  lockPlanLabel: _permissions.requiredPlanLabel(
+                                    LicenseCapability.backup,
+                                  ),
+                                  onTap: () => _abrirSiPermitido(
+                                    context: context,
+                                    capability: LicenseCapability.backup,
+                                    onAllowed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => const BackupScreen()),
+                                    ),
+                                  ),
+                                ),
+                                Divider(
+                                    height: 1,
+                                    indent: 56,
+                                    color:
+                                        colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                _buildModernMenuItem(
+                                  context: context,
+                                  title: 'Configuración',
+                                  icon: Icons.settings_rounded,
+                                  color: Colors.grey.shade700,
+                                  onTap: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => const ConfigScreen()),
+                                    );
+                                    if (!mounted) return;
+                                    final refreshed = await _licenseService.revisarLicencia(
+                                      forzarServidor: true,
+                                    );
+                                    if (!mounted) return;
+                                    _actualizarLicencia(refreshed.licencia);
+                                  },
+                                ),
+                                if (kDebugMode) ...[
+                                  Divider(
+                                      height: 1,
+                                      indent: 56,
+                                      color: colorScheme.outlineVariant
+                                          .withValues(alpha: 0.5)),
+                                  _buildModernMenuItem(
+                                    context: context,
+                                    title: 'Recorte Diana (pruebas)',
+                                    icon: Icons.camera_alt_rounded,
+                                    color: Colors.deepOrange,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const RecorteDianaScreen(),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),
+                ),
               ]),
             ),
           ),
@@ -736,6 +783,8 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color color,
     required bool isDark,
     required VoidCallback onTap,
+    bool dense = false,
+    bool inGrid = false,
     bool locked = false,
     String? lockPlanLabel,
   }) {
@@ -746,7 +795,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final double opacity = locked ? 0.7 : 1.0;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: inGrid ? 0 : 16),
       decoration: BoxDecoration(
         color: isDark ? color.withValues(alpha: 0.15) : color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
@@ -778,19 +827,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 if (compact) {
                   return Padding(
-                    padding: const EdgeInsets.all(14),
+                    padding: EdgeInsets.all(dense ? 12 : 14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(10),
+                              padding: EdgeInsets.all(dense ? 8 : 10),
                               decoration: BoxDecoration(
                                 color: color.withValues(alpha: isDark ? 0.2 : 0.1),
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(icon, size: 24, color: color),
+                              child: Icon(icon, size: dense ? 20 : 24, color: color),
                             ),
                             const Spacer(),
                             Icon(
@@ -800,24 +849,24 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        SizedBox(height: dense ? 6 : 10),
                         Text(
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: dense ? 14 : 15,
                             fontWeight: FontWeight.bold,
                             color: themeInfo.onSurface,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: dense ? 2 : 4),
                         Text(
                           subtitle,
-                          maxLines: 2,
+                          maxLines: dense ? 1 : 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: dense ? 11 : 12,
                             color: themeInfo.onSurfaceVariant,
                             height: 1.2,
                           ),
@@ -872,18 +921,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(dense ? 12 : 16),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: EdgeInsets.all(dense ? 8 : 10),
                             decoration: BoxDecoration(
                               color: color.withValues(alpha: isDark ? 0.2 : 0.1),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(icon, size: 28, color: color),
+                            child: Icon(icon, size: dense ? 22 : 28, color: color),
                           ),
-                          const SizedBox(width: 14),
+                          SizedBox(width: dense ? 10 : 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -893,18 +942,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: dense ? 14 : 16,
                                     fontWeight: FontWeight.bold,
                                     color: themeInfo.onSurface,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
+                                SizedBox(height: dense ? 1 : 2),
                                 Text(
                                   subtitle,
-                                  maxLines: 2,
+                                  maxLines: dense ? 1 : 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: dense ? 11 : 12,
                                     color: themeInfo.onSurfaceVariant,
                                     height: 1.2,
                                   ),
@@ -945,7 +994,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Icon(
                             Icons.chevron_right_rounded,
                             color: themeInfo.onSurface.withValues(alpha: 0.3),
-                            size: 28,
+                            size: dense ? 24 : 28,
                           ),
                         ],
                       ),
@@ -966,6 +1015,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    bool dense = false,
     bool locked = false,
     String? lockPlanLabel,
   }) {
@@ -980,27 +1030,27 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: onTap,
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: compact ? 12 : 16,
-              vertical: compact ? 12 : 14,
+              horizontal: compact ? (dense ? 10 : 12) : (dense ? 12 : 16),
+              vertical: compact ? (dense ? 10 : 12) : (dense ? 11 : 14),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(compact ? 7 : 8),
+                  padding: EdgeInsets.all(compact ? (dense ? 6 : 7) : (dense ? 7 : 8)),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: isDark ? 0.2 : 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, size: compact ? 18 : 20, color: color),
+                  child: Icon(icon, size: compact ? (dense ? 16 : 18) : (dense ? 18 : 20), color: color),
                 ),
-                SizedBox(width: compact ? 8 : 12),
+                SizedBox(width: compact ? (dense ? 6 : 8) : (dense ? 8 : 12)),
                 Expanded(
                   child: Text(
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: compact ? 14 : 16,
+                      fontSize: compact ? (dense ? 13 : 14) : (dense ? 14 : 16),
                       fontWeight: FontWeight.w600,
                       color: locked
                           ? themeInfo.onSurface.withValues(alpha: 0.6)

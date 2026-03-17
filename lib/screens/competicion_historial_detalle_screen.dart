@@ -480,151 +480,163 @@ class _CompeticionHistorialDetalleScreenState
               onPressed: _generarPDF)
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                          child: Text(widget.nombreTorneo,
-                              style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: colorScheme.primary,
-                                  letterSpacing: -0.5))),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                            color: colorScheme.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2))),
-                        child: Text('${widget.totalPuntos} pts',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary)),
-                      )
-                    ]),
-                const SizedBox(height: 16),
-                Row(children: [
-                  Icon(Icons.calendar_today_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "${widget.fecha.day}/${widget.fecha.month}/${widget.fecha.year}",
-                      style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w500),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ]),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Icon(Icons.hardware_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _equipoUsado?.nombre ?? "Arma no especificada",
-                      style: TextStyle(color: colorScheme.onSurface),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ]),
-                if (_municionUsada != null) ...[
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    Icon(Icons.local_fire_department_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${_municionUsada!.marca} (${_municionUsada!.lote})',
-                        style: TextStyle(color: colorScheme.onSurface),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ]),
-                ],
-                if (_lugarGuardado.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    Icon(Icons.place_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _lugarGuardado,
-                        style: TextStyle(color: colorScheme.onSurface),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ]),
-                ],
-                if (_distanciaMetros != null) ...[
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    Icon(Icons.straighten_rounded, size: 14, color: colorScheme.onSurfaceVariant),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '$_distanciaMetros m',
-                        style: TextStyle(color: colorScheme.onSurface),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ]),
-                ],
-                if (_temperaturaC != null || _humedadPct != null || _vientoMs != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Met: ${_temperaturaC?.toStringAsFixed(1) ?? '-'}°C | '
-                    'Hum: ${_humedadPct?.toStringAsFixed(0) ?? '-'}% | '
-                    'Viento: ${_vientoMs?.toStringAsFixed(1) ?? '-'} m/s ${_vientoDireccion ?? ''}',
-                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
-                  ),
-                ],
-                if (_notasGuardadas.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(10),
+      body: _cargando
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
+          : CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(12)
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
                     ),
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Icon(Icons.notes_rounded, size: 16, color: colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 8),
-                      Expanded(
-                          child: Text(_notasGuardadas,
-                              style: TextStyle(
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontSize: 13,
-                                  fontStyle: FontStyle.italic))),
-                    ]),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                  child: Text(widget.nombreTorneo,
+                                      style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w900,
+                                          color: colorScheme.primary,
+                                          letterSpacing: -0.5))),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                    color: colorScheme.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2))),
+                                child: Text('${widget.totalPuntos} pts',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.primary)),
+                              )
+                            ]),
+                        const SizedBox(height: 16),
+                        Row(children: [
+                          Icon(Icons.calendar_today_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "${widget.fecha.day}/${widget.fecha.month}/${widget.fecha.year}",
+                              style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          Icon(Icons.hardware_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _equipoUsado?.nombre ?? "Arma no especificada",
+                              style: TextStyle(color: colorScheme.onSurface),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ]),
+                        if (_municionUsada != null) ...[
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            Icon(Icons.local_fire_department_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${_municionUsada!.marca} (${_municionUsada!.lote})',
+                                style: TextStyle(color: colorScheme.onSurface),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ]),
+                        ],
+                        if (_lugarGuardado.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            Icon(Icons.place_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _lugarGuardado,
+                                style: TextStyle(color: colorScheme.onSurface),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ]),
+                        ],
+                        if (_distanciaMetros != null) ...[
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            Icon(Icons.straighten_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$_distanciaMetros m',
+                                style: TextStyle(color: colorScheme.onSurface),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ]),
+                        ],
+                        if (_temperaturaC != null || _humedadPct != null || _vientoMs != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Met: ${_temperaturaC?.toStringAsFixed(1) ?? '-'}°C | '
+                            'Hum: ${_humedadPct?.toStringAsFixed(0) ?? '-'}% | '
+                            'Viento: ${_vientoMs?.toStringAsFixed(1) ?? '-'} m/s ${_vientoDireccion ?? ''}',
+                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
+                          ),
+                        ],
+                        if (_notasGuardadas.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainer,
+                                borderRadius: BorderRadius.circular(12)
+                            ),
+                            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Icon(Icons.notes_rounded, size: 16, color: colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                  child: Text(_notasGuardadas,
+                                      style: TextStyle(
+                                          color: colorScheme.onSurfaceVariant,
+                                          fontSize: 13,
+                                          fontStyle: FontStyle.italic))),
+                            ]),
+                          ),
+                        ]
+                      ],
+                    ),
                   ),
-                ]
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-            child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text("Fases del Torneo",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2, color: colorScheme.primary))),
-          ),
-          Expanded(
-            child: _cargando
-                ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                    child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text("Fases del Torneo",
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2, color: colorScheme.primary))),
+                  ),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 12,
+                  ),
+                  sliver: SliverList.builder(
                     itemCount: _fases.length,
                     itemBuilder: (context, index) {
                       final fase = _fases[index];
@@ -672,9 +684,9 @@ class _CompeticionHistorialDetalleScreenState
                       );
                     },
                   ),
-          ),
-        ],
-      ),
+                ),
+              ],
+            ),
     );
   }
 }

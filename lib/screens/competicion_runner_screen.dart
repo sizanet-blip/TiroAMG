@@ -8,6 +8,7 @@ import '../models/disparo_model.dart';
 import '../services/competicion_service.dart';
 import '../services/entrenamiento_service.dart';
 import '../services/plantilla_tiempos_service.dart';
+import '../utils/responsive_layout.dart';
 import 'sesion_disparo_screen.dart'; // La pantalla de la diana
 
 class CompeticionRunnerScreen extends StatefulWidget {
@@ -304,6 +305,9 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final media = MediaQuery.of(context);
+    final isLandscape = media.orientation == Orientation.landscape;
+    final compactLandscape = ResponsiveLayout.isCompactLandscape(context);
 
     if (_cargando) {
       return Scaffold(
@@ -393,18 +397,29 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: Text(widget.modalidad.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        toolbarHeight: compactLandscape ? 56 : 64,
+        title: Text(
+          widget.modalidad.nombre,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: compactLandscape ? 16 : 18,
+          ),
+        ),
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
         elevation: 0,
         centerTitle: true,
       ),
-      body: Column(
+      body: ListView(
+        padding: EdgeInsets.only(bottom: media.padding.bottom + (compactLandscape ? 8 : 12)),
         children: [
           // 1. MARCADOR GENERAL M3
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            padding: const EdgeInsets.all(20),
+            margin: EdgeInsets.symmetric(
+              horizontal: compactLandscape ? 12 : 16,
+              vertical: compactLandscape ? 6 : 8,
+            ),
+            padding: EdgeInsets.all(compactLandscape ? 14 : 20),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(24),
@@ -417,14 +432,19 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('PUNTUACIÓN TOTAL', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                    const SizedBox(height: 4),
+                    SizedBox(height: compactLandscape ? 2 : 4),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
                         Text(
                           _formatearPuntos(_puntosTotales),
-                          style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1, color: colorScheme.primary),
+                          style: TextStyle(
+                            fontSize: compactLandscape ? 34 : 40,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1,
+                            color: colorScheme.primary,
+                          ),
                         ),
                         const SizedBox(width: 4),
                         Text('pts', style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
@@ -433,7 +453,10 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compactLandscape ? 12 : 16,
+                    vertical: compactLandscape ? 10 : 12,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainer,
                     borderRadius: BorderRadius.circular(16),
@@ -441,9 +464,23 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('FASE ${_indiceFase + 1} / ${_fases.length}', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onSurface, letterSpacing: 1.0)),
-                      const SizedBox(height: 4),
-                      Text('Serie ${_indiceRepeticion + 1} de ${faseActual.fase.repeticiones}', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13)),
+                      Text(
+                        'FASE ${_indiceFase + 1} / ${_fases.length}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                          letterSpacing: 1.0,
+                          fontSize: compactLandscape ? 12 : 14,
+                        ),
+                      ),
+                      SizedBox(height: compactLandscape ? 2 : 4),
+                      Text(
+                        'Serie ${_indiceRepeticion + 1} de ${faseActual.fase.repeticiones}',
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: compactLandscape ? 12 : 13,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -455,8 +492,8 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
 
           // 2. TARJETA DE PRÓXIMA ACCIÓN M3
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(24),
+            margin: EdgeInsets.symmetric(horizontal: compactLandscape ? 12 : 16),
+            padding: EdgeInsets.all(compactLandscape ? 16 : 24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: esEnsayo 
@@ -465,7 +502,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(32),
+              borderRadius: BorderRadius.circular(compactLandscape ? 24 : 32),
               border: Border.all(
                 color: esEnsayo ? Colors.orange.shade300.withValues(alpha: 0.5) : colorScheme.primary.withValues(alpha: 0.3),
                 width: 2,
@@ -498,31 +535,50 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                 const SizedBox(height: 16),
                 Text(
                   faseActual.fase.descripcionFase,
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, height: 1.2, color: colorScheme.onSurface, letterSpacing: -0.5),
+                  style: TextStyle(
+                    fontSize: compactLandscape ? 23 : 28,
+                    fontWeight: FontWeight.w900,
+                    height: 1.2,
+                    color: colorScheme.onSurface,
+                    letterSpacing: -0.5,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   faseActual.nombrePlantilla,
-                  style: TextStyle(fontSize: 15, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: compactLandscape ? 14 : 15,
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: compactLandscape ? 16 : 24),
 
                 // BOTÓN DE ACCIÓN
                 SizedBox(
                   width: double.infinity,
-                  height: 64,
+                  height: compactLandscape ? 56 : 64,
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: esEnsayo ? Colors.orange.shade600 : colorScheme.primary,
                       foregroundColor: esEnsayo ? Colors.white : colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(compactLandscape ? 16 : 20),
+                      ),
                       elevation: 4,
                     ),
-                    icon: const Icon(Icons.play_circle_fill_rounded, size: 28),
+                    icon: Icon(
+                      Icons.play_circle_fill_rounded,
+                      size: compactLandscape ? 24 : 28,
+                    ),
                     label: Text(
                       'TIRAR SERIE ${_indiceRepeticion + 1}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+                      style: TextStyle(
+                        fontSize: compactLandscape ? 16 : 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.0,
+                      ),
                     ),
                     onPressed: _lanzarSiguienteSerie,
                   ),
@@ -546,19 +602,28 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
             ),
           ),
 
-          const SizedBox(height: 24),
+          SizedBox(height: compactLandscape ? 16 : 24),
           
           Container(
              alignment: Alignment.centerLeft,
-             padding: const EdgeInsets.symmetric(horizontal: 24),
-             child: Text('HISTORIAL DEL TORNEO', style: TextStyle(color: colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+             padding: EdgeInsets.symmetric(horizontal: compactLandscape ? 16 : 24),
+             child: Text(
+               'HISTORIAL DEL TORNEO',
+               style: TextStyle(
+                 color: colorScheme.primary,
+                 fontSize: compactLandscape ? 11 : 12,
+                 fontWeight: FontWeight.bold,
+                 letterSpacing: 1.2,
+               ),
+             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: compactLandscape ? 6 : 8),
 
           // 3. HISTORIAL DE EVENTOS (LOG) M3
-          Expanded(
+          SizedBox(
+            height: isLandscape ? (compactLandscape ? 160 : 180) : 320,
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
+              margin: EdgeInsets.symmetric(horizontal: compactLandscape ? 12 : 16),
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerLowest,
@@ -581,14 +646,14 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                       )
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(compactLandscape ? 12 : 16),
                       itemCount: _logEventos.length,
                       itemBuilder: (context, index) {
                         final isEnsayo = _logEventos[index].contains('[ENSAYO]');
                         
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(16),
+                          margin: EdgeInsets.only(bottom: compactLandscape ? 6 : 8),
+                          padding: EdgeInsets.all(compactLandscape ? 12 : 16),
                           decoration: BoxDecoration(
                             color: isEnsayo ? Colors.orange.withValues(alpha: 0.05) : colorScheme.surfaceContainer,
                             borderRadius: BorderRadius.circular(16),
@@ -597,23 +662,23 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                           child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(8),
+                                padding: EdgeInsets.all(compactLandscape ? 6 : 8),
                                 decoration: BoxDecoration(
                                   color: isEnsayo ? Colors.orange.withValues(alpha: 0.1) : colorScheme.primary.withValues(alpha: 0.1),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
                                   isEnsayo ? Icons.science_rounded : Icons.sports_score_rounded, 
-                                  size: 16, 
+                                  size: compactLandscape ? 14 : 16, 
                                   color: isEnsayo ? Colors.orange.shade700 : colorScheme.primary
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              SizedBox(width: compactLandscape ? 10 : 16),
                               Expanded(
                                 child: Text(
                                   _logEventos[index].replaceAll(' [ENSAYO]', '').replaceAll(' [COMPETICIÓN]', ''),
                                   style: TextStyle(
-                                    fontSize: 14, 
+                                    fontSize: compactLandscape ? 13 : 14, 
                                     color: colorScheme.onSurface,
                                     fontWeight: FontWeight.w500
                                   ),

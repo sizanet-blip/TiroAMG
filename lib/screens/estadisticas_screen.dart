@@ -64,7 +64,19 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   void initState() {
     super.initState();
     if (_esModoDetalle) _filtrosAbiertos = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _esModoDetalle) return;
+      _aplicarEstadoInicialFiltrosSegunPantalla();
+    });
     _cargarFiltrosIniciales();
+  }
+
+  void _aplicarEstadoInicialFiltrosSegunPantalla() {
+    final media = MediaQuery.of(context);
+    final pantallaBaja = media.size.height < 760;
+    if (pantallaBaja && _filtrosAbiertos) {
+      setState(() => _filtrosAbiertos = false);
+    }
   }
 
   void _cargarFiltrosIniciales() async {
@@ -340,6 +352,13 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             : 'Análisis Entrenamientos');
 
     final colorScheme = Theme.of(context).colorScheme;
+    final media = MediaQuery.of(context);
+    final isLandscape = media.orientation == Orientation.landscape;
+    final compactHeight = media.size.height < 760;
+    final filtrosMaxHeight = isLandscape
+        ? media.size.height * 0.20
+        : media.size.height * (compactHeight ? 0.24 : 0.30);
+    final tabHeight = compactHeight ? 44.0 : 50.0;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -356,11 +375,13 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
               onPressed: !_cargando ? _imprimirInforme : null)
         ],
       ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
           if (!_esModoDetalle)
             Container(
-              margin: const EdgeInsets.only(bottom: 16),
+              margin: EdgeInsets.only(bottom: compactHeight ? 10 : 16),
               decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                   borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
@@ -392,8 +413,16 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                   ),
                   if (_filtrosAbiertos)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                      child: Column(
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        0,
+                        20,
+                        compactHeight ? 14 : 24,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: filtrosMaxHeight),
+                        child: SingleChildScrollView(
+                          child: Column(
                         children: [
                           const SizedBox(height: 8),
                           DropdownButtonFormField<int>(
@@ -494,6 +523,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                             }),
                           ),
                         ],
+                          ),
+                        ),
                       ),
                     )
                 ],
@@ -512,12 +543,38 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                     indicatorColor: colorScheme.primary,
                     indicatorWeight: 3,
                     labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
-                    tabs: const [
-                      Tab(text: 'AGRUPACIÓN', icon: Icon(Icons.gps_fixed_rounded)),
-                      Tab(text: 'TÉCNICA', icon: Icon(Icons.psychology_rounded)),
-                      Tab(text: 'EVOLUCIÓN', icon: Icon(Icons.show_chart_rounded)),
-                      Tab(text: 'MUNICIÓN', icon: Icon(Icons.local_fire_department_rounded)),
-                      Tab(text: 'COMPARATIVO', icon: Icon(Icons.compare_arrows_rounded)),
+                    labelPadding: EdgeInsets.symmetric(horizontal: isLandscape ? 8 : 12),
+                    tabs: [
+                      Tab(
+                        text: 'AGRUPACIÓN',
+                        icon: Icon(Icons.gps_fixed_rounded),
+                        iconMargin: EdgeInsets.only(bottom: 2),
+                        height: tabHeight,
+                      ),
+                      Tab(
+                        text: 'TÉCNICA',
+                        icon: Icon(Icons.psychology_rounded),
+                        iconMargin: EdgeInsets.only(bottom: 2),
+                        height: tabHeight,
+                      ),
+                      Tab(
+                        text: 'EVOLUCIÓN',
+                        icon: Icon(Icons.show_chart_rounded),
+                        iconMargin: EdgeInsets.only(bottom: 2),
+                        height: tabHeight,
+                      ),
+                      Tab(
+                        text: 'MUNICIÓN',
+                        icon: Icon(Icons.local_fire_department_rounded),
+                        iconMargin: EdgeInsets.only(bottom: 2),
+                        height: tabHeight,
+                      ),
+                      Tab(
+                        text: 'COMPARATIVO',
+                        icon: Icon(Icons.compare_arrows_rounded),
+                        iconMargin: EdgeInsets.only(bottom: 2),
+                        height: tabHeight,
+                      ),
                     ],
                   ),
                   Expanded(
@@ -538,6 +595,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -671,17 +729,22 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   }
 
   Widget _buildVistaAgrupacion() {
+    final media = MediaQuery.of(context);
+    final compactHeight = media.size.height < 760;
+    final chipsBarHeight = compactHeight ? 44.0 : 50.0;
+    final chipsVerticalMargin = compactHeight ? 6.0 : 10.0;
+
     if (_dianasEnContexto.isEmpty && _dianaSel == null && !_esModoDetalle) {
       return const Center(child: Text("No hay datos para mostrar."));
     }
     return Column(children: [
       if (_dianasEnContexto.length > 1)
         Container(
-            height: 50,
-            margin: const EdgeInsets.symmetric(vertical: 10),
+            height: chipsBarHeight,
+            margin: EdgeInsets.symmetric(vertical: chipsVerticalMargin),
             child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: compactHeight ? 12 : 16),
                 itemCount: _dianasEnContexto.length,
                 itemBuilder: (ctx, i) {
                   final d = _dianasEnContexto[i];
