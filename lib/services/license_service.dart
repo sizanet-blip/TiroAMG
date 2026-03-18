@@ -258,6 +258,153 @@ class LicenseService {
     );
   }
 
+  Future<List<LicensePlanCatalogItem>> obtenerCatalogoPlanesComerciales({
+    bool includeFree = false,
+  }) async {
+    final base = apiBaseUrl.trim();
+    if (base.isEmpty) return const [];
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$base/licenses/catalog'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({'include_free': includeFree}),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return const [];
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return const [];
+      final plans = decoded['plans'];
+      if (plans is! List) return const [];
+
+      return plans
+          .whereType<Map<String, dynamic>>()
+          .map(LicensePlanCatalogItem.fromMap)
+          .where((item) => includeFree || item.price > 0)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<LicensePlanChangeResult> cambiarPlan({
+    required LicenciaLocal? licencia,
+    required String targetPlan,
+  }) async {
+    if (licencia == null || licencia.licenciaKey.trim().isEmpty) {
+      return const LicensePlanChangeResult(
+        ok: false,
+        message: 'No hay licencia activa para cambiar de plan.',
+      );
+    }
+    final base = apiBaseUrl.trim();
+    if (base.isEmpty) {
+      return const LicensePlanChangeResult(
+        ok: false,
+        message: 'No se ha configurado LICENSE_API_URL.',
+      );
+    }
+
+    final deviceId = await _obtenerDeviceIdPersistente();
+    final package = await PackageInfo.fromPlatform();
+    final target = targetPlan.trim().toLowerCase();
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$base/licenses/change-plan'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'license_key': licencia.licenciaKey.trim(),
+              'device_id': deviceId,
+              'target_plan': target,
+              'platform': _platformKey,
+              'app_version': package.version,
+              'build_number': package.buildNumber,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = jsonDecode(response.body);
+        if (data is Map<String, dynamic>) {
+          final payload = _normalizarPayloadLicencia(
+            data,
+            licenciaKey: licencia.licenciaKey.trim(),
+            deviceId: deviceId,
+          );
+          final nuevaLicencia = await _guardarPayloadLicencia(payload);
+          final msg = (data['message']?.toString().trim().isNotEmpty ?? false)
+              ? data['message'].toString().trim()
+              : 'Plan actualizado correctamente.';
+          await _guardarEstadoUltimoUpgrade(
+            capability: 'plan_change',
+            requiredPlan: target,
+            currentPlan: (licencia.plan ?? '').trim(),
+            backendRegistered: true,
+            emailOpened: false,
+            message: msg,
+          );
+          await _registrarEnHistorialUpgrade(
+            capability: 'plan_change',
+            requiredPlan: target,
+            currentPlan: (licencia.plan ?? '').trim(),
+            backendRegistered: true,
+            emailOpened: false,
+            message: msg,
+          );
+          return LicensePlanChangeResult(
+            ok: true,
+            message: msg,
+            licenciaActualizada: nuevaLicencia,
+          );
+        }
+      }
+
+      final msg = _mensajeServidorAmigable(
+        response.statusCode,
+        contexto: 'change_plan',
+      );
+      await _guardarEstadoUltimoUpgrade(
+        capability: 'plan_change',
+        requiredPlan: target,
+        currentPlan: (licencia.plan ?? '').trim(),
+        backendRegistered: false,
+        emailOpened: false,
+        message: msg,
+      );
+      await _registrarEnHistorialUpgrade(
+        capability: 'plan_change',
+        requiredPlan: target,
+        currentPlan: (licencia.plan ?? '').trim(),
+        backendRegistered: false,
+        emailOpened: false,
+        message: msg,
+      );
+      return LicensePlanChangeResult(ok: false, message: msg);
+    } on SocketException {
+      return const LicensePlanChangeResult(
+        ok: false,
+        message: 'No hay conexión. Inténtalo más tarde.',
+      );
+    } on TimeoutException {
+      return const LicensePlanChangeResult(
+        ok: false,
+        message: 'El servidor tardó demasiado en responder.',
+      );
+    } catch (_) {
+      return const LicensePlanChangeResult(
+        ok: false,
+        message: 'No se pudo cambiar el plan en este momento.',
+      );
+    }
+  }
+
   Future<LicenseUpgradeStatus?> obtenerUltimoUpgradeStatus() async {
     final db = await DatabaseProvider.instance.database;
     final rows = await db.query(
@@ -917,6 +1064,9 @@ class LicenseService {
       if (contexto == 'can') {
         return 'No se encontró la licencia al validar permisos.';
       }
+      if (contexto == 'change_plan') {
+        return 'No se encontró la licencia para aplicar el cambio de plan.';
+      }
       return 'La clave de licencia no existe o ya no es válida.';
     }
     if (statusCode == 409) {
@@ -941,21 +1091,44 @@ class LicenseService {
   }
 
   Map<String, dynamic> _featuresPorPlanDev(String plan) {
-    final tier = plan == 'completo'
-        ? 3
-        : plan == 'pro'
-            ? 2
-            : plan == 'medio'
-                ? 1
-                : 0;
-    return {
-      'competition_mode': tier >= 2,
-      'advanced_stats': tier >= 1,
-      'backup_export': tier >= 2,
-      'training_rules': tier >= 1,
-      'catalog_management': tier >= 2,
-      'target_shot_detection': tier >= 3,
-    };
+    switch (plan) {
+      case 'medio':
+        return {
+          'competition_mode': true,
+          'advanced_stats': false,
+          'backup_export': false,
+          'training_rules': false,
+          'catalog_management': false,
+          'target_shot_detection': false,
+        };
+      case 'pro':
+        return {
+          'competition_mode': true,
+          'advanced_stats': true,
+          'backup_export': true,
+          'training_rules': true,
+          'catalog_management': true,
+          'target_shot_detection': false,
+        };
+      case 'completo':
+        return {
+          'competition_mode': true,
+          'advanced_stats': true,
+          'backup_export': true,
+          'training_rules': true,
+          'catalog_management': true,
+          'target_shot_detection': true,
+        };
+      default:
+        return {
+          'competition_mode': false,
+          'advanced_stats': false,
+          'backup_export': false,
+          'training_rules': true,
+          'catalog_management': false,
+          'target_shot_detection': false,
+        };
+    }
   }
 
 }
@@ -1007,5 +1180,46 @@ class LicenseUpgradeStatus {
     required this.backendRegistered,
     required this.emailOpened,
     required this.message,
+  });
+}
+
+class LicensePlanCatalogItem {
+  final String plan;
+  final String label;
+  final double price;
+  final bool isPaid;
+  final Map<String, dynamic> features;
+
+  const LicensePlanCatalogItem({
+    required this.plan,
+    required this.label,
+    required this.price,
+    required this.isPaid,
+    required this.features,
+  });
+
+  factory LicensePlanCatalogItem.fromMap(Map<String, dynamic> map) {
+    final rawFeatures = map['features'];
+    return LicensePlanCatalogItem(
+      plan: (map['plan']?.toString() ?? '').trim().toLowerCase(),
+      label: (map['label']?.toString() ?? '').trim(),
+      price: (map['price'] as num?)?.toDouble() ?? 0,
+      isPaid: map['is_paid'] == true,
+      features: rawFeatures is Map<String, dynamic>
+          ? rawFeatures
+          : <String, dynamic>{},
+    );
+  }
+}
+
+class LicensePlanChangeResult {
+  final bool ok;
+  final String message;
+  final LicenciaLocal? licenciaActualizada;
+
+  const LicensePlanChangeResult({
+    required this.ok,
+    required this.message,
+    this.licenciaActualizada,
   });
 }

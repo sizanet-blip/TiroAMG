@@ -41,35 +41,19 @@ class LicensePermissionsService {
     final features = licencia.features;
     switch (capability) {
       case LicenseCapability.competition:
-        if (_featureBool(features, 'competition_mode') != null) {
-          return _featureBool(features, 'competition_mode')!;
-        }
-        return tier >= 2; // pro+
+        // El plan comercial manda para visibilidad; features solo amplían.
+        return tier >= 1 || _featureBool(features, 'competition_mode') == true;
       case LicenseCapability.analytics:
-        if (_featureBool(features, 'advanced_stats') != null) {
-          return _featureBool(features, 'advanced_stats')!;
-        }
-        return tier >= 1; // medio+
+        // Analítica solo en Competición Plus o superior.
+        return tier >= 2;
       case LicenseCapability.backup:
-        if (_featureBool(features, 'backup_export') != null) {
-          return _featureBool(features, 'backup_export')!;
-        }
-        return tier >= 2; // pro+
+        return tier >= 2 || _featureBool(features, 'backup_export') == true;
       case LicenseCapability.settingsRules:
-        if (_featureBool(features, 'training_rules') != null) {
-          return _featureBool(features, 'training_rules')!;
-        }
-        return tier >= 1; // medio+
+        return tier >= 0 || _featureBool(features, 'training_rules') == true;
       case LicenseCapability.settingsCatalogs:
-        if (_featureBool(features, 'catalog_management') != null) {
-          return _featureBool(features, 'catalog_management')!;
-        }
-        return tier >= 2; // pro+
+        return tier >= 2 || _featureBool(features, 'catalog_management') == true;
       case LicenseCapability.targetDetection:
-        if (_featureBool(features, 'target_shot_detection') != null) {
-          return _featureBool(features, 'target_shot_detection')!;
-        }
-        return tier >= 3; // completo
+        return tier >= 3 || _featureBool(features, 'target_shot_detection') == true;
       case LicenseCapability.training:
         return true; // siempre permitido con licencia válida
     }
@@ -80,12 +64,14 @@ class LicensePermissionsService {
       case LicenseCapability.training:
         return 'Básico';
       case LicenseCapability.analytics:
+        return 'Pro';
       case LicenseCapability.settingsRules:
-        return 'Medio';
+        return 'Entrenamiento';
       case LicenseCapability.competition:
+        return 'Competición';
       case LicenseCapability.backup:
       case LicenseCapability.settingsCatalogs:
-        return 'Pro';
+        return 'Competición Plus';
       case LicenseCapability.targetDetection:
         return 'Completo';
     }
@@ -96,11 +82,11 @@ class LicensePermissionsService {
       case 3:
         return 'Completo';
       case 2:
-        return 'Pro';
+        return 'Competición Plus';
       case 1:
-        return 'Medio';
+        return 'Competición';
       default:
-        return 'Básico';
+        return 'Entrenamiento';
     }
   }
 
@@ -123,6 +109,11 @@ class LicensePermissionsService {
     // Nivel 3
     if ([
       'pro',
+      'competition_plus',
+      'competicion_plus',
+      'competición_plus',
+      'competicion plus',
+      'competición plus',
       'performance',
       'professional',
       'professional_plus',
@@ -135,6 +126,9 @@ class LicensePermissionsService {
     // Nivel 2
     if ([
       'medio',
+      'competition',
+      'competicion',
+      'competición',
       'advanced',
       'avanzado',
       'precision',
@@ -145,6 +139,8 @@ class LicensePermissionsService {
     // Nivel 1
     if ([
       'basic',
+      'training',
+      'entrenamiento',
       'basico',
       'básico',
       'essential',

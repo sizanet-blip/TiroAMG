@@ -342,9 +342,17 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
                                 ),
                               ),
                               if (isOficial)
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Icon(Icons.lock_outline_rounded, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5), size: 20),
+                                Tooltip(
+                                  message: 'Modalidad oficial (solo lectura)',
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Icon(
+                                      Icons.verified_outlined,
+                                      color: colorScheme.onSurfaceVariant
+                                          .withValues(alpha: 0.6),
+                                      size: 20,
+                                    ),
+                                  ),
                                 )
                               else
                                 IconButton(

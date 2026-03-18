@@ -312,10 +312,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bloqueoCompeticion =
-        !_permissions.canAccess(_licenciaActual, LicenseCapability.competition);
-    final bloqueoBackup =
-        !_permissions.canAccess(_licenciaActual, LicenseCapability.backup);
+    final puedeCompeticion =
+        _permissions.canAccess(_licenciaActual, LicenseCapability.competition);
+    final puedeBackup =
+        _permissions.canAccess(_licenciaActual, LicenseCapability.backup);
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.sizeOf(context).width;
@@ -329,10 +329,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final compactTopBar = isLandscape && screenWidth < 900;
     final mainCardsAspect = !isLandscape
         ? 2.0
-        : (screenWidth < 700 ? 2.7 : (screenWidth < 1100 ? 3.0 : 3.25));
+        : (screenWidth < 700 ? 2.5 : (screenWidth < 1100 ? 2.7 : 2.9));
     final moreCardsAspect = !isLandscape
         ? 2.4
-        : (screenWidth < 700 ? 2.9 : (screenWidth < 1100 ? 3.2 : 3.5));
+        : (screenWidth < 700 ? 2.7 : (screenWidth < 1100 ? 2.9 : 3.1));
     final contentPadding = ResponsiveLayout.pagePadding(context);
     final maxContentWidth = ResponsiveLayout.maxContentWidth(context);
 
@@ -461,29 +461,27 @@ class _HomeScreenState extends State<HomeScreen> {
                                       builder: (_) => const EntrenamientoScreen()),
                                 ),
                               ),
-                              _buildModernActionCard(
-                                context: context,
-                                title: 'Competición',
-                                subtitle: 'Gestiona tiradas oficiales y resultados.',
-                                icon: Icons.emoji_events,
-                                color: Colors.amber.shade700,
-                                isDark: isDark,
-                                dense: landscapeCompactCards,
-                                inGrid: true,
-                                locked: bloqueoCompeticion,
-                                lockPlanLabel: _permissions.requiredPlanLabel(
-                                  LicenseCapability.competition,
-                                ),
-                                onTap: () => _abrirSiPermitido(
+                              if (puedeCompeticion)
+                                _buildModernActionCard(
                                   context: context,
-                                  capability: LicenseCapability.competition,
-                                  onAllowed: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (_) => const CompeticionScreen()),
+                                  title: 'Competición',
+                                  subtitle:
+                                      'Gestiona tiradas oficiales y resultados.',
+                                  icon: Icons.emoji_events,
+                                  color: Colors.amber.shade700,
+                                  isDark: isDark,
+                                  dense: landscapeCompactCards,
+                                  inGrid: true,
+                                  onTap: () => _abrirSiPermitido(
+                                    context: context,
+                                    capability: LicenseCapability.competition,
+                                    onAllowed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => const CompeticionScreen()),
+                                    ),
                                   ),
                                 ),
-                              ),
                               _buildModernActionCard(
                                 context: context,
                                 title: 'Historial y análisis',
@@ -529,27 +527,25 @@ class _HomeScreenState extends State<HomeScreen> {
                                   builder: (_) => const EntrenamientoScreen()),
                             ),
                           ),
-                          _buildModernActionCard(
-                            context: context,
-                            title: 'Competición',
-                            subtitle: 'Gestiona tiradas oficiales y resultados.',
-                            icon: Icons.emoji_events,
-                            color: Colors.amber.shade700,
-                            isDark: isDark,
-                            locked: bloqueoCompeticion,
-                            lockPlanLabel: _permissions.requiredPlanLabel(
-                              LicenseCapability.competition,
-                            ),
-                            onTap: () => _abrirSiPermitido(
+                          if (puedeCompeticion)
+                            _buildModernActionCard(
                               context: context,
-                              capability: LicenseCapability.competition,
-                              onAllowed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const CompeticionScreen()),
+                              title: 'Competición',
+                              subtitle:
+                                  'Gestiona tiradas oficiales y resultados.',
+                              icon: Icons.emoji_events,
+                              color: Colors.amber.shade700,
+                              isDark: isDark,
+                              onTap: () => _abrirSiPermitido(
+                                context: context,
+                                capability: LicenseCapability.competition,
+                                onAllowed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => const CompeticionScreen()),
+                                ),
                               ),
                             ),
-                          ),
                           _buildModernActionCard(
                             context: context,
                             title: 'Historial y análisis',
@@ -594,28 +590,25 @@ class _HomeScreenState extends State<HomeScreen> {
                             crossAxisCount: landscapeColumns,
                             childAspectRatio: moreCardsAspect,
                             children: [
-                              _buildModernMenuCard(
-                                child: _buildModernMenuItem(
-                                  context: context,
-                                  title: 'Copia de seguridad',
-                                  icon: Icons.cloud_sync_rounded,
-                                  color: Colors.blueGrey,
-                                  dense: landscapeCompactCards,
-                                  locked: bloqueoBackup,
-                                  lockPlanLabel: _permissions.requiredPlanLabel(
-                                    LicenseCapability.backup,
-                                  ),
-                                  onTap: () => _abrirSiPermitido(
+                              if (puedeBackup)
+                                _buildModernMenuCard(
+                                  child: _buildModernMenuItem(
                                     context: context,
-                                    capability: LicenseCapability.backup,
-                                    onAllowed: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) => const BackupScreen()),
+                                    title: 'Copia de seguridad',
+                                    icon: Icons.cloud_sync_rounded,
+                                    color: Colors.blueGrey,
+                                    dense: landscapeCompactCards,
+                                    onTap: () => _abrirSiPermitido(
+                                      context: context,
+                                      capability: LicenseCapability.backup,
+                                      onAllowed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) => const BackupScreen()),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
                               _buildModernMenuCard(
                                 child: _buildModernMenuItem(
                                   context: context,
@@ -666,30 +659,28 @@ class _HomeScreenState extends State<HomeScreen> {
                                 )),
                             child: Column(
                               children: [
-                                _buildModernMenuItem(
-                                  context: context,
-                                  title: 'Copia de seguridad',
-                                  icon: Icons.cloud_sync_rounded,
-                                  color: Colors.blueGrey,
-                                  locked: bloqueoBackup,
-                                  lockPlanLabel: _permissions.requiredPlanLabel(
-                                    LicenseCapability.backup,
-                                  ),
-                                  onTap: () => _abrirSiPermitido(
+                                if (puedeBackup)
+                                  _buildModernMenuItem(
                                     context: context,
-                                    capability: LicenseCapability.backup,
-                                    onAllowed: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) => const BackupScreen()),
+                                    title: 'Copia de seguridad',
+                                    icon: Icons.cloud_sync_rounded,
+                                    color: Colors.blueGrey,
+                                    onTap: () => _abrirSiPermitido(
+                                      context: context,
+                                      capability: LicenseCapability.backup,
+                                      onAllowed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) => const BackupScreen()),
+                                      ),
                                     ),
                                   ),
-                                ),
-                                Divider(
-                                    height: 1,
-                                    indent: 56,
-                                    color:
-                                        colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                if (puedeBackup)
+                                  Divider(
+                                      height: 1,
+                                      indent: 56,
+                                      color: colorScheme.outlineVariant
+                                          .withValues(alpha: 0.5)),
                                 _buildModernMenuItem(
                                   context: context,
                                   title: 'Configuración',
@@ -820,7 +811,7 @@ class _HomeScreenState extends State<HomeScreen> {
             opacity: opacity,
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final compact = constraints.maxWidth < 420;
+                final compact = constraints.maxWidth < 420 && !inGrid;
                 final lockText = lockPlanLabel == null
                     ? null
                     : 'REQUIERE PLAN ${lockPlanLabel.toUpperCase()}';
@@ -863,7 +854,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         SizedBox(height: dense ? 2 : 4),
                         Text(
                           subtitle,
-                          maxLines: dense ? 1 : 2,
+                          maxLines: (dense || inGrid) ? 1 : 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: dense ? 11 : 12,
@@ -921,18 +912,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     Padding(
-                      padding: EdgeInsets.all(dense ? 12 : 16),
+                      padding: EdgeInsets.all((dense || inGrid) ? 10 : 16),
                       child: Row(
                         children: [
                           Container(
-                            padding: EdgeInsets.all(dense ? 8 : 10),
+                            padding: EdgeInsets.all((dense || inGrid) ? 8 : 10),
                             decoration: BoxDecoration(
                               color: color.withValues(alpha: isDark ? 0.2 : 0.1),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(icon, size: dense ? 22 : 28, color: color),
+                            child: Icon(
+                              icon,
+                              size: (dense || inGrid) ? 20 : 28,
+                              color: color,
+                            ),
                           ),
-                          SizedBox(width: dense ? 10 : 14),
+                          SizedBox(width: (dense || inGrid) ? 8 : 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -942,18 +937,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: dense ? 14 : 16,
+                                    fontSize: (dense || inGrid) ? 13 : 16,
                                     fontWeight: FontWeight.bold,
                                     color: themeInfo.onSurface,
                                   ),
                                 ),
-                                SizedBox(height: dense ? 1 : 2),
+                                SizedBox(height: (dense || inGrid) ? 1 : 2),
                                 Text(
                                   subtitle,
-                                  maxLines: dense ? 1 : 2,
+                                  maxLines: (dense || inGrid) ? 1 : 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: dense ? 11 : 12,
+                                    fontSize: (dense || inGrid) ? 10 : 12,
                                     color: themeInfo.onSurfaceVariant,
                                     height: 1.2,
                                   ),
@@ -994,7 +989,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Icon(
                             Icons.chevron_right_rounded,
                             color: themeInfo.onSurface.withValues(alpha: 0.3),
-                            size: dense ? 24 : 28,
+                            size: (dense || inGrid) ? 22 : 28,
                           ),
                         ],
                       ),

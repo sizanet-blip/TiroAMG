@@ -224,14 +224,22 @@ class _ConfigScreenState extends State<ConfigScreen> {
       case 'basic':
       case 'basico':
       case 'básico':
+      case 'entrenamiento':
+      case 'training':
       case 'trial':
       case 'essential':
         return 'basic';
       case 'medio':
       case 'medium':
+      case 'competicion':
+      case 'competición':
+      case 'competition':
         return 'medio';
       case 'pro':
       case 'premium':
+      case 'competicion_plus':
+      case 'competición_plus':
+      case 'competition_plus':
         return 'pro';
       case 'completo':
       case 'complete':
@@ -246,14 +254,44 @@ class _ConfigScreenState extends State<ConfigScreen> {
   String _planLabelPorClave(String clave) {
     switch (clave) {
       case 'medio':
-        return 'Medio';
+        return 'Competición';
       case 'pro':
-        return 'Pro';
+        return 'Competición Plus';
       case 'completo':
         return 'Completo';
       default:
-        return 'Básico';
+        return 'Entrenamiento';
     }
+  }
+
+  String _featureLabel(String key) {
+    switch (key.trim().toLowerCase()) {
+      case 'competition_mode':
+        return 'Modo competición';
+      case 'advanced_stats':
+        return 'Análisis avanzado';
+      case 'backup_export':
+        return 'Copias de seguridad';
+      case 'training_rules':
+        return 'Reglas de entrenamiento';
+      case 'catalog_management':
+        return 'Gestión de catálogos';
+      case 'target_shot_detection':
+        return 'Detección automática';
+      default:
+        return key.replaceAll('_', ' ');
+    }
+  }
+
+  String _descripcionFeaturesPlan(Map<String, dynamic> features) {
+    final activas = features.entries
+        .where((e) => e.value == true)
+        .map((e) => _featureLabel(e.key))
+        .toList();
+    if (activas.isEmpty) {
+      return 'Sin funcionalidades adicionales';
+    }
+    return activas.join(', ');
   }
 
   Future<void> _aplicarPlanDesarrollo() async {
@@ -275,34 +313,59 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
   Future<void> _solicitarAmpliacionDesdeHistorial() async {
     if (!mounted) return;
-    var planSolicitado = 'medio';
-    var enviando = false;
-    final planActualClave = _normalizarPlan(_licenciaActual?.plan);
-    final opcionesPlan = <String>['medio', 'pro', 'completo'];
-    if (planActualClave == 'medio') {
-      planSolicitado = 'pro';
-    } else if (planActualClave == 'pro') {
-      planSolicitado = 'completo';
-    } else if (planActualClave == 'completo') {
-      planSolicitado = 'completo';
+    final catalogo = await _licenseService.obtenerCatalogoPlanesComerciales(
+      includeFree: true,
+    );
+    if (!mounted) return;
+    if (catalogo.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay planes disponibles ahora mismo.'),
+        ),
+      );
+      return;
     }
+
+    var planSeleccionado = catalogo.first;
+    final planActualClave = _normalizarPlan(_licenciaActual?.plan);
+    for (final item in catalogo) {
+      if (_normalizarPlan(item.plan) == planActualClave) {
+        planSeleccionado = item;
+        break;
+      }
+    }
+    if (_normalizarPlan(planSeleccionado.plan) == planActualClave &&
+        catalogo.length > 1) {
+      planSeleccionado = catalogo.firstWhere(
+        (item) => _normalizarPlan(item.plan) != planActualClave,
+        orElse: () => catalogo.first,
+      );
+    }
+    var enviando = false;
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final screenSize = MediaQuery.sizeOf(ctx);
+          final dialogColorScheme = Theme.of(ctx).colorScheme;
           final dialogWidth =
               (screenSize.width - 32).clamp(280.0, 780.0).toDouble();
           final dialogMaxHeight =
               (screenSize.height * 0.78).clamp(240.0, 560.0).toDouble();
+          final narrowDialog = dialogWidth < 620;
           final planActual =
               _permissions.currentPlanLabel(_licenciaActual?.plan);
-          final planObjetivo = _planLabelPorClave(planSolicitado);
-          final capability = 'solicitud_plan_$planSolicitado';
+          final planObjetivo = planSeleccionado.label;
+          final precio = planSeleccionado.price.toStringAsFixed(2);
+          final precioLabel = planSeleccionado.price <= 0
+              ? 'Sin coste'
+              : '$precio EUR';
+          final esMismoPlan =
+              _normalizarPlan(planSeleccionado.plan) == planActualClave;
 
           return AlertDialog(
-            title: const Text('Solicitar ampliación de licencia'),
+            title: const Text('Cambiar plan'),
             content: SizedBox(
               width: dialogWidth,
               child: ConstrainedBox(
@@ -313,80 +376,140 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Selecciona el plan que quieres solicitar.',
+                        'Selecciona el plan que quieres activar.',
                       ),
                       const SizedBox(height: 10),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minWidth: 640),
-                          child: DataTable(
-                            headingRowHeight: 36,
-                            dataRowMinHeight: 36,
-                            dataRowMaxHeight: 56,
-                            columns: const [
-                              DataColumn(label: Text('Plan')),
-                              DataColumn(label: Text('Uso recomendado')),
-                              DataColumn(label: Text('Funciones clave')),
-                            ],
-                            rows: const [
-                              DataRow(cells: [
-                                DataCell(Text('Básico')),
-                                DataCell(Text('Inicio y entreno manual')),
-                                DataCell(Text(
-                                    'Entrenamiento base, sin competición ni analítica avanzada.')),
-                              ]),
-                              DataRow(cells: [
-                                DataCell(Text('Medio')),
-                                DataCell(Text('Entrenamiento con más control')),
-                                DataCell(Text(
-                                    'Analítica avanzada y reglas de entrenamiento.')),
-                              ]),
-                              DataRow(cells: [
-                                DataCell(Text('Pro')),
-                                DataCell(Text('Tirador competitivo')),
-                                DataCell(Text(
-                                    'Competición, backup/export y gestión de catálogos.')),
-                              ]),
-                              DataRow(cells: [
-                                DataCell(Text('Completo')),
-                                DataCell(Text('Uso premium integral')),
-                                DataCell(Text(
-                                    'Todo lo de Pro + detección automática de tiros en diana.')),
-                              ]),
-                            ],
-                          ),
-                        ),
+                      Column(
+                        children: catalogo
+                            .map(
+                              (item) => Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: dialogColorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.35),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: dialogColorScheme.outlineVariant
+                                        .withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${item.label} · ${item.price.toStringAsFixed(2)} EUR',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _descripcionFeaturesPlan(item.features),
+                                      softWrap: true,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: dialogColorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
-                        initialValue: planSolicitado,
+                        initialValue: planSeleccionado.plan,
                         decoration: const InputDecoration(
-                          labelText: 'Plan que quieres solicitar',
+                          labelText: 'Plan que quieres activar',
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
-                        items: opcionesPlan
-                            .map((plan) => DropdownMenuItem(
-                                  value: plan,
-                                  child: Text(_planLabelPorClave(plan)),
+                        items: catalogo
+                            .map((item) => DropdownMenuItem(
+                                  value: item.plan,
+                                  child: Text(item.label),
                                 ))
                             .toList(),
                         onChanged: enviando
                             ? null
                             : (value) {
                                 if (value == null) return;
-                                setDialogState(() => planSolicitado = value);
+                                final nuevo = catalogo.firstWhere(
+                                  (item) => item.plan == value,
+                                  orElse: () => catalogo.first,
+                                );
+                                setDialogState(() => planSeleccionado = nuevo);
                               },
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: dialogColorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: dialogColorScheme.outlineVariant
+                                .withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Qué incluye cada plan',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: dialogColorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Entrenamiento: solo modo entrenamiento.',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: dialogColorScheme.onSurfaceVariant),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Competición: entrenamiento + competición (sin análisis avanzado).',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: dialogColorScheme.onSurfaceVariant),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Competición Plus: añade análisis, copias y catálogos.',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: dialogColorScheme.onSurfaceVariant),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Completo: todo lo anterior + detección automática (en I+D Próximamente).',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: dialogColorScheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Text('Plan actual: $planActual'),
                       Text('Plan solicitado: $planObjetivo'),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Nota: la activación final depende de validación de licencia.',
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
-                      ),
+                      Text('Precio: $precioLabel'),
+                      if (esMismoPlan)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: Text(
+                            'Ya tienes este plan activo.',
+                            style: TextStyle(fontSize: 12, color: Colors.black54),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -400,18 +523,49 @@ class _ConfigScreenState extends State<ConfigScreen> {
               FilledButton(
                 onPressed: enviando
                     ? null
+                    : esMismoPlan
+                    ? null
                     : () async {
                         setDialogState(() => enviando = true);
-                        final result = await _licenseService.solicitarUpgrade(
-                          licencia: _licenciaActual,
-                          capability: capability,
-                          requiredPlan: planObjetivo,
-                          currentPlan: planActual,
+                        final confirmar = await showDialog<bool>(
+                          context: ctx,
+                          builder: (confirmCtx) => AlertDialog(
+                            title: const Text('Confirmar cambio de plan'),
+                            content: Text(
+                              planSeleccionado.price <= 0
+                                  ? 'Vas a cambiar al plan ${planSeleccionado.label} (sin coste). ¿Deseas continuar?'
+                                  : 'Vas a cambiar al plan ${planSeleccionado.label} por $precio EUR. ¿Deseas continuar?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.pop(confirmCtx, false),
+                                child: const Text('Cancelar'),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.pop(confirmCtx, true),
+                                child: const Text('Confirmar'),
+                              ),
+                            ],
+                          ),
                         );
-                        final ultimo =
-                            await _licenseService.obtenerUltimoUpgradeStatus();
+                        if (confirmar != true) {
+                          setDialogState(() => enviando = false);
+                          return;
+                        }
+
+                        final result = await _licenseService.cambiarPlan(
+                          licencia: _licenciaActual,
+                          targetPlan: planSeleccionado.plan,
+                        );
+
                         if (!mounted) return;
-                        setState(() => _ultimoUpgrade = ultimo);
+                        if (result.licenciaActualizada != null) {
+                          setState(
+                              () => _licenciaActual = result.licenciaActualizada);
+                          await _cargarEstadoLicencia(forzarServidor: true);
+                        }
+                        if (!mounted) return;
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                         }
@@ -419,7 +573,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                           SnackBar(content: Text(result.message)),
                         );
                       },
-                child: const Text('Solicitar ampliación'),
+                child: const Text('Aplicar cambio'),
               ),
             ],
           );
@@ -695,9 +849,9 @@ class _ConfigScreenState extends State<ConfigScreen> {
     const dbEsperada = DatabaseProvider.schemaVersion;
     final dbReal = _dbUserVersion;
     final migracionOk = dbReal != null && dbReal >= dbEsperada;
-    final bloqueoReglas = !_permissions.canAccess(
+    final puedeReglas = _permissions.canAccess(
         _licenciaActual, LicenseCapability.settingsRules);
-    final bloqueoCatalogos = !_permissions.canAccess(
+    final puedeCatalogos = _permissions.canAccess(
         _licenciaActual, LicenseCapability.settingsCatalogs);
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -755,91 +909,92 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
-                _buildModernSectionHeader('B. Reglas de Entrenamiento', colorScheme),
-                Container(
-                  decoration: _modernContainerDecoration(colorScheme),
-                  child: Column(
-                    children: [
-                      _buildModernMenuItem(
-                        context: context,
-                        title: 'Plantillas de Tiempos/Series',
-                        subtitle: 'Crear reglas de Duelo (3s/7s), Precisión...',
-                        icon: Icons.timer_rounded,
-                        color: Colors.indigo,
-                        locked: bloqueoReglas,
-                        lockPlanLabel: _permissions.requiredPlanLabel(LicenseCapability.settingsRules),
-                        onTap: _accionProtegida(
-                          capability: LicenseCapability.settingsRules,
-                          onAllowed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const GestionTiemposScreen()),
+                if (puedeReglas) ...[
+                  const SizedBox(height: 24),
+                  _buildModernSectionHeader(
+                      'B. Reglas de Entrenamiento', colorScheme),
+                  Container(
+                    decoration: _modernContainerDecoration(colorScheme),
+                    child: Column(
+                      children: [
+                        _buildModernMenuItem(
+                          context: context,
+                          title: 'Plantillas de Tiempos/Series',
+                          subtitle: 'Crear reglas de Duelo (3s/7s), Precisión...',
+                          icon: Icons.timer_rounded,
+                          color: Colors.indigo,
+                          onTap: _accionProtegida(
+                            capability: LicenseCapability.settingsRules,
+                            onAllowed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const GestionTiemposScreen()),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-
-                const SizedBox(height: 24),
-                _buildModernSectionHeader('C. Datos del Sistema (Catálogos)', colorScheme),
-                Container(
-                  decoration: _modernContainerDecoration(colorScheme),
-                  child: Column(
-                    children: [
-                      _buildModernMenuItem(
-                        context: context,
-                        title: 'Catálogo Tipos de Arma',
-                        subtitle: 'Añadir categorías.',
-                        icon: Icons.category_rounded,
-                        color: Colors.blueGrey,
-                        locked: bloqueoCatalogos,
-                        lockPlanLabel: _permissions.requiredPlanLabel(LicenseCapability.settingsCatalogs),
-                        onTap: _accionProtegida(
-                          capability: LicenseCapability.settingsCatalogs,
-                          onAllowed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const CatalogoTiposScreen()),
+                ],
+                if (puedeCatalogos) ...[
+                  const SizedBox(height: 24),
+                  _buildModernSectionHeader(
+                      'C. Datos del Sistema (Catálogos)', colorScheme),
+                  Container(
+                    decoration: _modernContainerDecoration(colorScheme),
+                    child: Column(
+                      children: [
+                        _buildModernMenuItem(
+                          context: context,
+                          title: 'Catálogo Tipos de Arma',
+                          subtitle: 'Añadir categorías.',
+                          icon: Icons.category_rounded,
+                          color: Colors.blueGrey,
+                          onTap: _accionProtegida(
+                            capability: LicenseCapability.settingsCatalogs,
+                            onAllowed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const CatalogoTiposScreen()),
+                            ),
                           ),
                         ),
-                      ),
-                      _buildDivider(colorScheme),
-                      _buildModernMenuItem(
-                        context: context,
-                        title: 'Catálogo de Calibres',
-                        subtitle: 'Añadir calibres no estándar.',
-                        icon: Icons.straighten_rounded,
-                        color: Colors.blueGrey,
-                        locked: bloqueoCatalogos,
-                        lockPlanLabel: _permissions.requiredPlanLabel(LicenseCapability.settingsCatalogs),
-                        onTap: _accionProtegida(
-                          capability: LicenseCapability.settingsCatalogs,
-                          onAllowed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const CatalogoCalibresScreen()),
+                        _buildDivider(colorScheme),
+                        _buildModernMenuItem(
+                          context: context,
+                          title: 'Catálogo de Calibres',
+                          subtitle: 'Añadir calibres no estándar.',
+                          icon: Icons.straighten_rounded,
+                          color: Colors.blueGrey,
+                          onTap: _accionProtegida(
+                            capability: LicenseCapability.settingsCatalogs,
+                            onAllowed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const CatalogoCalibresScreen()),
+                            ),
                           ),
                         ),
-                      ),
-                      _buildDivider(colorScheme),
-                      _buildModernMenuItem(
-                        context: context,
-                        title: 'Catálogo de Dianas',
-                        subtitle: 'Definir tipos de diana.',
-                        icon: Icons.adjust_rounded,
-                        color: Colors.blueGrey,
-                        locked: bloqueoCatalogos,
-                        lockPlanLabel: _permissions.requiredPlanLabel(LicenseCapability.settingsCatalogs),
-                        onTap: _accionProtegida(
-                          capability: LicenseCapability.settingsCatalogs,
-                          onAllowed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const CatalogoDianasScreen()),
+                        _buildDivider(colorScheme),
+                        _buildModernMenuItem(
+                          context: context,
+                          title: 'Catálogo de Dianas',
+                          subtitle: 'Definir tipos de diana.',
+                          icon: Icons.adjust_rounded,
+                          color: Colors.blueGrey,
+                          onTap: _accionProtegida(
+                            capability: LicenseCapability.settingsCatalogs,
+                            onAllowed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const CatalogoDianasScreen()),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
 
                 const SizedBox(height: 24),
                 _buildModernSectionHeader('D. Estado de la Aplicación', colorScheme),
@@ -875,6 +1030,44 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     subtitle: _licenciaDetalle,
                   ),
                 ),
+                const SizedBox(height: 8),
+                _buildSubSectionHeader('Qué incluye cada plan', colorScheme),
+                Container(
+                  decoration: _modernContainerDecoration(colorScheme),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Plan actual: ${_permissions.currentPlanLabel(_licenciaActual?.plan)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Entrenamiento: solo modo entrenamiento.',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Competición: entrenamiento + competición (sin análisis avanzado).',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Competición Plus: añade análisis, copias y catálogos.',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Completo: todo lo anterior + detección automática (en I+D Próximamente).',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
 
                 if (LicenseService.devPlanSelectorEnabled) ...[
                   const SizedBox(height: 16),
@@ -906,9 +1099,9 @@ class _ConfigScreenState extends State<ConfigScreen> {
                             isDense: true,
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'basic', child: Text('Básico')),
-                            DropdownMenuItem(value: 'medio', child: Text('Medio')),
-                            DropdownMenuItem(value: 'pro', child: Text('Pro')),
+                            DropdownMenuItem(value: 'basic', child: Text('Entrenamiento')),
+                            DropdownMenuItem(value: 'medio', child: Text('Competición')),
+                            DropdownMenuItem(value: 'pro', child: Text('Competición Plus')),
                             DropdownMenuItem(value: 'completo', child: Text('Completo')),
                           ],
                           onChanged: (value) {
@@ -952,16 +1145,29 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   ),
                 ],
                 
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: _mostrarHistorialUpgrade,
-                    icon: const Icon(Icons.history_rounded, size: 18),
-                    label: const Text('Ver historial de solicitudes'),
-                    style: TextButton.styleFrom(
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _solicitarAmpliacionDesdeHistorial,
+                      icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                      label: const Text('Cambiar plan'),
+                      style: TextButton.styleFrom(
+                        textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    TextButton.icon(
+                      onPressed: _mostrarHistorialUpgrade,
+                      icon: const Icon(Icons.history_rounded, size: 18),
+                      label: const Text('Historial'),
+                      style: TextButton.styleFrom(
+                        textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 8),

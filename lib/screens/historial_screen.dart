@@ -5,8 +5,6 @@ import 'sesion_detalle_screen.dart';
 import 'competicion_historial_detalle_screen.dart';
 // Asegúrate de que el nombre del archivo de estadísticas coincida con el que tienes
 import 'estadisticas_screen.dart'; 
-import '../services/license_permissions_service.dart';
-import '../utils/license_ui_helper.dart';
 import '../utils/responsive_layout.dart';
 
 class HistorialScreen extends StatefulWidget {
@@ -27,7 +25,6 @@ class HistorialScreen extends StatefulWidget {
 
 class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProviderStateMixin {
   final _service = EntrenamientoService();
-  final LicensePermissionsService _permissions = const LicensePermissionsService();
   
   // Listas completas (Datos brutos)
   List<SesionResumen> _entrenamientosRaw = [];
@@ -215,22 +212,6 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => EstadisticasScreen(modo: modo)),
-                );
-              },
-            ),
-          if (!widget.puedeVerEstadisticas)
-            IconButton(
-              icon: Icon(Icons.lock_rounded, color: Colors.orange.shade700),
-              tooltip: LicenseUiHelper.blockedTooltip(
-                permissions: _permissions,
-                capability: LicenseCapability.analytics,
-              ),
-              onPressed: () {
-                LicenseUiHelper.showBlockedSnackBar(
-                  context: context,
-                  permissions: _permissions,
-                  licencia: null,
-                  capability: LicenseCapability.analytics,
                 );
               },
             ),

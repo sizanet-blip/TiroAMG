@@ -15,7 +15,6 @@ import '../services/municion_service.dart';
 import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
-import '../utils/license_ui_helper.dart';
 import 'estadisticas_screen.dart'; // <--- IMPORTANTE: Para navegar a estadísticas
 
 class SesionDetalleScreen extends StatefulWidget {
@@ -927,36 +926,23 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
         elevation: 0,
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(
-              _permitido(LicenseCapability.analytics) ? Icons.bar_chart_rounded : Icons.lock_rounded,
-              color: _permitido(LicenseCapability.analytics) ? colorScheme.primary : Colors.orange,
+          if (_permitido(LicenseCapability.analytics))
+            IconButton(
+              icon: Icon(
+                Icons.bar_chart_rounded,
+                color: colorScheme.primary,
+              ),
+              tooltip: "Analizar esta sesión",
+              onPressed: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => EstadisticasScreen(
+                                modo: 1, // Modo entrenamiento (o genérico)
+                                idsSesionFijos: [widget.sesionId]
+                                )));
+              },
             ),
-            tooltip: _permitido(LicenseCapability.analytics)
-                ? "Analizar esta sesión"
-                : LicenseUiHelper.blockedTooltip(
-                    permissions: _permissions,
-                    capability: LicenseCapability.analytics,
-                  ),
-            onPressed: () {
-              if (!_permitido(LicenseCapability.analytics)) {
-                LicenseUiHelper.showBlockedSnackBar(
-                  context: context,
-                  permissions: _permissions,
-                  licencia: _licenciaActual,
-                  capability: LicenseCapability.analytics,
-                );
-                return;
-              }
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => EstadisticasScreen(
-                              modo: 1, // Modo entrenamiento (o genérico)
-                              idsSesionFijos: [widget.sesionId]
-                              )));
-            },
-          ),
           IconButton(
               icon: const Icon(Icons.edit_rounded),
               tooltip: "Editar Datos",
@@ -966,30 +952,12 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
             tooltip: "Editar tiros",
             onPressed: _editarTirosSesion,
           ),
-          IconButton(
-            icon: Icon(
-              _permitido(LicenseCapability.backup) ? Icons.print_rounded : Icons.lock_rounded,
-              color: _permitido(LicenseCapability.backup) ? null : Colors.orange,
-            ),
-            tooltip: _permitido(LicenseCapability.backup)
-                ? 'Imprimir / PDF'
-                : LicenseUiHelper.blockedTooltip(
-                    permissions: _permissions,
-                    capability: LicenseCapability.backup,
-                  ),
-            onPressed: () {
-              if (!_permitido(LicenseCapability.backup)) {
-                LicenseUiHelper.showBlockedSnackBar(
-                  context: context,
-                  permissions: _permissions,
-                  licencia: _licenciaActual,
-                  capability: LicenseCapability.backup,
-                );
-                return;
-              }
-              _generarPDF();
-            },
-          )
+          if (_permitido(LicenseCapability.backup))
+            IconButton(
+              icon: const Icon(Icons.print_rounded),
+              tooltip: 'Imprimir / PDF',
+              onPressed: _generarPDF,
+            )
         ],
       ),
       body: SafeArea(
