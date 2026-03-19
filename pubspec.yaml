@@ -1,7 +1,7 @@
 name: tiro_deportivo_amg
 description: Aplicación integral para el registro, análisis y gestión de entrenamientos y competiciones de tiro deportivo (ISSF). Incluye simulador, estadísticas avanzadas y generación de informes.
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
