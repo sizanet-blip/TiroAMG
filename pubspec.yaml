@@ -1,0 +1,73 @@
+name: tiro_deportivo_amg
+description: Aplicación integral para el registro, análisis y gestión de entrenamientos y competiciones de tiro deportivo (ISSF). Incluye simulador, estadísticas avanzadas y generación de informes.
+publish_to: 'none'
+version: 1.0.0+3
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- LIBRERÍA DE IDIOMAS ---
+  flutter_localizations:
+    sdk: flutter
+  # -------------------------------------
+  
+  # --- BASE DE DATOS ---
+  sqflite: ^2.3.0
+  path: ^1.9.0
+  sqflite_common_ffi: ^2.3.0
+  
+  # --- GRÁFICAS ---
+  fl_chart: ^0.63.0
+  
+  # --- PDF E IMPRESIÓN ---
+  pdf: ^3.10.4
+  printing: ^5.11.0
+  
+  # --- EXCEL Y ARCHIVOS ---
+  excel: ^4.0.6
+  path_provider: ^2.1.2
+  share_plus: ^10.0.0
+  file_picker: ^8.0.0
+  package_info_plus: ^8.0.2
+  http: ^1.2.2
+  url_launcher: ^6.3.1
+  wakelock_plus: ^1.2.8
+
+  # --- TEXTO A VOZ ---
+
+  # --- ICONOS ---
+  cupertino_icons: ^1.0.2
+
+  # --- Imagenes ---
+  image_picker: ^1.2.1
+  image: ^4.1.7
+  flutter_tts: ^3.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  
+  # --- HERRAMIENTA PARA GENERAR ICONOS ---
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+     - assets/logo.png
+
+# --- CONFIGURACIÓN DEL ICONO DE LA APP ---
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logo.png" 
+  min_sdk_android: 21
+  windows:
+    generate: true
+    image_path: "assets/logo.png"
+    icon_size: 48
