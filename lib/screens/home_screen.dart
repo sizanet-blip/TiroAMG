@@ -14,6 +14,7 @@ import '../services/app_update_service.dart';
 import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
+import '../database/database_provider.dart';
 import '../utils/license_ui_helper.dart';
 import '../utils/responsive_layout.dart';
 
@@ -33,6 +34,14 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _updateDialogShown = false;
   bool _licenseDialogShown = false;
   LicenciaLocal? _licenciaActual;
+  AppDataProfile _perfilDatos = AppDataProfile.personal;
+
+  bool get _bloqueoDemoSoloLectura {
+    final lic = _licenciaActual;
+    if (lic != null) return lic.esDemoSinPlan;
+    // Fallback defensivo mientras carga la licencia.
+    return _perfilDatos == AppDataProfile.demo;
+  }
 
   @override
   void initState() {
@@ -41,9 +50,47 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _runStartupChecks() async {
+    await _refrescarPerfilDatos();
     final ok = await _checkLicenseOnStart();
     if (!ok || !mounted) return;
     await _checkUpdatesOnStart();
+  }
+
+  Future<void> _refrescarPerfilDatos() async {
+    final perfil = await DatabaseProvider.instance.currentProfile;
+    if (!mounted) return;
+    setState(() => _perfilDatos = perfil);
+  }
+
+  Future<bool> _aplicarPerfilSegunLicencia(LicenciaLocal? licencia) async {
+    final perfilActual = await DatabaseProvider.instance.currentProfile;
+
+    // Regla:
+    // - DEMO (sin plan) => Demo
+    // - PLAN => Personal
+    // - PLAN + DEMO => selector manual (conserva perfil actual)
+    if (licencia != null && licencia.esPlanConDemo) {
+      if (mounted) setState(() => _perfilDatos = perfilActual);
+      return false;
+    }
+
+    final perfilObjetivo = (licencia != null && licencia.esDemoSinPlan)
+        ? AppDataProfile.demo
+        : AppDataProfile.personal;
+    if (perfilActual == perfilObjetivo) {
+      if (mounted) setState(() => _perfilDatos = perfilObjetivo);
+      return false;
+    }
+
+    await DatabaseProvider.instance.switchProfile(
+      profile: perfilObjetivo,
+      persist: true,
+      migrateLicense: true,
+    );
+
+    if (!mounted) return true;
+    setState(() => _perfilDatos = perfilObjetivo);
+    return true;
   }
 
   Future<bool> _checkLicenseOnStart() async {
@@ -54,6 +101,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (initialResult.esValida) {
       _actualizarLicencia(initialResult.licencia);
+      final cambioPerfil =
+          await _aplicarPerfilSegunLicencia(initialResult.licencia);
+      if (cambioPerfil) {
+        final recheck = await _licenseService.revisarLicencia();
+        if (!mounted) return false;
+        if (recheck.esValida) {
+          _actualizarLicencia(recheck.licencia);
+          return true;
+        }
+      }
+      if (!mounted) return false;
       if (initialResult.enGraciaOffline) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(initialResult.mensaje)),
@@ -61,6 +119,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       return true;
     }
+
+    // Si no hay licencia válida todavía, forzamos perfil Personal.
+    await _aplicarPerfilSegunLicencia(null);
 
     if (_licenseDialogShown) return false;
     _licenseDialogShown = true;
@@ -72,6 +133,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return false;
     if (retryResult.esValida) {
       _actualizarLicencia(retryResult.licencia);
+      final cambioPerfil = await _aplicarPerfilSegunLicencia(retryResult.licencia);
+      if (cambioPerfil) {
+        final recheck = await _licenseService.revisarLicencia();
+        if (!mounted) return false;
+        if (recheck.esValida) {
+          _actualizarLicencia(recheck.licencia);
+          return true;
+        }
+      }
       return true;
     }
 
@@ -91,28 +161,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _abrirSiPermitido({
-    required BuildContext context,
     required LicenseCapability capability,
     required VoidCallback onAllowed,
   }) async {
     final permitidoLocal = _permissions.canAccess(_licenciaActual, capability);
-    if (!permitidoLocal) {
-      await _mostrarDialogoUpgrade(capability: capability);
-      return;
-    }
-
     final serverResult = await _licenseService.verificarCapacidadServidor(
       licencia: _licenciaActual,
       capability: _permissions.toServerCapability(capability),
     );
 
     // known=true: respuesta autoritativa del servidor.
+    if (serverResult.known && serverResult.allowed) {
+      onAllowed();
+      return;
+    }
     if (serverResult.known && !serverResult.allowed) {
       if (!mounted) return;
       await _mostrarDialogoUpgrade(
         capability: capability,
         detalleServidor: serverResult.message,
       );
+      return;
+    }
+
+    // Si servidor no responde con certeza, usamos fallback local.
+    if (!permitidoLocal) {
+      await _mostrarDialogoUpgrade(capability: capability);
       return;
     }
 
@@ -316,6 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _permissions.canAccess(_licenciaActual, LicenseCapability.competition);
     final puedeBackup =
         _permissions.canAccess(_licenciaActual, LicenseCapability.backup);
+    final mostrarBackup = puedeBackup || _perfilDatos == AppDataProfile.demo;
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.sizeOf(context).width;
@@ -440,6 +515,29 @@ class _HomeScreenState extends State<HomeScreen> {
                             letterSpacing: -0.5,
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            Chip(
+                              avatar: const Icon(Icons.storage, size: 16),
+                              label: Text('Perfil: ${_perfilDatos.label}'),
+                            ),
+                            if (_licenciaActual?.esDemoSinPlan ?? false)
+                              const Chip(
+                                avatar: Icon(Icons.visibility, size: 16),
+                                label: Text('MODO DEMO'),
+                                backgroundColor: Color(0xFFFFE0B2),
+                              ),
+                            if (_licenciaActual?.esPlanConDemo ?? false)
+                              const Chip(
+                                avatar: Icon(Icons.verified, size: 16),
+                                label: Text('PLAN + DEMO'),
+                                backgroundColor: Color(0xFFD1C4E9),
+                              ),
+                          ],
+                        ),
                         SizedBox(height: isLandscape ? 12 : 16),
                         if (isLandscape)
                           _buildGroupedButtonsGrid(
@@ -473,7 +571,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   dense: landscapeCompactCards,
                                   inGrid: true,
                                   onTap: () => _abrirSiPermitido(
-                                    context: context,
                                     capability: LicenseCapability.competition,
                                     onAllowed: () => Navigator.push(
                                       context,
@@ -537,7 +634,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: Colors.amber.shade700,
                               isDark: isDark,
                               onTap: () => _abrirSiPermitido(
-                                context: context,
                                 capability: LicenseCapability.competition,
                                 onAllowed: () => Navigator.push(
                                   context,
@@ -590,7 +686,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             crossAxisCount: landscapeColumns,
                             childAspectRatio: moreCardsAspect,
                             children: [
-                              if (puedeBackup)
+                              if (mostrarBackup)
                                 _buildModernMenuCard(
                                   child: _buildModernMenuItem(
                                     context: context,
@@ -598,15 +694,48 @@ class _HomeScreenState extends State<HomeScreen> {
                                     icon: Icons.cloud_sync_rounded,
                                     color: Colors.blueGrey,
                                     dense: landscapeCompactCards,
-                                    onTap: () => _abrirSiPermitido(
-                                      context: context,
+                                  onTap: () async {
+                                    if (_perfilDatos == AppDataProfile.demo) {
+                                      if (!context.mounted) return;
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const BackupScreen(
+                                            demoToolsOnly: true,
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    final licenciaLocal =
+                                        await _licenseService.obtenerLicenciaLocal();
+                                    if (licenciaLocal != null && mounted) {
+                                      setState(() => _licenciaActual = licenciaLocal);
+                                    }
+                                    final bloqueo = licenciaLocal?.esDemoSinPlan ??
+                                        _bloqueoDemoSoloLectura;
+                                    if (bloqueo) {
+                                      if (!context.mounted) return;
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const BackupScreen(
+                                            demoToolsOnly: true,
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    if (!mounted) return;
+                                    await _abrirSiPermitido(
                                       capability: LicenseCapability.backup,
                                       onAllowed: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                             builder: (_) => const BackupScreen()),
                                       ),
-                                    ),
+                                    );
+                                  },
                                   ),
                                 ),
                               _buildModernMenuCard(
@@ -617,17 +746,36 @@ class _HomeScreenState extends State<HomeScreen> {
                                   color: Colors.grey.shade700,
                                   dense: landscapeCompactCards,
                                   onTap: () async {
-                                    await Navigator.push(
+                                    final cambioPerfil = await Navigator.push<bool>(
                                       context,
                                       MaterialPageRoute(
                                           builder: (_) => const ConfigScreen()),
                                     );
                                     if (!mounted) return;
-                                    final refreshed = await _licenseService.revisarLicencia(
+                                    if (cambioPerfil == true) {
+                                      await _refrescarPerfilDatos();
+                                      await _checkLicenseOnStart();
+                                      return;
+                                    }
+                                    final refreshed =
+                                        await _licenseService.revisarLicencia(
                                       forzarServidor: true,
                                     );
                                     if (!mounted) return;
                                     _actualizarLicencia(refreshed.licencia);
+                                    final perfilCambiado =
+                                        await _aplicarPerfilSegunLicencia(
+                                      refreshed.licencia,
+                                    );
+                                    if (perfilCambiado) {
+                                      final recheck =
+                                          await _licenseService.revisarLicencia(
+                                        forzarServidor: true,
+                                      );
+                                      if (!mounted) return;
+                                      _actualizarLicencia(recheck.licencia);
+                                    }
+                                    await _refrescarPerfilDatos();
                                   },
                                 ),
                               ),
@@ -659,23 +807,56 @@ class _HomeScreenState extends State<HomeScreen> {
                                 )),
                             child: Column(
                               children: [
-                                if (puedeBackup)
+                                if (mostrarBackup)
                                   _buildModernMenuItem(
                                     context: context,
                                     title: 'Copia de seguridad',
                                     icon: Icons.cloud_sync_rounded,
                                     color: Colors.blueGrey,
-                                    onTap: () => _abrirSiPermitido(
-                                      context: context,
+                                  onTap: () async {
+                                    if (_perfilDatos == AppDataProfile.demo) {
+                                      if (!context.mounted) return;
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const BackupScreen(
+                                            demoToolsOnly: true,
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    final licenciaLocal =
+                                        await _licenseService.obtenerLicenciaLocal();
+                                    if (licenciaLocal != null && mounted) {
+                                      setState(() => _licenciaActual = licenciaLocal);
+                                    }
+                                    final bloqueo = licenciaLocal?.esDemoSinPlan ??
+                                        _bloqueoDemoSoloLectura;
+                                    if (bloqueo) {
+                                      if (!context.mounted) return;
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const BackupScreen(
+                                            demoToolsOnly: true,
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    if (!mounted) return;
+                                    await _abrirSiPermitido(
                                       capability: LicenseCapability.backup,
                                       onAllowed: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                             builder: (_) => const BackupScreen()),
                                       ),
-                                    ),
+                                    );
+                                  },
                                   ),
-                                if (puedeBackup)
+                                if (mostrarBackup)
                                   Divider(
                                       height: 1,
                                       indent: 56,
@@ -687,17 +868,36 @@ class _HomeScreenState extends State<HomeScreen> {
                                   icon: Icons.settings_rounded,
                                   color: Colors.grey.shade700,
                                   onTap: () async {
-                                    await Navigator.push(
+                                    final cambioPerfil = await Navigator.push<bool>(
                                       context,
                                       MaterialPageRoute(
                                           builder: (_) => const ConfigScreen()),
                                     );
                                     if (!mounted) return;
-                                    final refreshed = await _licenseService.revisarLicencia(
+                                    if (cambioPerfil == true) {
+                                      await _refrescarPerfilDatos();
+                                      await _checkLicenseOnStart();
+                                      return;
+                                    }
+                                    final refreshed =
+                                        await _licenseService.revisarLicencia(
                                       forzarServidor: true,
                                     );
                                     if (!mounted) return;
                                     _actualizarLicencia(refreshed.licencia);
+                                    final perfilCambiado =
+                                        await _aplicarPerfilSegunLicencia(
+                                      refreshed.licencia,
+                                    );
+                                    if (perfilCambiado) {
+                                      final recheck =
+                                          await _licenseService.revisarLicencia(
+                                        forzarServidor: true,
+                                      );
+                                      if (!mounted) return;
+                                      _actualizarLicencia(recheck.licencia);
+                                    }
+                                    await _refrescarPerfilDatos();
                                   },
                                 ),
                                 if (kDebugMode) ...[

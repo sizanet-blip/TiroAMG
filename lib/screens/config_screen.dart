@@ -39,12 +39,27 @@ class _ConfigScreenState extends State<ConfigScreen> {
   LicenciaLocal? _licenciaActual;
   LicenseUpgradeStatus? _ultimoUpgrade;
   String _planDevSeleccionado = 'basic';
+  AppDataProfile _perfilDatos = AppDataProfile.personal;
+
+  bool get _bloqueoDemoSoloLectura {
+    final lic = _licenciaActual;
+    if (lic != null) return lic.esDemoSinPlan;
+    // Fallback defensivo mientras carga la licencia.
+    return _perfilDatos == AppDataProfile.demo;
+  }
 
   @override
   void initState() {
     super.initState();
+    _cargarPerfilDatos();
     _cargarInfoSistema();
     _cargarEstadoLicencia();
+  }
+
+  Future<void> _cargarPerfilDatos() async {
+    final perfil = await DatabaseProvider.instance.currentProfile;
+    if (!mounted) return;
+    setState(() => _perfilDatos = perfil);
   }
 
   Future<void> _cargarInfoSistema() async {
@@ -73,10 +88,11 @@ class _ConfigScreenState extends State<ConfigScreen> {
     final result = await _licenseService.revisarLicencia(
       forzarServidor: forzarServidor,
     );
+    final lic = result.licencia;
+    await _sincronizarPerfilSegunLicencia(lic);
     final ultimoUpgrade = await _licenseService.obtenerUltimoUpgradeStatus();
     if (!mounted) return;
 
-    final lic = result.licencia;
     final fechaFin =
         lic?.fechaFin?.toLocal().toString().split(' ').first ?? '-';
     final ultimaValidacion =
@@ -92,18 +108,74 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _ultimoUpgrade = ultimoUpgrade;
       _planDevSeleccionado = _normalizarPlan(_licenciaActual?.plan);
     });
+    await _cargarPerfilDatos();
+    await _cargarInfoSistema();
+  }
+
+  Future<void> _sincronizarPerfilSegunLicencia(LicenciaLocal? licencia) async {
+    final actual = await DatabaseProvider.instance.currentProfile;
+    // Regla:
+    // - DEMO (sin plan) => Demo
+    // - PLAN => Personal
+    // - PLAN + DEMO => selector manual (no forzar cambio)
+    if (licencia != null && licencia.esPlanConDemo) {
+      if (mounted) {
+        setState(() => _perfilDatos = actual);
+      }
+      return;
+    }
+    final objetivo = (licencia != null && licencia.esDemoSinPlan)
+        ? AppDataProfile.demo
+        : AppDataProfile.personal;
+    if (actual == objetivo) return;
+    await DatabaseProvider.instance.switchProfile(
+      profile: objetivo,
+      persist: true,
+      migrateLicense: true,
+    );
+  }
+
+  Future<void> _cambiarPerfilDatos(AppDataProfile perfil) async {
+    if (!(_licenciaActual?.esPlanConDemo ?? false)) return;
+    final cambiado = await DatabaseProvider.instance.switchProfile(
+      profile: perfil,
+      persist: true,
+      migrateLicense: true,
+    );
+    if (!cambiado) return;
+    await _cargarPerfilDatos();
+    await _cargarInfoSistema();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Perfil cambiado a ${perfil.label}.')),
+    );
   }
 
   Future<void> _refrescarEstadoLicenciaManual() async {
     if (_refrescandoLicencia) return;
     final planAntes = _permissions.currentPlanLabel(_licenciaActual?.plan);
+    final perfilAntes = _perfilDatos;
     setState(() => _refrescandoLicencia = true);
     try {
       await _cargarEstadoLicencia(forzarServidor: true);
       final planDespues = _permissions.currentPlanLabel(_licenciaActual?.plan);
-      final mensaje = planAntes != planDespues
-          ? 'Licencia actualizada: plan cambiado de $planAntes a $planDespues.'
-          : 'Licencia actualizada. No hubo cambio de plan.';
+      final perfilDespues = _perfilDatos;
+      final huboCambioPlan = planAntes != planDespues;
+      final huboCambioPerfil = perfilAntes != perfilDespues;
+
+      late final String mensaje;
+      if (huboCambioPlan && huboCambioPerfil) {
+        mensaje =
+            'Licencia actualizada: plan $planAntes -> $planDespues y modo ${perfilAntes.label} -> ${perfilDespues.label}.';
+      } else if (huboCambioPerfil) {
+        mensaje =
+            'Licencia actualizada: modo cambiado de ${perfilAntes.label} a ${perfilDespues.label}.';
+      } else if (huboCambioPlan) {
+        mensaje =
+            'Licencia actualizada: plan cambiado de $planAntes a $planDespues.';
+      } else {
+        mensaje = 'Licencia actualizada. No hubo cambios.';
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(mensaje)),
@@ -130,15 +202,16 @@ class _ConfigScreenState extends State<ConfigScreen> {
     return () async {
       final permitidoLocal =
           _permissions.canAccess(_licenciaActual, capability);
-      if (!permitidoLocal) {
-        await _mostrarDialogoUpgrade(capability: capability);
-        return;
-      }
 
       final serverResult = await _licenseService.verificarCapacidadServidor(
         licencia: _licenciaActual,
         capability: _permissions.toServerCapability(capability),
       );
+
+      if (serverResult.known && serverResult.allowed) {
+        onAllowed();
+        return;
+      }
 
       if (serverResult.known && !serverResult.allowed) {
         if (!mounted) return;
@@ -149,6 +222,52 @@ class _ConfigScreenState extends State<ConfigScreen> {
         return;
       }
 
+      // Si servidor no responde con certeza, fallback local.
+      if (!permitidoLocal) {
+        await _mostrarDialogoUpgrade(capability: capability);
+        return;
+      }
+
+      onAllowed();
+    };
+  }
+
+  Future<void> _mostrarBloqueoDemo({
+    required String accion,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Modo Demo (solo lectura)'),
+        content: Text(
+          'La opción "$accion" está deshabilitada en Demo sin plan.\n'
+          'Con Plan + Demo se aplican permisos según el plan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  VoidCallback _accionSoloPersonal({
+    required String accion,
+    required VoidCallback onAllowed,
+  }) {
+    return () async {
+      final licenciaLocal = await _licenseService.obtenerLicenciaLocal();
+      if (licenciaLocal != null && mounted) {
+        setState(() => _licenciaActual = licenciaLocal);
+      }
+      final bloqueo = licenciaLocal?.esDemoSinPlan ?? _bloqueoDemoSoloLectura;
+      if (bloqueo) {
+        await _mostrarBloqueoDemo(accion: accion);
+        return;
+      }
       onAllowed();
     };
   }
@@ -353,7 +472,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
               (screenSize.width - 32).clamp(280.0, 780.0).toDouble();
           final dialogMaxHeight =
               (screenSize.height * 0.78).clamp(240.0, 560.0).toDouble();
-          final narrowDialog = dialogWidth < 620;
           final planActual =
               _permissions.currentPlanLabel(_licenciaActual?.plan);
           final planObjetivo = planSeleccionado.label;
@@ -885,7 +1003,15 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         subtitle: 'Nombre, Licencia, Club...',
                         icon: Icons.account_circle_rounded,
                         color: Colors.teal,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PerfilFormScreen())),
+                        onTap: _accionSoloPersonal(
+                          accion: 'Mis Datos (Perfil)',
+                          onAllowed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PerfilFormScreen(),
+                            ),
+                          ),
+                        ),
                       ),
                       _buildDivider(colorScheme),
                       _buildModernMenuItem(
@@ -894,7 +1020,15 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         subtitle: 'Añadir, modificar y borrar.',
                         icon: Icons.hardware_rounded,
                         color: Colors.teal,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GestionEquiposScreen())),
+                        onTap: _accionSoloPersonal(
+                          accion: 'Gestión de Armas (Equipos)',
+                          onAllowed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const GestionEquiposScreen(),
+                            ),
+                          ),
+                        ),
                       ),
                       _buildDivider(colorScheme),
                       _buildModernMenuItem(
@@ -903,7 +1037,15 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         subtitle: 'Registro y seguimiento de lotes.',
                         icon: Icons.local_fire_department_rounded,
                         color: Colors.teal,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GestionMunicionScreen())),
+                        onTap: _accionSoloPersonal(
+                          accion: 'Gestión de Munición',
+                          onAllowed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const GestionMunicionScreen(),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -923,12 +1065,16 @@ class _ConfigScreenState extends State<ConfigScreen> {
                           subtitle: 'Crear reglas de Duelo (3s/7s), Precisión...',
                           icon: Icons.timer_rounded,
                           color: Colors.indigo,
-                          onTap: _accionProtegida(
+                        onTap: _accionSoloPersonal(
+                          accion: 'Plantillas de Tiempos/Series',
+                          onAllowed: _accionProtegida(
                             capability: LicenseCapability.settingsRules,
                             onAllowed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const GestionTiemposScreen()),
+                                builder: (_) => const GestionTiemposScreen(),
+                              ),
+                            ),
                             ),
                           ),
                         ),
@@ -950,12 +1096,16 @@ class _ConfigScreenState extends State<ConfigScreen> {
                           subtitle: 'Añadir categorías.',
                           icon: Icons.category_rounded,
                           color: Colors.blueGrey,
-                          onTap: _accionProtegida(
+                        onTap: _accionSoloPersonal(
+                          accion: 'Catálogo Tipos de Arma',
+                          onAllowed: _accionProtegida(
                             capability: LicenseCapability.settingsCatalogs,
                             onAllowed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const CatalogoTiposScreen()),
+                                builder: (_) => const CatalogoTiposScreen(),
+                              ),
+                            ),
                             ),
                           ),
                         ),
@@ -966,12 +1116,16 @@ class _ConfigScreenState extends State<ConfigScreen> {
                           subtitle: 'Añadir calibres no estándar.',
                           icon: Icons.straighten_rounded,
                           color: Colors.blueGrey,
-                          onTap: _accionProtegida(
+                        onTap: _accionSoloPersonal(
+                          accion: 'Catálogo de Calibres',
+                          onAllowed: _accionProtegida(
                             capability: LicenseCapability.settingsCatalogs,
                             onAllowed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const CatalogoCalibresScreen()),
+                                builder: (_) => const CatalogoCalibresScreen(),
+                              ),
+                            ),
                             ),
                           ),
                         ),
@@ -982,12 +1136,16 @@ class _ConfigScreenState extends State<ConfigScreen> {
                           subtitle: 'Definir tipos de diana.',
                           icon: Icons.adjust_rounded,
                           color: Colors.blueGrey,
-                          onTap: _accionProtegida(
+                        onTap: _accionSoloPersonal(
+                          accion: 'Catálogo de Dianas',
+                          onAllowed: _accionProtegida(
                             capability: LicenseCapability.settingsCatalogs,
                             onAllowed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const CatalogoDianasScreen()),
+                                builder: (_) => const CatalogoDianasScreen(),
+                              ),
+                            ),
                             ),
                           ),
                         ),
@@ -998,6 +1156,121 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
                 const SizedBox(height: 24),
                 _buildModernSectionHeader('D. Estado de la Aplicación', colorScheme),
+                _buildSubSectionHeader('Perfil de datos', colorScheme),
+                Container(
+                  decoration: _modernContainerDecoration(colorScheme),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.storage,
+                              color: Colors.deepPurple,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Perfil de uso',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            const Spacer(),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant
+                                  .withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                (_licenciaActual?.esDemoSinPlan ?? false)
+                                    ? Icons.visibility
+                                    : Icons.person,
+                                size: 18,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                (_licenciaActual?.esPlanConDemo ?? false)
+                                    ? 'Plan + Demo'
+                                    : ((_licenciaActual?.esDemoSinPlan ?? false)
+                                        ? 'Demo'
+                                        : 'Personal'),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                (_licenciaActual?.esPlanConDemo ?? false)
+                                    ? 'Licencia + selector manual'
+                                    : 'Controlado por licencia',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          (_licenciaActual?.esPlanConDemo ?? false)
+                              ? 'Modo Plan + Demo activo (datos editables con permisos del plan).'
+                              : ((_licenciaActual?.esDemoSinPlan ?? false)
+                                  ? 'Modo Demo activo (solo lectura y demostración).'
+                                  : 'Modo Personal activo (datos reales de uso diario).'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        if (_licenciaActual?.esPlanConDemo ?? false) ...[
+                          const SizedBox(height: 12),
+                          SegmentedButton<AppDataProfile>(
+                            segments: const [
+                              ButtonSegment<AppDataProfile>(
+                                value: AppDataProfile.personal,
+                                icon: Icon(Icons.person, size: 18),
+                                label: Text('Personal'),
+                              ),
+                              ButtonSegment<AppDataProfile>(
+                                value: AppDataProfile.demo,
+                                icon: Icon(Icons.visibility, size: 18),
+                                label: Text('Demo'),
+                              ),
+                            ],
+                            selected: {_perfilDatos},
+                            onSelectionChanged: (selection) {
+                              if (selection.isEmpty) return;
+                              _cambiarPerfilDatos(selection.first);
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
                 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -32,6 +32,21 @@ class LicenciaLocal {
   });
 
   bool get estaActiva => estado.toLowerCase() == 'active';
+  bool get esDemo {
+    final planValue = (plan ?? '').trim().toLowerCase();
+    if (planValue == 'demo') return true;
+    return _asBool(features['is_demo']) ||
+        _asBool(features['demo']) ||
+        _asBool(features['modo_demo']);
+  }
+  bool get tienePlan {
+    final planValue = (plan ?? '').trim().toLowerCase();
+    if (planValue.isEmpty) return false;
+    // Compatibilidad: antiguamente "demo" podía venir en plan.
+    return planValue != 'demo';
+  }
+  bool get esDemoSinPlan => esDemo && !tienePlan;
+  bool get esPlanConDemo => esDemo && tienePlan;
 
   factory LicenciaLocal.fromMap(Map<String, dynamic> map) {
     final rawFeatures = map['features_json']?.toString();
@@ -84,6 +99,20 @@ class LicenciaLocal {
     final text = raw?.toString();
     if (text == null || text.isEmpty) return null;
     return DateTime.tryParse(text)?.toUtc();
+  }
+
+  static bool _asBool(dynamic raw) {
+    if (raw is bool) return raw;
+    if (raw is num) return raw != 0;
+    if (raw is String) {
+      final normalized = raw.trim().toLowerCase();
+      return normalized == '1' ||
+          normalized == 'true' ||
+          normalized == 'yes' ||
+          normalized == 'si' ||
+          normalized == 'sí';
+    }
+    return false;
   }
 }
 

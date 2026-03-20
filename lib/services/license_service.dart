@@ -653,12 +653,31 @@ class LicenseService {
       final payload = _normalizarPayloadLicencia(data, licenciaKey: key, deviceId: deviceId);
       final licencia = await _guardarPayloadLicencia(payload);
       return _evaluarLicenciaLocal(licencia, huboErrorRed: false);
-    } catch (e) {
-      return LicenciaCheckResult(
+    } on SocketException {
+      return const LicenciaCheckResult(
         esValida: false,
         enGraciaOffline: false,
         requiereActivacion: true,
-        mensaje: 'No se pudo activar la licencia: $e',
+        mensaje:
+            'No se pudo conectar con el servidor. Revisa tu conexion a Internet e intentalo de nuevo.',
+        licencia: null,
+      );
+    } on http.ClientException {
+      return const LicenciaCheckResult(
+        esValida: false,
+        enGraciaOffline: false,
+        requiereActivacion: true,
+        mensaje:
+            'El servicio de activacion no esta disponible temporalmente. Intentalo de nuevo en unos minutos.',
+        licencia: null,
+      );
+    } catch (_) {
+      return const LicenciaCheckResult(
+        esValida: false,
+        enGraciaOffline: false,
+        requiereActivacion: true,
+        mensaje:
+            'No pudimos completar la activacion en este momento. Intentalo nuevamente.',
         licencia: null,
       );
     }
@@ -757,12 +776,31 @@ class LicenseService {
       );
       final licencia = await _guardarPayloadLicencia(payload);
       return _evaluarLicenciaLocal(licencia, huboErrorRed: false);
-    } catch (e) {
-      return LicenciaCheckResult(
+    } on SocketException {
+      return const LicenciaCheckResult(
         esValida: false,
         enGraciaOffline: false,
         requiereActivacion: true,
-        mensaje: 'No se pudo solicitar licencia automática: $e',
+        mensaje:
+            'No se pudo conectar con el servidor. Revisa tu conexion a Internet e intentalo de nuevo.',
+        licencia: null,
+      );
+    } on http.ClientException {
+      return const LicenciaCheckResult(
+        esValida: false,
+        enGraciaOffline: false,
+        requiereActivacion: true,
+        mensaje:
+            'El servicio de licencias no esta disponible temporalmente. Intentalo de nuevo en unos minutos.',
+        licencia: null,
+      );
+    } catch (_) {
+      return const LicenciaCheckResult(
+        esValida: false,
+        enGraciaOffline: false,
+        requiereActivacion: true,
+        mensaje:
+            'No pudimos completar la solicitud de activacion en este momento. Intentalo nuevamente.',
         licencia: null,
       );
     }
@@ -827,7 +865,21 @@ class LicenseService {
     final nextValidation = serverNow.add(const Duration(hours: 12));
 
     final rawFeatures = lic['features'];
-    final features = rawFeatures is Map<String, dynamic> ? rawFeatures : <String, dynamic>{};
+    final features = rawFeatures is Map<String, dynamic>
+        ? Map<String, dynamic>.from(rawFeatures)
+        : <String, dynamic>{};
+    final planNormalized = LicenseService._normalizeServerPlan(lic['plan']?.toString());
+    final isDemoFlag = _asBool(lic['is_demo']) ||
+        _asBool(root['is_demo']) ||
+        planNormalized == 'demo';
+    if (isDemoFlag) {
+      features['is_demo'] = true;
+    } else {
+      // Evita que un flag demo antiguo se quede "pegado" localmente.
+      features.remove('is_demo');
+      features.remove('demo');
+      features.remove('modo_demo');
+    }
 
     return {
       'id': 1,
@@ -932,6 +984,20 @@ class LicenseService {
     final raw = value?.toString().trim();
     if (raw == null || raw.isEmpty) return null;
     return DateTime.tryParse(raw)?.toUtc().toIso8601String();
+  }
+
+  bool _asBool(dynamic raw) {
+    if (raw is bool) return raw;
+    if (raw is num) return raw != 0;
+    final text = raw?.toString().trim().toLowerCase();
+    return text == '1' || text == 'true' || text == 'yes' || text == 'si' || text == 'sí';
+  }
+
+  static String _normalizeServerPlan(String? rawPlan) {
+    final p = (rawPlan ?? '').trim().toLowerCase();
+    if (p.isEmpty) return '';
+    if (p == 'demo') return 'demo';
+    return p;
   }
 
   String get _platformKey {

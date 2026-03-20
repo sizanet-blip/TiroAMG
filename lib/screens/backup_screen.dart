@@ -4,7 +4,12 @@ import '../services/backup_service.dart'; // Importar el nuevo servicio
 import 'package:flutter/foundation.dart'; // <--- Agrega esto para usar kDebugMode
 
 class BackupScreen extends StatefulWidget {
-  const BackupScreen({super.key});
+  final bool demoToolsOnly;
+
+  const BackupScreen({
+    super.key,
+    this.demoToolsOnly = false,
+  });
 
   @override
   State<BackupScreen> createState() => _BackupScreenState();
@@ -109,28 +114,30 @@ class _BackupScreenState extends State<BackupScreen> {
             const SizedBox(height: 20),
 
             // --- SECCIÓN BACKUP REAL ---
-            ListTile(
-              leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.upload, color: Colors.white)),
-              title: const Text('Exportar Base de Datos'),
-              subtitle: const Text('Crear copia de seguridad'),
-              onTap: _exportarBD,
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey[300]!)),
-            ),
-            const SizedBox(height: 10),
-            ListTile(
-              leading: const CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.download, color: Colors.white)),
-              title: const Text('Importar Base de Datos'),
-              subtitle: const Text('Restaurar desde un archivo'),
-              onTap: _importarBD,
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey[300]!)),
-            ),
+            if (!widget.demoToolsOnly) ...[
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.upload, color: Colors.white)),
+                title: const Text('Exportar Base de Datos'),
+                subtitle: const Text('Crear copia de seguridad'),
+                onTap: _exportarBD,
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey[300]!)),
+              ),
+              const SizedBox(height: 10),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.download, color: Colors.white)),
+                title: const Text('Importar Base de Datos'),
+                subtitle: const Text('Restaurar desde un archivo'),
+                onTap: _importarBD,
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey[300]!)),
+              ),
+            ],
 
             const SizedBox(height: 40),
             
             // --- SECCIÓN DESARROLLADOR ---
-            if (kDebugMode) ...[ 
+            if (kDebugMode || widget.demoToolsOnly) ...[ 
               const SizedBox(height: 40),
               
               // --- SECCIÓN DESARROLLADOR ---
@@ -148,7 +155,7 @@ class _BackupScreenState extends State<BackupScreen> {
                       children: [
                         Icon(Icons.build, color: Colors.grey),
                         SizedBox(width: 10),
-                        Text('Zona de Pruebas (Developer)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                        Text('Zona de Pruebas', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
                       ],
                     ),
                     const SizedBox(height: 15),
@@ -163,33 +170,35 @@ class _BackupScreenState extends State<BackupScreen> {
                             onPressed: _generarDatos,
                             child: const Text('GENERAR DATOS DE PRUEBA'),
                           ),
-                          const SizedBox(height: 10),
-                          OutlinedButton(
-                            onPressed: _borrarSoloPruebas,
-                            child: const Text('BORRAR SOLO DATOS DE PRUEBA'),
-                          ),
-                          const SizedBox(height: 10),
-                          OutlinedButton(
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('⚠️ ¿BORRAR TODO?'),
-                                  content: const Text('Se eliminarán tus entrenamientos REALES. No se puede deshacer.'),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                      onPressed: () { Navigator.pop(ctx); _borrarTodo(); }, 
-                                      child: const Text('Borrar Todo')
-                                    ),
-                                  ],
-                                )
-                              );
-                            },
-                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text('BORRAR ABSOLUTAMENTE TODO'),
-                          ),
+                          if (!widget.demoToolsOnly) ...[
+                            const SizedBox(height: 10),
+                            OutlinedButton(
+                              onPressed: _borrarSoloPruebas,
+                              child: const Text('BORRAR SOLO DATOS DE PRUEBA'),
+                            ),
+                            const SizedBox(height: 10),
+                            OutlinedButton(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('⚠️ ¿BORRAR TODO?'),
+                                    content: const Text('Se eliminarán tus entrenamientos REALES. No se puede deshacer.'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                        onPressed: () { Navigator.pop(ctx); _borrarTodo(); }, 
+                                        child: const Text('Borrar Todo')
+                                      ),
+                                    ],
+                                  )
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                              child: const Text('BORRAR ABSOLUTAMENTE TODO'),
+                            ),
+                          ],
                         ],
                       ),
                   ],

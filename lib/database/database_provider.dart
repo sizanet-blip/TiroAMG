@@ -1,22 +1,99 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+enum AppDataProfile { personal, demo }
+
+extension AppDataProfileX on AppDataProfile {
+  String get id => this == AppDataProfile.demo ? 'demo' : 'personal';
+  String get label => this == AppDataProfile.demo ? 'Demo' : 'Personal';
+}
 
 class DatabaseProvider {
   static const int schemaVersion = 7;
+  static const String _profilePrefKey = 'app_data_profile';
+  static const String _dbNamePersonal = 'tiro_deportivo.db';
+  static const String _dbNameDemo = 'tiro_deportivo_demo.db';
   static Database? _database;
+  static AppDataProfile _activeProfile = AppDataProfile.personal;
+  static bool _profileLoaded = false;
   static final DatabaseProvider instance = DatabaseProvider._constructor();
 
   DatabaseProvider._constructor();
 
   Future<Database> get database async {
+    await ensureProfileLoaded();
     if (_database != null) return _database!;
     _database = await _initDB();
     return _database!;
   }
 
+  Future<AppDataProfile> get currentProfile async {
+    await ensureProfileLoaded();
+    return _activeProfile;
+  }
+
+  Future<void> ensureProfileLoaded() async {
+    if (_profileLoaded) return;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_profilePrefKey)?.trim().toLowerCase() ?? '';
+    _activeProfile = raw == AppDataProfile.demo.id
+        ? AppDataProfile.demo
+        : AppDataProfile.personal;
+    _profileLoaded = true;
+  }
+
+  Future<bool> switchProfile({
+    required AppDataProfile profile,
+    bool persist = true,
+    bool migrateLicense = true,
+  }) async {
+    await ensureProfileLoaded();
+    if (_activeProfile == profile) return false;
+
+    Map<String, Object?>? licenciaActual;
+    if (migrateLicense) {
+      final currentDb = await database;
+      final rows = await currentDb.query(
+        'Licencias',
+        where: 'id = ?',
+        whereArgs: [1],
+        limit: 1,
+      );
+      if (rows.isNotEmpty) {
+        licenciaActual = Map<String, Object?>.from(rows.first);
+      }
+    }
+
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+
+    _activeProfile = profile;
+
+    if (persist) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_profilePrefKey, profile.id);
+    }
+
+    final targetDb = await database;
+    if (migrateLicense && licenciaActual != null) {
+      await targetDb.insert(
+        'Licencias',
+        licenciaActual,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    return true;
+  }
+
   Future<Database> _initDB() async {
     String path = await getDatabasesPath();
-    path = join(path, 'tiro_deportivo.db');
+    path = join(
+      path,
+      _activeProfile == AppDataProfile.demo ? _dbNameDemo : _dbNamePersonal,
+    );
     return await openDatabase(
       path,
       version: schemaVersion,

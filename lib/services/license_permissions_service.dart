@@ -78,6 +78,8 @@ class LicensePermissionsService {
   }
 
   String currentPlanLabel(String? plan) {
+    final raw = (plan ?? '').trim();
+    if (raw.isEmpty) return 'Sin plan';
     switch (_planTier(plan)) {
       case 3:
         return 'Completo';
