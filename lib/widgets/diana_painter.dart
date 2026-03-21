@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/diana_layout.dart';
 
 class DianaPainter extends CustomPainter {
   final List<Offset> impactos;
@@ -10,6 +11,7 @@ class DianaPainter extends CustomPainter {
   final bool tieneMosca;
   final bool tieneGuias;
   final bool esEstiloDuelo;
+  final bool mostrarCartulina;
 
   // NUEVO: Centro de Gravedad (MPI)
   // Si no es null, dibujaremos una cruz indicando el desvío medio
@@ -23,19 +25,46 @@ class DianaPainter extends CustomPainter {
     required this.tieneMosca,
     required this.tieneGuias,
     required this.esEstiloDuelo,
+    this.mostrarCartulina = false,
     this.centroGravedad,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    final maxR = size.width / 2;
+    final radius = radioPuntuacionPx(maxR, mostrarCartulina);
+
+    if (mostrarCartulina) {
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()..color = const Color(0xFFFFFEF5)..style = PaintingStyle.fill,
+      );
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..color = Colors.grey.shade400
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+    }
 
     // 1. Dibujar la Diana Base
     if (esEstiloDuelo) {
       _pintarDianaDuelo(canvas, center, radius);
     } else {
       _pintarDianaPrecision(canvas, center, radius);
+    }
+
+    if (mostrarCartulina) {
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..color = Colors.grey.shade500
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2,
+      );
     }
 
     // 2. Dibujar Impactos

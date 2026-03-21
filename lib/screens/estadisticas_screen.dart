@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../constants/diana_layout.dart';
 import '../services/estadisticas_service.dart';
 import '../services/equipo_service.dart';
 import '../services/catalogo_service.dart';
@@ -819,6 +820,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     bool tm = dianaActiva.tieneMosca;
     bool tg = dianaActiva.tieneGuias;
     bool ed = an <= 5;
+    bool mc = dianaActiva.mostrarCartulina;
     int numDescartes = _analisis!.disparosDescartados.length;
 
     return SingleChildScrollView(
@@ -909,23 +911,25 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
               aspectRatio: 1,
               child: LayoutBuilder(builder: (context, constraints) {
                 double diametro = constraints.maxWidth;
+                final rScore =
+                    radioPuntuacionPx(diametro / 2, mc);
+                final c = diametro / 2;
                 return CustomPaint(
                     painter: DianaPainter(
                         validos: _convertirImpactosAPixeles(
-                            _analisis!.disparosValidos, diametro / 2),
+                            _analisis!.disparosValidos, diametro, mc),
                         descartados: _convertirImpactosAPixeles(
-                            _analisis!.disparosDescartados, diametro / 2),
+                            _analisis!.disparosDescartados, diametro, mc),
                         valorMinimo: vm,
                         anilloNegroInicio: an,
                         esFondoNegro: fn,
                         tieneMosca: tm,
                         tieneGuias: tg,
                         esEstiloDuelo: ed,
+                        mostrarCartulina: mc,
                         centroGravedad: Offset(
-                            (_analisis!.mpi.x * (diametro / 2)) +
-                                (diametro / 2),
-                            (_analisis!.mpi.y * (diametro / 2)) +
-                                (diametro / 2))));
+                            (_analisis!.mpi.x * rScore) + c,
+                            (_analisis!.mpi.y * rScore) + c)));
               }))),
       const SizedBox(height: 10),
       Text("${_analisis!.disparosValidos.length} impactos válidos",
@@ -1159,9 +1163,14 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   }
 
   List<Offset> _convertirImpactosAPixeles(
-      List<Disparo> disparos, double radius) {
+    List<Disparo> disparos,
+    double diametro,
+    bool mostrarCartulina,
+  ) {
+    final c = diametro / 2;
+    final rScore = radioPuntuacionPx(diametro / 2, mostrarCartulina);
     return disparos
-        .map((d) => Offset((d.x * radius) + radius, (d.y * radius) + radius))
+        .map((d) => Offset((d.x * rScore) + c, (d.y * rScore) + c))
         .toList();
   }
 }
@@ -1175,6 +1184,7 @@ class DianaPainter extends CustomPainter {
   final bool tieneMosca;
   final bool tieneGuias;
   final bool esEstiloDuelo;
+  final bool mostrarCartulina;
   final Offset? centroGravedad;
 
   DianaPainter({
@@ -1186,18 +1196,46 @@ class DianaPainter extends CustomPainter {
     required this.tieneMosca,
     required this.tieneGuias,
     required this.esEstiloDuelo,
+    this.mostrarCartulina = false,
     this.centroGravedad,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    final maxR = size.width / 2;
+    final radius = radioPuntuacionPx(maxR, mostrarCartulina);
+
+    if (mostrarCartulina) {
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..color = const Color(0xFFFFFEF5)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..color = Colors.grey.shade400
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+    }
 
     final paintFondo = Paint()
       ..color = esFondoNegro ? const Color(0xFF1A1A1A) : Colors.white
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, paintFondo);
+    if (mostrarCartulina) {
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..color = Colors.grey.shade500
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2,
+      );
+    }
 
     final paintNegro = Paint()
       ..color = Colors.black

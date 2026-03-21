@@ -10,7 +10,7 @@ extension AppDataProfileX on AppDataProfile {
 }
 
 class DatabaseProvider {
-  static const int schemaVersion = 7;
+  static const int schemaVersion = 8;
   static const String _profilePrefKey = 'app_data_profile';
   static const String _dbNamePersonal = 'tiro_deportivo.db';
   static const String _dbNameDemo = 'tiro_deportivo_demo.db';
@@ -118,7 +118,8 @@ class DatabaseProvider {
         tiene_mosca INTEGER,
         tiene_guias INTEGER,
         ancho_exterior_mm REAL,
-        alto_exterior_mm REAL
+        alto_exterior_mm REAL,
+        mostrar_cartulina INTEGER NOT NULL DEFAULT 1
       )
     ''');
 
@@ -300,6 +301,9 @@ class DatabaseProvider {
     if (oldVersion < 7) {
       await _migrarV6aV7(db);
     }
+    if (oldVersion < 8) {
+      await _migrarV7aV8(db);
+    }
   }
 
   Future<void> _migrarV1aV2(Database db) async {
@@ -366,6 +370,14 @@ class DatabaseProvider {
     await _agregarColumnaSiNoExiste(db, 'Licencias', 'ultimo_upgrade_msg TEXT');
   }
 
+  Future<void> _migrarV7aV8(Database db) async {
+    await _agregarColumnaSiNoExiste(
+      db,
+      'CatalogoDianas',
+      'mostrar_cartulina INTEGER NOT NULL DEFAULT 0',
+    );
+  }
+
   Future<void> _migrarV6aV7(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS UpgradeSolicitudes (
@@ -408,13 +420,13 @@ class DatabaseProvider {
     
     // C. Dianas Oficiales
     int idDianaPrec = await db.insert('CatalogoDianas', {
-      'nombre': 'ISSF 25m/50m Precisión', 'valor_minimo': 1, 'anillo_negro_inicio': 7, 'es_fondo_negro': 0, 'tiene_mosca': 1, 'tiene_guias': 0, 'ancho_exterior_mm': 500.0, 'alto_exterior_mm': 500.0
+      'nombre': 'ISSF 25m/50m Precisión', 'valor_minimo': 1, 'anillo_negro_inicio': 7, 'es_fondo_negro': 0, 'tiene_mosca': 1, 'tiene_guias': 0, 'ancho_exterior_mm': 500.0, 'alto_exterior_mm': 500.0, 'mostrar_cartulina': 1
     });
     int idDianaDuelo = await db.insert('CatalogoDianas', {
-      'nombre': 'ISSF 25m Duelo/Rápido', 'valor_minimo': 5, 'anillo_negro_inicio': 5, 'es_fondo_negro': 1, 'tiene_mosca': 1, 'tiene_guias': 1, 'ancho_exterior_mm': 500.0, 'alto_exterior_mm': 500.0
+      'nombre': 'ISSF 25m Duelo/Rápido', 'valor_minimo': 5, 'anillo_negro_inicio': 5, 'es_fondo_negro': 1, 'tiene_mosca': 1, 'tiene_guias': 1, 'ancho_exterior_mm': 500.0, 'alto_exterior_mm': 500.0, 'mostrar_cartulina': 1
     });
     int idDianaAire = await db.insert('CatalogoDianas', {
-      'nombre': 'ISSF 10m Aire', 'valor_minimo': 1, 'anillo_negro_inicio': 7, 'es_fondo_negro': 0, 'tiene_mosca': 1, 'tiene_guias': 0, 'ancho_exterior_mm': 170.0, 'alto_exterior_mm': 170.0
+      'nombre': 'ISSF 10m Aire', 'valor_minimo': 1, 'anillo_negro_inicio': 7, 'es_fondo_negro': 0, 'tiene_mosca': 1, 'tiene_guias': 0, 'ancho_exterior_mm': 170.0, 'alto_exterior_mm': 170.0, 'mostrar_cartulina': 1
     });
 
     // D. PLANTILLAS DE TIEMPOS

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../constants/diana_layout.dart';
 import '../models/equipo_model.dart';
 import '../models/plantilla_tiempos_model.dart';
 import '../models/municion_model.dart';
@@ -79,6 +80,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   bool _esEstiloDuelo = false;
   double? _dianaAnchoExteriorMm;
   double? _calibreMm;
+  bool _mostrarCartulina = false;
   bool _cargando = true;
 
   // Estado Crono
@@ -112,6 +114,128 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       _indiceTiroEnAjuste != null &&
       _indiceTiroEnAjuste! >= 0 &&
       _indiceTiroEnAjuste! < _listaDisparos.length;
+
+  /// Tiros previstos por la plantilla (una serie en esta pantalla).
+  int get _tirosPrevistos => widget.plantilla.disparosPorSerie;
+
+  int get _tirosRegistrados => _listaDisparos.length;
+
+  /// Progreso de la serie (0–1); con tiros extra se mantiene en 1.
+  double get _progresoTirosSerie {
+    final m = _tirosPrevistos;
+    if (m <= 0) return 0;
+    return (_tirosRegistrados / m).clamp(0.0, 1.0);
+  }
+
+  Color get _colorBarraProgresoSerie {
+    final m = _tirosPrevistos;
+    final n = _tirosRegistrados;
+    if (m <= 0) return Colors.tealAccent.shade200;
+    if (n > m) return Colors.orange.shade400;
+    if (n >= m) return Colors.lightGreenAccent;
+    return Colors.tealAccent.shade200;
+  }
+
+  void _mostrarFeedbackConteoTiros(int totalTrasAnadir) {
+    final m = _tirosPrevistos;
+    if (m <= 0 || !mounted) return;
+    if (totalTrasAnadir == m) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Serie completada: $m/$m disparos.'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else if (totalTrasAnadir == m + 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Tiro extra: la plantilla prevé $m disparos por serie. Puedes seguir registrando.',
+          ),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Widget _buildContadorTirosSerie(bool narrow) {
+    final m = _tirosPrevistos;
+    final n = _tirosRegistrados;
+    if (m <= 0) {
+      return Row(
+        children: [
+          Icon(Icons.adjust, size: narrow ? 16 : 18, color: Colors.white54),
+          const SizedBox(width: 8),
+          Text(
+            '$n tiros registrados',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: narrow ? 12 : 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      );
+    }
+    final filaSerie = Row(
+      children: [
+        Icon(Icons.adjust, size: narrow ? 16 : 18, color: Colors.white54),
+        const SizedBox(width: 8),
+        Text(
+          'SERIE',
+          style: TextStyle(
+            color: Colors.white54,
+            fontSize: narrow ? 10 : 11,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          '$n / $m',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: narrow ? 16 : 18,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ],
+    );
+
+    // En curso: solo N/M (evita redundancia con "Quedan X").
+    if (n < m) {
+      return filaSerie;
+    }
+
+    final extras = n - m;
+    final String estado;
+    final Color estadoColor;
+    if (n == m) {
+      estado = 'Serie completa';
+      estadoColor = Colors.lightGreenAccent;
+    } else {
+      estado = extras == 1 ? '1 tiro extra' : '$extras tiros extra';
+      estadoColor = Colors.orange.shade200;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        filaSerie,
+        const SizedBox(height: 4),
+        Text(
+          estado,
+          style: TextStyle(
+            color: estadoColor,
+            fontSize: narrow ? 11 : 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
 
   String _formatearPuntos(double value) {
     if (!widget.usarPuntuacionDecimal) {
@@ -227,6 +351,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
           _tieneGuias = dianaConfig.tieneGuias;
           _esEstiloDuelo = _valorMinimo >= 5;
           _dianaAnchoExteriorMm = dianaConfig.anchoExteriorMm;
+          _mostrarCartulina = dianaConfig.mostrarCartulina;
           _calibreMm = _resolverCalibreMm(
             widget.municion?.nombreCalibre,
             widget.equipo.nombreCalibre,
@@ -426,26 +551,27 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     if (!_puedeRegistrarDisparoConFeedback()) return;
 
     setState(() {
-      Offset centro = Offset(tamanoDiana.width / 2, tamanoDiana.height / 2);
-      double distancia = (localPosition - centro).distance;
-      double radioMax = tamanoDiana.width / 2;
-      double distNorm = distancia / radioMax;
+      final centro = Offset(tamanoDiana.width / 2, tamanoDiana.height / 2);
+      final radioMax =
+          radioPuntuacionPx(tamanoDiana.width / 2, _mostrarCartulina);
+      final pos = _normalizarPosicionEnDiana(localPosition, tamanoDiana);
+      final xn = (pos.dx - centro.dx) / radioMax;
+      final yn = (pos.dy - centro.dy) / radioMax;
+      final valor = _calcularPuntuacionDesdeXY(xn, yn);
 
-      if (distNorm <= 1.0) {
-        final valor = _calcularPuntuacionDesdeXY(
-          (localPosition.dx - centro.dx) / radioMax,
-          (localPosition.dy - centro.dy) / radioMax,
-        );
+      _puntosTotal += valor;
 
-        _puntosTotal += valor;
-
-        _listaDisparos.add(Disparo(
-            numero: _listaDisparos.length + 1,
-            x: (localPosition.dx - centro.dx) / radioMax,
-            y: (localPosition.dy - centro.dy) / radioMax,
-            puntuacion: valor,
-            esMosca: false));
-      }
+      _listaDisparos.add(Disparo(
+        numero: _listaDisparos.length + 1,
+        x: xn,
+        y: yn,
+        puntuacion: valor,
+        esMosca: false,
+      ));
+    });
+    final n = _listaDisparos.length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _mostrarFeedbackConteoTiros(n);
     });
   }
 
@@ -461,6 +587,10 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         puntuacion: valor,
         esMosca: esMosca,
       ));
+    });
+    final n = _listaDisparos.length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _mostrarFeedbackConteoTiros(n);
     });
   }
 
@@ -683,13 +813,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       return;
     }
     final tiro = _listaDisparos[idx];
-    var x = tiro.x + dx;
-    var y = tiro.y + dy;
-    final dist = sqrt((x * x) + (y * y));
-    if (dist > 1.0) {
-      x = x / dist;
-      y = y / dist;
-    }
+    final x = tiro.x + dx;
+    final y = tiro.y + dy;
     final nuevaPuntuacion = _recalcularPuntosAjuste
         ? _calcularPuntuacionDesdeXY(x, y)
         : tiro.puntuacion;
@@ -714,14 +839,11 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     }
 
     final centro = Offset(tamanoDiana.width / 2, tamanoDiana.height / 2);
-    final radioMax = tamanoDiana.width / 2;
-    var x = (localPosition.dx - centro.dx) / radioMax;
-    var y = (localPosition.dy - centro.dy) / radioMax;
-    final dist = sqrt((x * x) + (y * y));
-    if (dist > 1.0) {
-      x = x / dist;
-      y = y / dist;
-    }
+    final radioMax =
+        radioPuntuacionPx(tamanoDiana.width / 2, _mostrarCartulina);
+    final pos = _normalizarPosicionEnDiana(localPosition, tamanoDiana);
+    final x = (pos.dx - centro.dx) / radioMax;
+    final y = (pos.dy - centro.dy) / radioMax;
 
     final tiro = _listaDisparos[idx];
     final nuevaPuntuacion = _recalcularPuntosAjuste
@@ -860,59 +982,52 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                       ],
                     ),
                   );
+                  const double kSerieBarHeight = 3;
+                  final cardPadH = narrowCard ? 12.0 : 20.0;
+                  final cardPadV = narrowCard
+                      ? (compactLandscapeBars ? 8.0 : 12.0)
+                      : (compactLandscapeBars ? 10.0 : 16.0);
+                  final showSerieBar = _tirosPrevistos > 0;
+                  final innerTopPad = showSerieBar
+                      ? max(4.0, cardPadV - kSerieBarHeight)
+                      : cardPadV;
+
                   return Container(
                     margin: EdgeInsets.symmetric(
                       horizontal: narrowCard ? 8 : 16,
                       vertical: compactLandscapeBars ? 4 : 8,
                     ),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: narrowCard ? 12 : 20,
-                      vertical: narrowCard
-                          ? (compactLandscapeBars ? 8 : 12)
-                          : (compactLandscapeBars ? 10 : 16),
-                    ),
+                    clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       color: Colors.blueGrey.shade900.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                     ),
-                    child: narrowCard
-                        ? Column(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (showSerieBar)
+                          LinearProgressIndicator(
+                            value: _progresoTirosSerie,
+                            minHeight: kSerieBarHeight,
+                            backgroundColor: Colors.white.withValues(alpha: 0.07),
+                            color: _colorBarraProgresoSerie,
+                          ),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            cardPadH,
+                            innerTopPad,
+                            cardPadH,
+                            cardPadV,
+                          ),
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
-                                'ARMA ACTUAL',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                widget.equipo.nombre,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 10),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: ptsChip,
-                              ),
-                            ],
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                              if (narrowCard)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
                                     const Text(
                                       'ARMA ACTUAL',
@@ -923,7 +1038,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                                         letterSpacing: 1.2,
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
+                                    const SizedBox(height: 4),
                                     Text(
                                       widget.equipo.nombre,
                                       style: const TextStyle(
@@ -931,15 +1046,57 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                       ),
-                                      maxLines: 1,
+                                      maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                    const SizedBox(height: 10),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: ptsChip,
+                                    ),
+                                  ],
+                                )
+                              else
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'ARMA ACTUAL',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1.2,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            widget.equipo.nombre,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    ptsChip,
                                   ],
                                 ),
-                              ),
-                              ptsChip,
+                              SizedBox(height: narrowCard ? 12 : 10),
+                              _buildContadorTirosSerie(narrowCard),
                             ],
                           ),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -1115,11 +1272,13 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                         double offY = (constraints.maxHeight - diametro) / 2;
                         Offset offsetCorrection = Offset(offX, offY);
                         Size size = Size(diametro, diametro);
-                        final radio = size.width / 2;
+                        final rScore =
+                            radioPuntuacionPx(size.width / 2, _mostrarCartulina);
                         final cx = size.width / 2;
                         final cy = size.height / 2;
                         final impactosPixels = _listaDisparos
-                            .map((d) => Offset((d.x * radio) + cx, (d.y * radio) + cy))
+                            .map((d) =>
+                                Offset((d.x * rScore) + cx, (d.y * rScore) + cy))
                             .toList();
 
                         return GestureDetector(
@@ -1135,14 +1294,21 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                               Center(
                                 child: Container(
                                   decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.05),
-                                            blurRadius: 30,
-                                            spreadRadius: 10)
-                                      ]),
+                                    shape: _mostrarCartulina
+                                        ? BoxShape.rectangle
+                                        : BoxShape.circle,
+                                    borderRadius: _mostrarCartulina
+                                        ? BorderRadius.circular(24)
+                                        : null,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 30,
+                                        spreadRadius: 10,
+                                      )
+                                    ],
+                                  ),
                                   child: CustomPaint(
                                     size: size,
                                     painter: DianaPainter(
@@ -1155,6 +1321,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                                       esEstiloDuelo: _esEstiloDuelo,
                                       diametroImpactoMm: _calibreMm,
                                       diametroDianaMm: _dianaAnchoExteriorMm,
+                                      mostrarCartulina: _mostrarCartulina,
                                     ),
                                   ),
                                 ),
@@ -1201,13 +1368,17 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                                               painter: DianaPainter(
                                                 impactos: impactosPixels,
                                                 valorMinimo: _valorMinimo,
-                                                anilloNegroInicio: _anilloNegroInicio,
+                                                anilloNegroInicio:
+                                                    _anilloNegroInicio,
                                                 esFondoNegro: _esFondoNegro,
                                                 tieneMosca: _tieneMosca,
                                                 tieneGuias: _tieneGuias,
                                                 esEstiloDuelo: _esEstiloDuelo,
                                                 diametroImpactoMm: _calibreMm,
-                                                diametroDianaMm: _dianaAnchoExteriorMm,
+                                                diametroDianaMm:
+                                                    _dianaAnchoExteriorMm,
+                                                mostrarCartulina:
+                                                    _mostrarCartulina,
                                               ),
                                             ),
                                           ),
@@ -1606,7 +1777,9 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                 ),
               ),
               Text(
-                'Tiros: ${_listaDisparos.length}',
+                _tirosPrevistos > 0
+                    ? 'Tiros: ${_listaDisparos.length} / $_tirosPrevistos'
+                    : 'Tiros: ${_listaDisparos.length}',
                 style: const TextStyle(
                   color: Colors.white60,
                   fontSize: 12,
@@ -1763,6 +1936,7 @@ class DianaPainter extends CustomPainter {
   final bool esEstiloDuelo;
   final double? diametroImpactoMm;
   final double? diametroDianaMm;
+  final bool mostrarCartulina;
 
   DianaPainter({
     required this.impactos,
@@ -1774,18 +1948,39 @@ class DianaPainter extends CustomPainter {
     required this.esEstiloDuelo,
     this.diametroImpactoMm,
     this.diametroDianaMm,
+    this.mostrarCartulina = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    final maxR = size.width / 2;
+    final radius = radioPuntuacionPx(maxR, mostrarCartulina);
 
-    // 1. Fondo
+    if (mostrarCartulina) {
+      final cartulina = Paint()
+        ..color = const Color(0xFFFFFEF5)
+        ..style = PaintingStyle.fill;
+      canvas.drawRect(Offset.zero & size, cartulina);
+      final bordePapel = Paint()
+        ..color = Colors.grey.shade400
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1;
+      canvas.drawRect(Offset.zero & size, bordePapel);
+    }
+
+    // 1. Fondo del disco de puntuación
     final paintFondo = Paint()
       ..color = esFondoNegro ? const Color(0xFF1A1A1A) : const Color(0xFFF5F3E0)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, paintFondo);
+    if (mostrarCartulina) {
+      final bordeDisco = Paint()
+        ..color = Colors.grey.shade500
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      canvas.drawCircle(center, radius, bordeDisco);
+    }
 
     // 2. Anillos y Números
     int totalZonas = 11 - valorMinimo;

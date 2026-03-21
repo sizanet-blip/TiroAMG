@@ -25,6 +25,7 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
   bool _esFondoNegro = false; 
   bool _tieneMosca = true;
   bool _tieneGuias = false;
+  bool _mostrarCartulina = true;
 
   @override
   void initState() {
@@ -36,6 +37,7 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
       _esFondoNegro = widget.diana!.esFondoNegro;
       _tieneMosca = widget.diana!.tieneMosca;
       _tieneGuias = widget.diana!.tieneGuias;
+      _mostrarCartulina = widget.diana!.mostrarCartulina;
       
       // Cargar dimensiones físicas (Corrección aplicada)
       _anchoMmController.text = widget.diana!.anchoExteriorMm?.toString() ?? ''; 
@@ -71,7 +73,8 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
         tieneGuias: _tieneGuias,
         // Asignar nuevas dimensiones
         anchoExteriorMm: ancho, 
-        altoExteriorMm: alto,   
+        altoExteriorMm: alto,
+        mostrarCartulina: _mostrarCartulina,
       );
 
       if (widget.diana == null) {
@@ -145,8 +148,23 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
                 ],
               ),
               const Padding(
-                padding: EdgeInsets.only(top: 4, bottom: 20, left: 2),
+                padding: EdgeInsets.only(top: 4, bottom: 12, left: 2),
                 child: Text('   • Dimensión física total del papel (ej: 170mm).', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ),
+              SwitchListTile(
+                title: const Text('Mostrar cartulina alrededor'),
+                subtitle: const Text(
+                  'Fondo claro tipo papel alrededor del disco de puntuación (más parecido al blanco real).',
+                ),
+                value: _mostrarCartulina,
+                onChanged: (v) => setState(() => _mostrarCartulina = v),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16, left: 2),
+                child: Text(
+                  '   • Si está desactivado, solo se ve el círculo de la diana.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
               ),
               // ** FIN CAMPOS DE DIMENSIONES FÍSICAS **
 

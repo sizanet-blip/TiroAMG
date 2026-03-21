@@ -11,6 +11,7 @@ import '../models/municion_model.dart';
 import '../models/informe_model.dart';
 import '../services/perfil_service.dart';
 import '../models/tipo_diana_model.dart';
+import '../constants/diana_layout.dart';
 import 'estadisticas_service.dart'; 
 
 class DatosInformeDiana {
@@ -490,8 +491,27 @@ class PdfService {
   void _dianaFinalV4(PdfGraphics canvas, PdfPoint size, TipoDiana diana, AnalisisAgrupacion analisis, {required PdfFont font}) {
       if (size.x.isNaN || size.y.isNaN || size.x <= 0 || size.y <= 0) return;
 
-      double cx = size.x / 2; double cy = size.y / 2; double radius = size.x / 2;
+      double cx = size.x / 2; double cy = size.y / 2;
+      double maxR = size.x / 2;
+      double radius = maxR * (diana.mostrarCartulina ? kRadioPuntuacionConCartulina : 1.0);
+
+      if (diana.mostrarCartulina) {
+        canvas.setColor(const PdfColor(1, 0.996, 0.965));
+        canvas.drawRect(0, 0, size.x, size.y);
+        canvas.fillPath();
+        canvas.setColor(PdfColors.grey400);
+        canvas.setLineWidth(0.5);
+        canvas.drawRect(0, 0, size.x, size.y);
+        canvas.strokePath();
+      }
+
       canvas.setColor(diana.esFondoNegro ? PdfColors.black : colorCrema); canvas.drawEllipse(cx, cy, radius, radius); canvas.fillPath();
+      if (diana.mostrarCartulina) {
+        canvas.setColor(PdfColors.grey);
+        canvas.setLineWidth(0.8);
+        canvas.drawEllipse(cx, cy, radius, radius);
+        canvas.strokePath();
+      }
       int totalZonas = 11 - diana.valorMinimo; 
       if (diana.nombre.toLowerCase().contains("duelo")) totalZonas = 6; 
       if (totalZonas <= 0) totalZonas = 1; // BLINDAJE

@@ -70,7 +70,10 @@ class _CatalogoDianasScreenState extends State<CatalogoDianasScreen> {
               child: Icon(Icons.adjust, color: Colors.black),
             ),
             title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('Negro desde el ${item.anilloNegroInicio} • ${item.tieneMosca ? "Con Mosca" : "Sin Mosca"}'),
+            subtitle: Text(
+              'Negro desde el ${item.anilloNegroInicio} • ${item.tieneMosca ? "Con Mosca" : "Sin Mosca"}'
+              '${item.mostrarCartulina ? " • Cartulina" : ""}',
+            ),
             
             onLongPress: () => _borrarDiana(item),
             

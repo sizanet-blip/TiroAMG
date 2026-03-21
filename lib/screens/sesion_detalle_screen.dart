@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../constants/diana_layout.dart';
 import '../models/sesion_model.dart';
 import '../models/disparo_model.dart';
 import '../models/plantilla_tiempos_model.dart';
@@ -59,6 +60,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
   bool _esEstiloDuelo = false;
   double? _dianaAnchoExteriorMm;
   double? _calibreMm;
+  bool _mostrarCartulina = false;
 
   @override
   void initState() {
@@ -112,6 +114,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
           _tieneGuias = dianaConfig.tieneGuias;
           _esEstiloDuelo = _anilloNegroInicio <= 5;
           _dianaAnchoExteriorMm = dianaConfig.anchoExteriorMm;
+          _mostrarCartulina = dianaConfig.mostrarCartulina;
         });
       } catch (e) {
         debugPrint('No se pudo cargar la configuración de diana: $e');
@@ -250,28 +253,22 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
 
     void updateFromLocal(Offset local, Size size, StateSetter setVisualState) {
       final center = Offset(size.width / 2, size.height / 2);
-      final radius = size.width / 2;
-      final vector = local - center;
-      final clamped = vector.distance <= radius
-          ? local
-          : center + (vector / vector.distance) * radius;
+      final rScore = radioPuntuacionPx(size.width / 2, _mostrarCartulina);
+      final pos = Offset(
+        local.dx.clamp(0.0, size.width),
+        local.dy.clamp(0.0, size.height),
+      );
       setVisualState(() {
-        xTemp = (clamped.dx - center.dx) / radius;
-        yTemp = (clamped.dy - center.dy) / radius;
+        xTemp = (pos.dx - center.dx) / rScore;
+        yTemp = (pos.dy - center.dy) / rScore;
       });
     }
 
     void nudge(double dx, double dy, StateSetter setVisualState) {
       final candidato = Offset(xTemp + dx, yTemp + dy);
-      final distancia = candidato.distance;
       setVisualState(() {
-        if (distancia <= 1.0) {
-          xTemp = candidato.dx;
-          yTemp = candidato.dy;
-          return;
-        }
-        xTemp = candidato.dx / distancia;
-        yTemp = candidato.dy / distancia;
+        xTemp = candidato.dx;
+        yTemp = candidato.dy;
       });
     }
 
@@ -284,10 +281,10 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
           final maxByHeight = screen.height * 0.34;
           final side = min(screen.width * 0.62, maxByHeight).clamp(170.0, 300.0).toDouble();
           final contentMaxHeight = (screen.height * 0.60).clamp(260.0, 520.0).toDouble();
-          final radio = side / 2;
+          final rScore = radioPuntuacionPx(side / 2, _mostrarCartulina);
           final cx = side / 2;
           final cy = side / 2;
-          final marker = Offset((xTemp * radio) + cx, (yTemp * radio) + cy);
+          final marker = Offset((xTemp * rScore) + cx, (yTemp * rScore) + cy);
 
           return AlertDialog(
             title: Text('Posición del tiro #${row.numero}'),
@@ -331,6 +328,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                                 esEstiloDuelo: _esEstiloDuelo,
                                 diametroImpactoMm: _calibreMm,
                                 diametroDianaMm: _dianaAnchoExteriorMm,
+                                mostrarCartulina: _mostrarCartulina,
                               ),
                             ),
                           ),
@@ -1274,16 +1272,21 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
           builder: (context, constraints) {
             final diametro = min(constraints.maxWidth, constraints.maxHeight);
             final size = Size(diametro, diametro);
-            final impactosPixels = _disparos.map((d) {
-              final radio = size.width / 2;
-              final cx = size.width / 2;
-              final cy = size.height / 2;
-              return Offset((d.x * radio) + cx, (d.y * radio) + cy);
-            }).toList();
+            final rScore =
+                radioPuntuacionPx(size.width / 2, _mostrarCartulina);
+            final cx = size.width / 2;
+            final cy = size.height / 2;
+            final impactosPixels = _disparos
+                .map((d) => Offset((d.x * rScore) + cx, (d.y * rScore) + cy))
+                .toList();
 
             return Container(
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
+                shape: _mostrarCartulina
+                    ? BoxShape.rectangle
+                    : BoxShape.circle,
+                borderRadius:
+                    _mostrarCartulina ? BorderRadius.circular(24) : null,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
@@ -1305,6 +1308,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                   esEstiloDuelo: _esEstiloDuelo,
                   diametroImpactoMm: _calibreMm,
                   diametroDianaMm: _dianaAnchoExteriorMm,
+                  mostrarCartulina: _mostrarCartulina,
                 ),
               ),
             );
@@ -1520,6 +1524,7 @@ class DianaPainter extends CustomPainter {
   final Offset? centroGravedad;
   final double? diametroImpactoMm;
   final double? diametroDianaMm;
+  final bool mostrarCartulina;
 
   DianaPainter({
     required this.impactos,
@@ -1532,17 +1537,43 @@ class DianaPainter extends CustomPainter {
     this.centroGravedad,
     this.diametroImpactoMm,
     this.diametroDianaMm,
+    this.mostrarCartulina = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    final maxR = size.width / 2;
+    final radius = radioPuntuacionPx(maxR, mostrarCartulina);
+
+    if (mostrarCartulina) {
+      final cartulina = Paint()
+        ..color = const Color(0xFFFFFEF5)
+        ..style = PaintingStyle.fill;
+      canvas.drawRect(Offset.zero & size, cartulina);
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..color = Colors.grey.shade400
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+    }
 
     final paintFondo = Paint()
       ..color = esFondoNegro ? const Color(0xFF1A1A1A) : Colors.white
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, paintFondo);
+    if (mostrarCartulina) {
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..color = Colors.grey.shade500
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2,
+      );
+    }
 
     int totalZonas = 11 - valorMinimo;
     if (totalZonas < 1) totalZonas = 1;

@@ -426,62 +426,80 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
               border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('PUNTUACIÓN TOTAL', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                    SizedBox(height: compactLandscape ? 2 : 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          _formatearPuntos(_puntosTotales),
-                          style: TextStyle(
-                            fontSize: compactLandscape ? 34 : 40,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text('pts', style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: compactLandscape ? 12 : 16,
-                    vertical: compactLandscape ? 10 : 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'FASE ${_indiceFase + 1} / ${_fases.length}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                          letterSpacing: 1.0,
-                          fontSize: compactLandscape ? 12 : 14,
-                        ),
-                      ),
+                      Text('PUNTUACIÓN TOTAL', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                       SizedBox(height: compactLandscape ? 2 : 4),
-                      Text(
-                        'Serie ${_indiceRepeticion + 1} de ${faseActual.fase.repeticiones}',
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: compactLandscape ? 12 : 13,
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _formatearPuntos(_puntosTotales),
+                                style: TextStyle(
+                                  fontSize: compactLandscape ? 34 : 40,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text('pts', style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+                        ],
                       ),
                     ],
+                  ),
+                ),
+                SizedBox(width: compactLandscape ? 6 : 10),
+                Flexible(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compactLandscape ? 10 : 14,
+                      vertical: compactLandscape ? 10 : 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'FASE ${_indiceFase + 1} / ${_fases.length}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                            letterSpacing: 0.5,
+                            fontSize: compactLandscape ? 12 : 14,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                        ),
+                        SizedBox(height: compactLandscape ? 2 : 4),
+                        Text(
+                          'Serie ${_indiceRepeticion + 1} de ${faseActual.fase.repeticiones}',
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: compactLandscape ? 11 : 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -587,13 +605,19 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                 if (esEnsayo) ...[
                   const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.info_outline_rounded, size: 16, color: isDark ? Colors.orange.shade300 : Colors.orange.shade800),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Icon(Icons.info_outline_rounded, size: 16, color: isDark ? Colors.orange.shade300 : Colors.orange.shade800),
+                      ),
                       const SizedBox(width: 8),
-                      Text(
-                        "Los puntos de esta serie NO se sumarán.",
-                        style: TextStyle(fontSize: 13, color: isDark ? Colors.orange.shade300 : Colors.orange.shade800, fontWeight: FontWeight.w500),
+                      Expanded(
+                        child: Text(
+                          "Los puntos de esta serie NO se sumarán.",
+                          style: TextStyle(fontSize: 13, color: isDark ? Colors.orange.shade300 : Colors.orange.shade800, fontWeight: FontWeight.w500),
+                          softWrap: true,
+                        ),
                       ),
                     ],
                   ),

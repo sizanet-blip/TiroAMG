@@ -10,6 +10,8 @@ class TipoDiana {
   // --- NUEVOS CAMPOS ---
   final double? anchoExteriorMm; // Ancho físico total del papel en milímetros (ej: 170.0)
   final double? altoExteriorMm;  // Alto físico total del papel en milímetros (ej: 170.0)
+  /// Si es true, se dibuja cartulina clara alrededor del disco de puntuación.
+  final bool mostrarCartulina;
   // ---------------------
 
   TipoDiana({
@@ -23,6 +25,7 @@ class TipoDiana {
     // Nuevos campos en el constructor
     this.anchoExteriorMm,
     this.altoExteriorMm,
+    this.mostrarCartulina = false,
   });
 
   factory TipoDiana.fromMap(Map<String, dynamic> map) {
@@ -37,6 +40,7 @@ class TipoDiana {
       // Nuevos campos: Convertimos a double para asegurar compatibilidad
       anchoExteriorMm: map['ancho_exterior_mm'] == null ? null : (map['ancho_exterior_mm'] as num).toDouble(),
       altoExteriorMm: map['alto_exterior_mm'] == null ? null : (map['alto_exterior_mm'] as num).toDouble(),
+      mostrarCartulina: (map['mostrar_cartulina'] as int? ?? 0) == 1,
     );
   }
 
@@ -52,6 +56,7 @@ class TipoDiana {
       // Nuevos campos para la base de datos
       'ancho_exterior_mm': anchoExteriorMm,
       'alto_exterior_mm': altoExteriorMm,
+      'mostrar_cartulina': mostrarCartulina ? 1 : 0,
     };
   }
 }
