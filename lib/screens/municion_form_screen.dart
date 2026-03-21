@@ -82,10 +82,13 @@ class _MunicionFormScreenState extends State<MunicionFormScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 420;
+            return Form(
+              key: _formKey,
+              child: Column(
+                children: [
               // Marca
               TextFormField(
                 controller: _marcaController,
@@ -121,12 +124,24 @@ class _MunicionFormScreenState extends State<MunicionFormScreen> {
               DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: 'Calibre', border: OutlineInputBorder()),
                 initialValue: _selectedCalibre,
-                items: _calibres.map((e) => DropdownMenuItem(value: e.id, child: Text(e.nombre))).toList(),
+                isExpanded: true,
+                items: _calibres
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: e.id,
+                        child: Text(
+                          e.nombre,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (val) => setState(() => _selectedCalibre = val),
                 validator: (v) => v == null ? 'Selecciona un calibre' : null,
               ),
 
-              const SizedBox(height: 30),
+              SizedBox(height: isNarrow ? 20 : 30),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -142,6 +157,8 @@ class _MunicionFormScreenState extends State<MunicionFormScreen> {
               ),
             ],
           ),
+            );
+          },
         ),
       ),
     );

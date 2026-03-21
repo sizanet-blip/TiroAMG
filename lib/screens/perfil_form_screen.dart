@@ -62,13 +62,16 @@ class _PerfilFormScreenState extends State<PerfilFormScreen> {
       appBar: AppBar(title: const Text('Mis Datos de Tirador'), backgroundColor: Colors.blueGrey),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 420;
+            return Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               const Text("Estos datos aparecerán automáticamente en tus Actas y PDFs.", style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 20),
+              SizedBox(height: isNarrow ? 16 : 20),
               
               TextFormField(
                 controller: _nombreCtrl,
@@ -106,6 +109,8 @@ class _PerfilFormScreenState extends State<PerfilFormScreen> {
               )
             ],
           ),
+            );
+          },
         ),
       ),
     );

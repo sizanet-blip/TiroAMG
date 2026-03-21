@@ -168,7 +168,7 @@ class _BackupScreenState extends State<BackupScreen> {
                         children: [
                           ElevatedButton(
                             onPressed: _generarDatos,
-                            child: const Text('GENERAR DATOS DE PRUEBA'),
+                            child: const Text('REGENERAR DATOS (BORRA ANTERIORES)'),
                           ),
                           if (!widget.demoToolsOnly) ...[
                             const SizedBox(height: 10),

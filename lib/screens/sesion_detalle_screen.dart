@@ -1398,64 +1398,106 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                 itemBuilder: (context, index) {
                   final tiro = _disparos[index];
                   final esAlto = tiro.puntuacion >= 9;
-                  return Container(
-                    width: ultraCompact ? 54 : (compact ? 58 : 64),
-                    margin: EdgeInsets.symmetric(
-                      horizontal: ultraCompact ? 4 : (compact ? 5 : 6),
-                      vertical: ultraCompact ? 1 : (compact ? 2 : 4),
-                    ),
-                    padding: EdgeInsets.symmetric(vertical: ultraCompact ? 3 : (compact ? 4 : 8)),
-                    decoration: BoxDecoration(
-                      color: tiro.esMosca
-                          ? Colors.amber.withValues(alpha: isDark ? 0.2 : 0.1)
-                          : esAlto
-                              ? colorScheme.primary.withValues(alpha: isDark ? 0.18 : 0.10)
-                          : colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(ultraCompact ? 14 : 16),
-                      border: Border.all(
-                        color: tiro.esMosca
-                            ? Colors.amber.withValues(alpha: 0.5)
-                            : esAlto
-                                ? colorScheme.primary.withValues(alpha: 0.45)
-                            : colorScheme.outlineVariant.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: ultraCompact
-                          ? MainAxisAlignment.center
-                          : MainAxisAlignment.spaceEvenly,
-                      children: [
-                        if (!ultraCompact)
-                          FittedBox(
-                              child: Text('#${tiro.numero}',
-                                  style: TextStyle(
-                                      fontSize: compact ? 9 : 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSurfaceVariant))),
-                        if (!ultraCompact) const SizedBox(height: 1),
-                        Text(
-                          '${tiro.puntuacion.toInt()}',
-                          style: TextStyle(
-                            fontSize: ultraCompact ? 15 : (compact ? 17 : 22),
-                            fontWeight: FontWeight.w900,
-                            color: tiro.esMosca
-                                ? (isDark
-                                    ? Colors.amber.shade200
-                                    : Colors.amber.shade800)
-                                : colorScheme.onSurface,
-                            height: 1.0,
+                  final cardW = ultraCompact ? 54.0 : (compact ? 58.0 : 64.0);
+                  final hMargin =
+                      ultraCompact ? 1.0 : (compact ? 2.0 : 4.0);
+                  final hPad =
+                      ultraCompact ? 3.0 : (compact ? 4.0 : 8.0);
+                  final xMargin =
+                      ultraCompact ? 4.0 : (compact ? 5.0 : 6.0);
+                  return LayoutBuilder(
+                    builder: (context, c) {
+                      // ListView horizontal: el alto disponible es el del viewport;
+                      // si la Column intrínseca es mayor → bottom overflow.
+                      final outerH = c.maxHeight;
+                      // Sin mínimo artificial: si el viewport es muy bajo, FittedBox escala.
+                      final innerH = outerH.isFinite
+                          ? max(0.0, outerH - 2 * hMargin)
+                          : 160.0;
+                      return Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: xMargin,
+                          vertical: hMargin,
+                        ),
+                        child: SizedBox(
+                          width: cardW,
+                          height: innerH,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: tiro.esMosca
+                                  ? Colors.amber
+                                      .withValues(alpha: isDark ? 0.2 : 0.1)
+                                  : esAlto
+                                      ? colorScheme.primary.withValues(
+                                          alpha: isDark ? 0.18 : 0.10)
+                                      : colorScheme.surfaceContainer,
+                              borderRadius: BorderRadius.circular(
+                                  ultraCompact ? 14 : 16),
+                              border: Border.all(
+                                color: tiro.esMosca
+                                    ? Colors.amber.withValues(alpha: 0.5)
+                                    : esAlto
+                                        ? colorScheme.primary
+                                            .withValues(alpha: 0.45)
+                                        : colorScheme.outlineVariant
+                                            .withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: hPad),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.center,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (!ultraCompact) ...[
+                                      Text(
+                                        '#${tiro.numero}',
+                                        style: TextStyle(
+                                          fontSize: compact ? 9 : 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      SizedBox(height: ultraCompact ? 0 : 2),
+                                    ],
+                                    Text(
+                                      '${tiro.puntuacion.toInt()}',
+                                      style: TextStyle(
+                                        fontSize: ultraCompact
+                                            ? 15
+                                            : (compact ? 17 : 22),
+                                        fontWeight: FontWeight.w900,
+                                        color: tiro.esMosca
+                                            ? (isDark
+                                                ? Colors.amber.shade200
+                                                : Colors.amber.shade800)
+                                            : colorScheme.onSurface,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                    if (tiro.esMosca) ...[
+                                      SizedBox(height: ultraCompact ? 1 : 2),
+                                      Icon(
+                                        Icons.star_rounded,
+                                        size: ultraCompact
+                                            ? 11
+                                            : (compact ? 12 : 14),
+                                        color: isDark
+                                            ? Colors.orange.shade300
+                                            : Colors.orange.shade700,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                        if (tiro.esMosca)
-                          Icon(Icons.star_rounded,
-                              size: ultraCompact ? 11 : (compact ? 12 : 14),
-                              color: isDark
-                                  ? Colors.orange.shade300
-                                  : Colors.orange.shade700)
-                        else if (!ultraCompact)
-                          SizedBox(height: compact ? 10 : 14),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               ),

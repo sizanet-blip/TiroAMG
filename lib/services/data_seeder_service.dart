@@ -13,6 +13,9 @@ class DataSeederService {
   Future<void> generarDatosPrueba() async {
     final db = await dbProvider.database;
 
+    // Si ya hay datos de prueba, los limpiamos antes de regenerar para no duplicar.
+    await borrarSoloDatosPrueba();
+
     await _asegurarPerfilUsuarioPrueba(db);
     final idsEquipos = await _asegurarEquiposPrueba(db);
     final plantillas = await _asegurarPlantillasPrueba(db);
@@ -325,29 +328,74 @@ class DataSeederService {
       return existentes.map((e) => (e['id'] as num).toInt()).toList();
     }
 
-    final calibres = await db.query('CatalogoCalibres', columns: ['id']);
-    final idCalibreDefault = calibres.isNotEmpty ? calibres.first['id'] as int : null;
+    final idCalibre22 = await _asegurarCalibre(db, [
+      '22',
+      '22 lr',
+      '.22',
+      '.22 lr',
+    ], '22 LR');
+    final idCalibre9mm = await _asegurarCalibre(db, [
+      '9mm',
+      '9 mm',
+      '9x19',
+      '9 para',
+    ], '9mm');
+    final idCalibre38 = await _asegurarCalibre(db, [
+      '38',
+      '.38',
+      '38 special',
+      '.38 special',
+      '38 spl',
+    ], '38 Special');
 
     final lotes = [
       {
         'marca': 'SK Long Range $_tagPrueba',
         'lote': 'SK-LR-001 $_tagPrueba',
-        'stock': 500
+        'stock': 500,
+        'id_calibre': idCalibre22,
       },
       {
         'marca': 'ELEY Match $_tagPrueba',
         'lote': 'ELY-M-778 $_tagPrueba',
-        'stock': 750
+        'stock': 750,
+        'id_calibre': idCalibre22,
       },
       {
         'marca': 'RWS R50 $_tagPrueba',
         'lote': 'RWS-R50-42 $_tagPrueba',
-        'stock': 600
+        'stock': 600,
+        'id_calibre': idCalibre22,
       },
       {
         'marca': 'Lapua X-Act $_tagPrueba',
         'lote': 'LAP-XA-221 $_tagPrueba',
-        'stock': 400
+        'stock': 400,
+        'id_calibre': idCalibre22,
+      },
+      {
+        'marca': 'Fiocchi FMJ $_tagPrueba',
+        'lote': 'FCH-9MM-11 $_tagPrueba',
+        'stock': 450,
+        'id_calibre': idCalibre9mm,
+      },
+      {
+        'marca': 'Geco 9mm $_tagPrueba',
+        'lote': 'GCO-9MM-02 $_tagPrueba',
+        'stock': 350,
+        'id_calibre': idCalibre9mm,
+      },
+      {
+        'marca': 'Sellier&Bellot .38 $_tagPrueba',
+        'lote': 'SB-38SP-07 $_tagPrueba',
+        'stock': 300,
+        'id_calibre': idCalibre38,
+      },
+      {
+        'marca': 'Magtech .38 $_tagPrueba',
+        'lote': 'MGT-38SP-03 $_tagPrueba',
+        'stock': 280,
+        'id_calibre': idCalibre38,
       },
     ];
 
@@ -356,7 +404,7 @@ class DataSeederService {
       final id = await db.insert('Municion', {
         'marca': l['marca'],
         'lote': l['lote'],
-        'id_calibre': idCalibreDefault,
+        'id_calibre': l['id_calibre'],
         'cantidad_inicial': l['stock'],
         'cantidad_actual': l['stock'],
         'total_disparada': 0,
@@ -375,6 +423,29 @@ class DataSeederService {
     }
 
     return ids;
+  }
+
+  Future<int?> _asegurarCalibre(
+    Database db,
+    List<String> aliases,
+    String nombreCreacion,
+  ) async {
+    final rows = await db.query('CatalogoCalibres', columns: ['id', 'nombre']);
+    for (final row in rows) {
+      final id = (row['id'] as num?)?.toInt();
+      final nombre = (row['nombre']?.toString() ?? '').trim().toLowerCase();
+      if (id == null || nombre.isEmpty) continue;
+      for (final alias in aliases) {
+        final a = alias.trim().toLowerCase();
+        if (a.isEmpty) continue;
+        if (nombre == a || nombre.contains(a)) {
+          return id;
+        }
+      }
+    }
+
+    final nuevoId = await db.insert('CatalogoCalibres', {'nombre': nombreCreacion});
+    return nuevoId;
   }
 
   Future<void> _insertarAjustesMunicionPrueba(

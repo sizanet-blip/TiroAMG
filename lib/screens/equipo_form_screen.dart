@@ -89,10 +89,13 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 420;
+            return Form(
+              key: _formKey,
+              child: Column(
+                children: [
               TextFormField(
                 controller: _nombreController,
                 decoration: const InputDecoration(labelText: 'Nombre (Ej: Mi Pardini)', border: OutlineInputBorder()),
@@ -102,7 +105,19 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
               DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: 'Tipo de Arma', border: OutlineInputBorder()),
                 initialValue: _selectedTipo,
-                items: _tipos.map((e) => DropdownMenuItem(value: e.id, child: Text(e.nombre))).toList(),
+                isExpanded: true,
+                items: _tipos
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: e.id,
+                        child: Text(
+                          e.nombre,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (val) => setState(() => _selectedTipo = val),
                 validator: (v) => v == null ? 'Selecciona un tipo' : null,
               ),
@@ -110,18 +125,63 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
               DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: 'Calibre', border: OutlineInputBorder()),
                 initialValue: _selectedCalibre,
-                items: _calibres.map((e) => DropdownMenuItem(value: e.id, child: Text(e.nombre))).toList(),
+                isExpanded: true,
+                items: _calibres
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: e.id,
+                        child: Text(
+                          e.nombre,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (val) => setState(() => _selectedCalibre = val),
                 validator: (v) => v == null ? 'Selecciona un calibre' : null,
               ),
               const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: TextFormField(controller: _marcaController, decoration: const InputDecoration(labelText: 'Marca', border: OutlineInputBorder()))),
-                  const SizedBox(width: 10),
-                  Expanded(child: TextFormField(controller: _modeloController, decoration: const InputDecoration(labelText: 'Modelo', border: OutlineInputBorder()))),
-                ],
-              ),
+              if (isNarrow) ...[
+                TextFormField(
+                  controller: _marcaController,
+                  decoration: const InputDecoration(
+                    labelText: 'Marca',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _modeloController,
+                  decoration: const InputDecoration(
+                    labelText: 'Modelo',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ] else
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _marcaController,
+                        decoration: const InputDecoration(
+                          labelText: 'Marca',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _modeloController,
+                        decoration: const InputDecoration(
+                          labelText: 'Modelo',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 20),
               
               // --- SECCIÓN TÉCNICA (CLICS) ---
@@ -164,6 +224,8 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
               ),
             ],
           ),
+            );
+          },
         ),
       ),
     );

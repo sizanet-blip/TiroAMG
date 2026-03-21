@@ -1199,38 +1199,86 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                   .withValues(alpha: 0.5),
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                (_licenciaActual?.esDemoSinPlan ?? false)
-                                    ? Icons.visibility
-                                    : Icons.person,
-                                size: 18,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                (_licenciaActual?.esPlanConDemo ?? false)
-                                    ? 'Plan + Demo'
-                                    : ((_licenciaActual?.esDemoSinPlan ?? false)
-                                        ? 'Demo'
-                                        : 'Personal'),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                (_licenciaActual?.esPlanConDemo ?? false)
-                                    ? 'Licencia + selector manual'
-                                    : 'Controlado por licencia',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
+                          child: LayoutBuilder(
+                            builder: (context, box) {
+                              final narrow = box.maxWidth < 380;
+                              final leftLabel = (_licenciaActual?.esPlanConDemo ?? false)
+                                  ? 'Plan + Demo'
+                                  : ((_licenciaActual?.esDemoSinPlan ?? false)
+                                      ? 'Demo'
+                                      : 'Personal');
+                              final rightLabel = (_licenciaActual?.esPlanConDemo ?? false)
+                                  ? 'Licencia + selector manual'
+                                  : 'Controlado por licencia';
+                              final modeIcon = (_licenciaActual?.esDemoSinPlan ?? false)
+                                  ? Icons.visibility
+                                  : Icons.person;
+                              if (narrow) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          modeIcon,
+                                          size: 18,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            leftLabel,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: colorScheme.onSurface,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      rightLabel,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }
+                              return Row(
+                                children: [
+                                  Icon(
+                                    modeIcon,
+                                    size: 18,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    leftLabel,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Flexible(
+                                    child: Text(
+                                      rightLabel,
+                                      textAlign: TextAlign.end,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -1247,23 +1295,68 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         ),
                         if (_licenciaActual?.esPlanConDemo ?? false) ...[
                           const SizedBox(height: 12),
-                          SegmentedButton<AppDataProfile>(
-                            segments: const [
-                              ButtonSegment<AppDataProfile>(
-                                value: AppDataProfile.personal,
-                                icon: Icon(Icons.person, size: 18),
-                                label: Text('Personal'),
-                              ),
-                              ButtonSegment<AppDataProfile>(
-                                value: AppDataProfile.demo,
-                                icon: Icon(Icons.visibility, size: 18),
-                                label: Text('Demo'),
-                              ),
-                            ],
-                            selected: {_perfilDatos},
-                            onSelectionChanged: (selection) {
-                              if (selection.isEmpty) return;
-                              _cambiarPerfilDatos(selection.first);
+                          LayoutBuilder(
+                            builder: (context, box) {
+                              final narrow = box.maxWidth < 420;
+                              if (!narrow) {
+                                return SegmentedButton<AppDataProfile>(
+                                  segments: const [
+                                    ButtonSegment<AppDataProfile>(
+                                      value: AppDataProfile.personal,
+                                      icon: Icon(Icons.person, size: 18),
+                                      label: Text('Personal'),
+                                    ),
+                                    ButtonSegment<AppDataProfile>(
+                                      value: AppDataProfile.demo,
+                                      icon: Icon(Icons.visibility, size: 18),
+                                      label: Text('Demo'),
+                                    ),
+                                  ],
+                                  selected: {_perfilDatos},
+                                  onSelectionChanged: (selection) {
+                                    if (selection.isEmpty) return;
+                                    _cambiarPerfilDatos(selection.first);
+                                  },
+                                );
+                              }
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: () =>
+                                        _cambiarPerfilDatos(AppDataProfile.personal),
+                                    icon: const Icon(Icons.person, size: 18),
+                                    label: const Text('Personal'),
+                                    style: OutlinedButton.styleFrom(
+                                      backgroundColor: _perfilDatos ==
+                                              AppDataProfile.personal
+                                          ? colorScheme.primaryContainer
+                                          : null,
+                                      foregroundColor: _perfilDatos ==
+                                              AppDataProfile.personal
+                                          ? colorScheme.onPrimaryContainer
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OutlinedButton.icon(
+                                    onPressed: () =>
+                                        _cambiarPerfilDatos(AppDataProfile.demo),
+                                    icon: const Icon(Icons.visibility, size: 18),
+                                    label: const Text('Demo'),
+                                    style: OutlinedButton.styleFrom(
+                                      backgroundColor: _perfilDatos ==
+                                              AppDataProfile.demo
+                                          ? colorScheme.primaryContainer
+                                          : null,
+                                      foregroundColor: _perfilDatos ==
+                                              AppDataProfile.demo
+                                          ? colorScheme.onPrimaryContainer
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              );
                             },
                           ),
                         ],
@@ -1272,12 +1365,13 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   ),
                 ),
                 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildSubSectionHeader('Licencia', colorScheme),
-                    TextButton.icon(
-                      onPressed: _refrescandoLicencia ? null : _refrescarEstadoLicenciaManual,
+                LayoutBuilder(
+                  builder: (context, c) {
+                    final narrow = c.maxWidth < 420;
+                    final refreshBtn = TextButton.icon(
+                      onPressed: _refrescandoLicencia
+                          ? null
+                          : _refrescarEstadoLicenciaManual,
                       icon: _refrescandoLicencia
                           ? const SizedBox(
                               width: 14,
@@ -1285,13 +1379,37 @@ class _ConfigScreenState extends State<ConfigScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.refresh, size: 18),
-                      label: Text(_refrescandoLicencia ? 'Refrescando...' : 'Refrescar'),
+                      label: Text(
+                          _refrescandoLicencia ? 'Refrescando...' : 'Refrescar'),
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13),
                       ),
-                    ),
-                  ],
+                    );
+                    if (narrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSubSectionHeader('Licencia', colorScheme),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: refreshBtn,
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: _buildSubSectionHeader(
+                              'Licencia', colorScheme),
+                        ),
+                        refreshBtn,
+                      ],
+                    );
+                  },
                 ),
                 Container(
                   decoration: _modernContainerDecoration(colorScheme),
@@ -1418,10 +1536,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   ),
                 ],
                 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton.icon(
+                LayoutBuilder(
+                  builder: (context, c) {
+                    final narrow = c.maxWidth < 420;
+                    final cambiar = TextButton.icon(
                       onPressed: _solicitarAmpliacionDesdeHistorial,
                       icon: const Icon(Icons.swap_horiz_rounded, size: 18),
                       label: const Text('Cambiar plan'),
@@ -1429,9 +1547,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         textStyle: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 13),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    TextButton.icon(
+                    );
+                    final historial = TextButton.icon(
                       onPressed: _mostrarHistorialUpgrade,
                       icon: const Icon(Icons.history_rounded, size: 18),
                       label: const Text('Historial'),
@@ -1439,8 +1556,24 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         textStyle: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 13),
                       ),
-                    ),
-                  ],
+                    );
+                    if (narrow) {
+                      return Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 4,
+                        runSpacing: 0,
+                        children: [cambiar, historial],
+                      );
+                    }
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        cambiar,
+                        const SizedBox(width: 4),
+                        historial,
+                      ],
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 8),

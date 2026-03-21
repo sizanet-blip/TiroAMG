@@ -238,51 +238,122 @@ class _GestionMunicionScreenState extends State<GestionMunicionScreen> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(Icons.local_fire_department_rounded, size: 14, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
-                            const SizedBox(width: 4),
-                            Text('Disparada: ${item.totalDisparada}', style: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8), fontSize: 12)),
-                            const Spacer(),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
+                        LayoutBuilder(
+                          builder: (context, rowConstraints) {
+                            final isNarrow = rowConstraints.maxWidth < 420;
+                            final acciones = Wrap(
+                              spacing: 2,
+                              runSpacing: 2,
                               children: [
                                 IconButton(
                                   constraints: const BoxConstraints(),
                                   padding: const EdgeInsets.all(8),
                                   tooltip: 'Historial de uso',
-                                  icon: Icon(Icons.history_rounded, color: colorScheme.onSurfaceVariant, size: 20),
+                                  icon: Icon(
+                                    Icons.history_rounded,
+                                    color: colorScheme.onSurfaceVariant,
+                                    size: 20,
+                                  ),
                                   onPressed: () => _verDondeSeUso(item),
                                 ),
                                 IconButton(
                                   constraints: const BoxConstraints(),
                                   padding: const EdgeInsets.all(8),
                                   tooltip: 'Comprar (+)',
-                                  icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.green, size: 20),
-                                  onPressed: () => _registrarMovimiento(item, esCompra: true),
+                                  icon: const Icon(
+                                    Icons.add_shopping_cart_rounded,
+                                    color: Colors.green,
+                                    size: 20,
+                                  ),
+                                  onPressed: () =>
+                                      _registrarMovimiento(item, esCompra: true),
                                 ),
                                 IconButton(
                                   constraints: const BoxConstraints(),
                                   padding: const EdgeInsets.all(8),
                                   tooltip: 'Restar (-)',
-                                  icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.orange, size: 20),
-                                  onPressed: () => _registrarMovimiento(item, esCompra: false),
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline_rounded,
+                                    color: Colors.orange,
+                                    size: 20,
+                                  ),
+                                  onPressed: () =>
+                                      _registrarMovimiento(item, esCompra: false),
                                 ),
                                 IconButton(
                                   constraints: const BoxConstraints(),
                                   padding: const EdgeInsets.all(8),
-                                  icon: Icon(Icons.edit_rounded, color: colorScheme.primary, size: 20),
+                                  icon: Icon(
+                                    Icons.edit_rounded,
+                                    color: colorScheme.primary,
+                                    size: 20,
+                                  ),
                                   onPressed: () => _abrirFormulario(item.id),
                                 ),
                                 IconButton(
                                   constraints: const BoxConstraints(),
                                   padding: const EdgeInsets.all(8),
-                                  icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 20),
+                                  icon: Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: colorScheme.error,
+                                    size: 20,
+                                  ),
                                   onPressed: () => _borrarMunicion(item),
                                 ),
                               ],
-                            ),
-                          ],
+                            );
+
+                            if (isNarrow) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.local_fire_department_rounded,
+                                        size: 14,
+                                        color: colorScheme.onSurfaceVariant
+                                            .withValues(alpha: 0.7),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Disparada: ${item.totalDisparada}',
+                                        style: TextStyle(
+                                          color: colorScheme.onSurfaceVariant
+                                              .withValues(alpha: 0.8),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  acciones,
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              children: [
+                                Icon(
+                                  Icons.local_fire_department_rounded,
+                                  size: 14,
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.7),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Disparada: ${item.totalDisparada}',
+                                  style: TextStyle(
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.8),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const Spacer(),
+                                acciones,
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),

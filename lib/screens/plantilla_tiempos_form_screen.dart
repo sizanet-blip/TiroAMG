@@ -104,11 +104,14 @@ class _PlantillaTiemposFormScreenState extends State<PlantillaTiemposFormScreen>
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 420;
+            return Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               // 1. Nombre
               TextFormField(
                 controller: _nombreController,
@@ -134,7 +137,19 @@ class _PlantillaTiemposFormScreenState extends State<PlantillaTiemposFormScreen>
               : DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: 'Tipo de Diana a usar', border: OutlineInputBorder()),
                 initialValue: _selectedDianaId,
-                items: _dianas.map((d) => DropdownMenuItem(value: d.id, child: Text(d.nombre))).toList(),
+                isExpanded: true,
+                items: _dianas
+                    .map(
+                      (d) => DropdownMenuItem(
+                        value: d.id,
+                        child: Text(
+                          d.nombre,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (val) => setState(() => _selectedDianaId = val),
                 validator: (v) => v == null ? 'Selecciona una diana' : null,
               ),
@@ -160,35 +175,58 @@ class _PlantillaTiemposFormScreenState extends State<PlantillaTiemposFormScreen>
               const Divider(),
 
               // 4. Tiempos
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _tiempoExpController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: _esDuelo ? 'Tiempo Visible (Verde)' : 'Tiempo Límite Total',
-                        suffixText: 'seg',
-                        border: const OutlineInputBorder(),
-                      ),
+              if (isNarrow) ...[
+                TextFormField(
+                  controller: _tiempoExpController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: _esDuelo ? 'Tiempo Visible (Verde)' : 'Tiempo Limite Total',
+                    suffixText: 'seg',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                if (_esDuelo) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _tiempoOcultacionController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Tiempo Oculto (Rojo)',
+                      suffixText: 'seg',
+                      border: OutlineInputBorder(),
                     ),
                   ),
-                  if (_esDuelo) ...[
-                    const SizedBox(width: 15),
+                ],
+              ] else
+                Row(
+                  children: [
                     Expanded(
                       child: TextFormField(
-                        controller: _tiempoOcultacionController,
+                        controller: _tiempoExpController,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Tiempo Oculto (Rojo)',
+                        decoration: InputDecoration(
+                          labelText: _esDuelo ? 'Tiempo Visible (Verde)' : 'Tiempo Límite Total',
                           suffixText: 'seg',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ),
-                  ]
-                ],
-              ),
+                    if (_esDuelo) ...[
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _tiempoOcultacionController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Tiempo Oculto (Rojo)',
+                            suffixText: 'seg',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ]
+                  ],
+                ),
               const SizedBox(height: 15),
               
               // 5. Preparación
@@ -200,25 +238,38 @@ class _PlantillaTiemposFormScreenState extends State<PlantillaTiemposFormScreen>
               const SizedBox(height: 20),
 
               // 6. Series y Disparos
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _disparosController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Disparos/Serie'),
+              if (isNarrow) ...[
+                TextFormField(
+                  controller: _disparosController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Disparos/Serie'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _seriesController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Nº Series'),
+                ),
+              ] else
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _disparosController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Disparos/Serie'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _seriesController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Nº Series'),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _seriesController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Nº Series'),
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               const SizedBox(height: 20),
 
               // 7. Puntuación Decimal
@@ -244,6 +295,8 @@ class _PlantillaTiemposFormScreenState extends State<PlantillaTiemposFormScreen>
               ),
             ],
           ),
+            );
+          },
         ),
       ),
     );

@@ -755,138 +755,336 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     final usarControlesSuperpuestos =
         isLandscape && !widget.usarEntradaManualPuntos && !_ajusteActivo;
+    final screenW = MediaQuery.sizeOf(context).width;
+    // En apaisado/tablet ancho antes se ocultaban arma y cronómetro → parecían “desaparecer”.
+    final compactLandscapeBars = isLandscape;
+    final appBarUltraNarrow = screenW < 340;
+    final appBarNarrow = screenW < 400;
 
     return Scaffold(
       backgroundColor: Colors.black, // Fondo ultra oscuro para contraste con la diana
       appBar: AppBar(
-        title: Text(widget.tituloSerie ?? widget.plantilla.nombreDisciplina, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(
+          widget.tituloSerie ?? widget.plantilla.nombreDisciplina,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: appBarNarrow ? 15 : 18,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
-        centerTitle: true,
+        centerTitle: screenW > 420,
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-            child: FilledButton.icon(
-              onPressed: _guardarYSalir,
-              icon: const Icon(Icons.stop_circle_rounded, size: 18),
-              label: const Text('FINALIZAR', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+          Padding(
+            padding: EdgeInsets.only(
+              right: appBarUltraNarrow ? 4 : 8,
+              top: 8,
+              bottom: 8,
             ),
+            child: appBarUltraNarrow
+                ? IconButton.filled(
+                    onPressed: _guardarYSalir,
+                    tooltip: 'Finalizar',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.red.shade700,
+                      foregroundColor: Colors.white,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: const Icon(Icons.stop_circle_rounded, size: 22),
+                  )
+                : FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.icon(
+                      onPressed: _guardarYSalir,
+                      icon: const Icon(Icons.stop_circle_rounded, size: 18),
+                      label: const Text(
+                        'FINALIZAR',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: appBarNarrow ? 10 : 16,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // BARRA SUPERIOR DE INFO (PUNTOS Y ARMA)
-            if (!_ajusteActivo && !isLandscape)
-              Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                color: Colors.blueGrey.shade900.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                   Expanded(
-                     child: Column(
-                       crossAxisAlignment: CrossAxisAlignment.start,
-                       children: [
-                         const Text('ARMA ACTUAL', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                         const SizedBox(height: 2),
-                         Text(
-                           widget.equipo.nombre,
-                           style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                           maxLines: 1, overflow: TextOverflow.ellipsis,
-                         ),
-                       ],
-                     ),
-                   ),
-                   Container(
-                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                     decoration: BoxDecoration(
-                       color: Colors.amber.withValues(alpha: 0.15),
-                       borderRadius: BorderRadius.circular(16),
-                       border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-                     ),
-                     child: Row(
-                       mainAxisSize: MainAxisSize.min,
-                       children: [
-                         const Icon(Icons.stars_rounded, color: Colors.amber, size: 20),
-                         const SizedBox(width: 8),
-                         Text(
-                           '${_formatearPuntos(_puntosTotal)} pts',
-                           style: const TextStyle(
-                             color: Colors.amber,
-                             fontSize: 22,
-                             fontWeight: FontWeight.w900,
-                             letterSpacing: -0.5,
-                           ),
-                         ),
-                       ],
-                     ),
-                   )
-                ]
-              )
-            ),
-
-            // BARRA DEL CRONÓMETRO Y ESTADO M3
-            if (!_ajusteActivo && !isLandscape)
-              Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: _colorEstado.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: _colorEstado.withValues(alpha: 0.5), width: 2),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: _colorEstado, shape: BoxShape.circle),
-                    child: Icon(
-                      _estaPausado ? Icons.pause_rounded :
-                      _faseActual == FaseSesion.fuego ? Icons.whatshot_rounded : 
-                      _faseActual == FaseSesion.preparacion ? Icons.build_rounded :
-                      _faseActual == FaseSesion.espera ? Icons.pan_tool_rounded : Icons.timer_rounded,
-                      color: Colors.white,
-                      size: 24,
+            // BARRA SUPERIOR DE INFO (PUNTOS Y ARMA) — siempre en sesión (también apaisado)
+            if (!_ajusteActivo)
+              LayoutBuilder(
+                builder: (context, c) {
+                  final narrowCard = c.maxWidth < 400;
+                  final ptsChip = Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: narrowCard ? 10 : 16,
+                      vertical: narrowCard ? 6 : 8,
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(_mensajeEstado, style: TextStyle(color: _colorEstado, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.5)),
+                        Icon(
+                          Icons.stars_rounded,
+                          color: Colors.amber,
+                          size: narrowCard ? 18 : 20,
+                        ),
+                        SizedBox(width: narrowCard ? 6 : 8),
                         Text(
-                          '$_segundosRestantes s',
-                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, height: 1.0),
+                          '${_formatearPuntos(_puntosTotal)} pts',
+                          style: TextStyle(
+                            color: Colors.amber,
+                            fontSize: narrowCard ? 17 : 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  // BOTÓN SALTAR FASE
-                  if (_enCurso)
-                    IconButton(
-                      icon: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 32),
-                      onPressed: _avanzarFaseManual,
-                      tooltip: "Saltar tiempo actual",
-                      style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.1)),
-                    )
-                ],
+                  );
+                  return Container(
+                    margin: EdgeInsets.symmetric(
+                      horizontal: narrowCard ? 8 : 16,
+                      vertical: compactLandscapeBars ? 4 : 8,
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: narrowCard ? 12 : 20,
+                      vertical: narrowCard
+                          ? (compactLandscapeBars ? 8 : 12)
+                          : (compactLandscapeBars ? 10 : 16),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blueGrey.shade900.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    ),
+                    child: narrowCard
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'ARMA ACTUAL',
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.equipo.nombre,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 10),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: ptsChip,
+                              ),
+                            ],
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'ARMA ACTUAL',
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      widget.equipo.nombre,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ptsChip,
+                            ],
+                          ),
+                  );
+                },
               ),
-            ),
+
+            // BARRA DEL CRONÓMETRO Y ESTADO M3 — siempre en sesión (también apaisado)
+            if (!_ajusteActivo)
+              LayoutBuilder(
+                builder: (context, c) {
+                  final narrowTimer = c.maxWidth < 400;
+                  final skipBtn = _enCurso
+                      ? IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(
+                            Icons.skip_next_rounded,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                          onPressed: _avanzarFaseManual,
+                          tooltip: 'Saltar tiempo actual',
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white.withValues(alpha: 0.1),
+                            minimumSize: const Size(40, 40),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        )
+                      : null;
+                  final estadoCol = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _mensajeEstado,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _colorEstado,
+                          fontWeight: FontWeight.bold,
+                          fontSize: narrowTimer ? 12 : 14,
+                          letterSpacing: narrowTimer ? 1.0 : 1.5,
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '$_segundosRestantes s',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: narrowTimer ? 22 : 28,
+                            fontWeight: FontWeight.w900,
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                  return Container(
+                    margin: EdgeInsets.symmetric(
+                      horizontal: narrowTimer ? 8 : 16,
+                      vertical: compactLandscapeBars ? 2 : 4,
+                    ),
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: narrowTimer ? 10 : 16,
+                      vertical: compactLandscapeBars
+                          ? (narrowTimer ? 6 : 8)
+                          : (narrowTimer ? 10 : 12),
+                    ),
+                    decoration: BoxDecoration(
+                      color: _colorEstado.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: _colorEstado.withValues(alpha: 0.5),
+                        width: 2,
+                      ),
+                    ),
+                    child: narrowTimer
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: _colorEstado,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      _estaPausado
+                                          ? Icons.pause_rounded
+                                          : _faseActual == FaseSesion.fuego
+                                              ? Icons.whatshot_rounded
+                                              : _faseActual == FaseSesion.preparacion
+                                                  ? Icons.build_rounded
+                                                  : _faseActual == FaseSesion.espera
+                                                      ? Icons.pan_tool_rounded
+                                                      : Icons.timer_rounded,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: estadoCol),
+                                ],
+                              ),
+                              if (skipBtn != null)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: skipBtn,
+                                ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: _colorEstado,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _estaPausado
+                                      ? Icons.pause_rounded
+                                      : _faseActual == FaseSesion.fuego
+                                          ? Icons.whatshot_rounded
+                                          : _faseActual == FaseSesion.preparacion
+                                              ? Icons.build_rounded
+                                              : _faseActual == FaseSesion.espera
+                                                  ? Icons.pan_tool_rounded
+                                                  : Icons.timer_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(child: estadoCol),
+                              if (skipBtn != null) skipBtn,
+                            ],
+                          ),
+                  );
+                },
+              ),
             
             Expanded(
               child: widget.usarEntradaManualPuntos
@@ -895,10 +1093,20 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                       children: [
                         Padding(
                           padding: EdgeInsets.fromLTRB(
-                            isLandscape ? 6.0 : 16.0,
-                            isLandscape ? 4.0 : 16.0,
-                            isLandscape ? 6.0 : 16.0,
-                            usarControlesSuperpuestos ? 86.0 : (_ajusteActivo ? 6.0 : 16.0),
+                            isLandscape
+                                ? 6.0
+                                : (screenW < 400 ? 8.0 : 16.0),
+                            isLandscape
+                                ? 4.0
+                                : (screenW < 400 ? 8.0 : 16.0),
+                            isLandscape
+                                ? 6.0
+                                : (screenW < 400 ? 8.0 : 16.0),
+                            usarControlesSuperpuestos
+                                ? 86.0
+                                : (_ajusteActivo
+                                    ? 6.0
+                                    : (screenW < 400 ? 8.0 : 16.0)),
                           ),
                           child: LayoutBuilder(builder: (context, constraints) {
                         double diametro =
@@ -1176,79 +1384,200 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     required bool compact,
     bool superpuesto = false,
   }) {
-    return Container(
-      margin: superpuesto
-          ? EdgeInsets.zero
-          : EdgeInsets.fromLTRB(16, compact ? 4 : 8, 16, compact ? 8 : 16),
-      padding: EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: compact ? 6 : 12,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.blueGrey.shade900.withValues(alpha: superpuesto ? 0.9 : 0.8),
-        borderRadius: BorderRadius.circular(24),
-        border: superpuesto
-            ? Border.all(color: Colors.white.withValues(alpha: 0.08))
-            : null,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildBottomButton(
-            icon: Icons.refresh_rounded,
-            color: Colors.redAccent,
-            onPressed: _reiniciarSerie,
-            tooltip: 'Reiniciar',
-            compact: compact,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 400;
+        final twoRows = constraints.maxWidth < 420;
+        final tightIcons = compact || narrow;
+        final microIcons = constraints.maxWidth < 320;
+        final hPad = superpuesto
+            ? (narrow ? 4.0 : 8.0)
+            : (narrow ? 8.0 : 16.0);
+        final gapCenter = narrow ? 4.0 : 8.0;
+
+        final playButton = FilledButton.icon(
+          onPressed: _iniciarSecuencia,
+          icon: Icon(
+            _enCurso ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            size: microIcons ? 20 : 22,
           ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: FilledButton.icon(
-                onPressed: _iniciarSecuencia,
-                icon: Icon(_enCurso ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                label: Text(
-                  _enCurso ? "PAUSA" : (_puedeReanudar ? "CONTINUAR" : "INICIAR"),
-                  style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _enCurso
-                      ? Colors.orange.shade700
-                      : (_puedeReanudar ? Colors.green.shade700 : colorScheme.primary),
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: compact ? 10 : 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
+          label: Text(
+            _enCurso
+                ? 'PAUSA'
+                : (_puedeReanudar ? 'CONTINUAR' : 'INICIAR'),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              letterSpacing: microIcons ? 0.5 : 1.0,
+              fontSize: microIcons ? 12 : 14,
             ),
           ),
-          _buildBottomButton(
-            icon: Icons.my_location_rounded,
-            color: Colors.amberAccent,
-            onPressed: widget.usarEntradaManualPuntos
-                ? null
-                : (_listaDisparos.isEmpty ? null : _ajustarUltimoTiroDirecto),
-            tooltip: "Ajustar último tiro",
-            compact: compact,
+          style: FilledButton.styleFrom(
+            backgroundColor: _enCurso
+                ? Colors.orange.shade700
+                : (_puedeReanudar
+                    ? Colors.green.shade700
+                    : colorScheme.primary),
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(
+              horizontal: microIcons ? 8 : (narrow ? 10 : 16),
+              vertical: compact ? 8 : (microIcons ? 10 : 16),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
           ),
-          _buildBottomButton(
-            icon: Icons.format_list_bulleted_rounded,
-            color: const Color(0xFF00E5FF),
-            onPressed: widget.usarEntradaManualPuntos
-                ? null
-                : (_listaDisparos.isEmpty ? null : _seleccionarTiroParaAjuste),
-            tooltip: "Lista de tiros a ajustar",
-            compact: compact,
+        );
+
+        Widget mainRow() => Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildBottomButton(
+                  icon: Icons.refresh_rounded,
+                  color: Colors.redAccent,
+                  onPressed: _reiniciarSerie,
+                  tooltip: 'Reiniciar',
+                  compact: tightIcons,
+                  micro: microIcons,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: gapCenter),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: playButton,
+                    ),
+                  ),
+                ),
+                _buildBottomButton(
+                  icon: Icons.undo_rounded,
+                  color: Colors.white,
+                  onPressed: _borrarUltimo,
+                  tooltip: 'Deshacer último tiro',
+                  compact: tightIcons,
+                  micro: microIcons,
+                ),
+              ],
+            );
+
+        Widget secondRow() => Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildBottomButton(
+                  icon: Icons.my_location_rounded,
+                  color: Colors.amberAccent,
+                  onPressed: widget.usarEntradaManualPuntos
+                      ? null
+                      : (_listaDisparos.isEmpty
+                          ? null
+                          : _ajustarUltimoTiroDirecto),
+                  tooltip: 'Ajustar último tiro',
+                  compact: tightIcons,
+                  micro: microIcons,
+                ),
+                SizedBox(width: microIcons ? 8 : 16),
+                _buildBottomButton(
+                  icon: Icons.format_list_bulleted_rounded,
+                  color: const Color(0xFF00E5FF),
+                  onPressed: widget.usarEntradaManualPuntos
+                      ? null
+                      : (_listaDisparos.isEmpty
+                          ? null
+                          : _seleccionarTiroParaAjuste),
+                  tooltip: 'Lista de tiros a ajustar',
+                  compact: tightIcons,
+                  micro: microIcons,
+                ),
+              ],
+            );
+
+        return Container(
+          margin: superpuesto
+              ? EdgeInsets.zero
+              : EdgeInsets.fromLTRB(
+                  narrow ? 8 : 16,
+                  compact ? 4 : 8,
+                  narrow ? 8 : 16,
+                  compact ? 8 : 16,
+                ),
+          padding: EdgeInsets.symmetric(
+            horizontal: hPad,
+            vertical: compact ? 6 : (twoRows ? 8 : 12),
           ),
-          _buildBottomButton(
-            icon: Icons.undo_rounded,
-            color: Colors.white,
-            onPressed: _borrarUltimo,
-            tooltip: 'Deshacer último tiro',
-            compact: compact,
+          decoration: BoxDecoration(
+            color: Colors.blueGrey.shade900
+                .withValues(alpha: superpuesto ? 0.9 : 0.8),
+            borderRadius: BorderRadius.circular(24),
+            border: superpuesto
+                ? Border.all(color: Colors.white.withValues(alpha: 0.08))
+                : null,
           ),
-        ],
-      ),
+          child: twoRows
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    mainRow(),
+                    SizedBox(height: compact ? 4 : 6),
+                    secondRow(),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildBottomButton(
+                      icon: Icons.refresh_rounded,
+                      color: Colors.redAccent,
+                      onPressed: _reiniciarSerie,
+                      tooltip: 'Reiniciar',
+                      compact: tightIcons,
+                      micro: microIcons,
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: gapCenter),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.center,
+                          child: playButton,
+                        ),
+                      ),
+                    ),
+                    _buildBottomButton(
+                      icon: Icons.my_location_rounded,
+                      color: Colors.amberAccent,
+                      onPressed: widget.usarEntradaManualPuntos
+                          ? null
+                          : (_listaDisparos.isEmpty
+                              ? null
+                              : _ajustarUltimoTiroDirecto),
+                      tooltip: 'Ajustar último tiro',
+                      compact: tightIcons,
+                      micro: microIcons,
+                    ),
+                    _buildBottomButton(
+                      icon: Icons.format_list_bulleted_rounded,
+                      color: const Color(0xFF00E5FF),
+                      onPressed: widget.usarEntradaManualPuntos
+                          ? null
+                          : (_listaDisparos.isEmpty
+                              ? null
+                              : _seleccionarTiroParaAjuste),
+                      tooltip: 'Lista de tiros a ajustar',
+                      compact: tightIcons,
+                      micro: microIcons,
+                    ),
+                    _buildBottomButton(
+                      icon: Icons.undo_rounded,
+                      color: Colors.white,
+                      onPressed: _borrarUltimo,
+                      tooltip: 'Deshacer último tiro',
+                      compact: tightIcons,
+                      micro: microIcons,
+                    ),
+                  ],
+                ),
+        );
+      },
     );
   }
 
@@ -1405,14 +1734,20 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     required VoidCallback? onPressed,
     required String tooltip,
     bool compact = false,
+    bool micro = false,
   }) {
+    final pad = micro ? 4.0 : (compact ? 6.0 : 12.0);
+    final minSide = micro ? 36.0 : (compact ? 40.0 : 48.0);
     return IconButton(
+      visualDensity: VisualDensity.compact,
       icon: Icon(icon, color: onPressed == null ? Colors.white24 : color),
       onPressed: onPressed,
       tooltip: tooltip,
       style: IconButton.styleFrom(
         backgroundColor: Colors.white.withValues(alpha: 0.05),
-        padding: EdgeInsets.all(compact ? 8 : 12),
+        padding: EdgeInsets.all(pad),
+        minimumSize: Size(minSide, minSide),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }
@@ -1468,6 +1803,10 @@ class DianaPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
+    // En dianas muy pequeñas, fuente y ejes reducidos para evitar solapamiento.
+    final fontNumeros = (radius * 0.072).clamp(6.0, 14.0);
+    final cuatroEjes = radius >= 34;
+
     for (int i = 0; i < totalZonas; i++) {
       int numeroAnillo = valorMinimo + i;
       double r = radius - (i * anchoZona);
@@ -1478,8 +1817,15 @@ class DianaPainter extends CustomPainter {
         canvas.drawCircle(center, r, paintLineaBlanca);
         // NÚMEROS BLANCOS EN ZONA NEGRA
         if (numeroAnillo < 10) {
-          _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center,
-              r - (anchoZona / 2), Colors.white);
+          _dibujarNumerosEjes(
+            canvas,
+            numeroAnillo.toString(),
+            center,
+            r - (anchoZona / 2),
+            Colors.white,
+            fontNumeros,
+            cuatroEjes: cuatroEjes,
+          );
         }
       }
       // Zona Clara
@@ -1490,8 +1836,15 @@ class DianaPainter extends CustomPainter {
         }
         // NÚMEROS NEGROS EN ZONA CLARA (O BLANCOS SI FONDO NEGRO)
         Color colorNum = esFondoNegro ? Colors.white : Colors.black;
-        _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center,
-            r - (anchoZona / 2), colorNum);
+        _dibujarNumerosEjes(
+          canvas,
+          numeroAnillo.toString(),
+          center,
+          r - (anchoZona / 2),
+          colorNum,
+          fontNumeros,
+          cuatroEjes: cuatroEjes,
+        );
       }
     }
 
@@ -1540,22 +1893,34 @@ class DianaPainter extends CustomPainter {
     }
   }
 
-  void _dibujarNumeros4Ejes(
-      Canvas canvas, String texto, Offset center, double dist, Color color) {
-    _texto(canvas, texto, Offset(center.dx, center.dy - dist), color); // Arriba
-    _texto(canvas, texto, Offset(center.dx, center.dy + dist), color); // Abajo
-    _texto(
-        canvas, texto, Offset(center.dx + dist, center.dy), color); // Derecha
-    _texto(
-        canvas, texto, Offset(center.dx - dist, center.dy), color); // Izquierda
+  void _dibujarNumerosEjes(
+    Canvas canvas,
+    String texto,
+    Offset center,
+    double dist,
+    Color color,
+    double fontSize, {
+    required bool cuatroEjes,
+  }) {
+    _texto(canvas, texto, Offset(center.dx, center.dy - dist), color, fontSize);
+    _texto(canvas, texto, Offset(center.dx, center.dy + dist), color, fontSize);
+    if (cuatroEjes) {
+      _texto(
+          canvas, texto, Offset(center.dx + dist, center.dy), color, fontSize);
+      _texto(
+          canvas, texto, Offset(center.dx - dist, center.dy), color, fontSize);
+    }
   }
 
-  void _texto(Canvas canvas, String texto, Offset pos, Color color) {
+  void _texto(
+      Canvas canvas, String texto, Offset pos, Color color, double fontSize) {
     final tp = TextPainter(
         text: TextSpan(
             text: texto,
             style: TextStyle(
-                color: color, fontSize: 14, fontWeight: FontWeight.bold)),
+                color: color,
+                fontSize: fontSize,
+                fontWeight: FontWeight.bold)),
         textDirection: TextDirection.ltr);
     tp.layout();
     tp.paint(canvas, Offset(pos.dx - tp.width / 2, pos.dy - tp.height / 2));
