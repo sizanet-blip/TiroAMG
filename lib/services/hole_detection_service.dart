@@ -413,6 +413,7 @@ class HoleDetectionService {
             y: offsetY,
             puntuacion: puntuacionFinal,
             esMosca: distanciaDisparo < 0.05,
+            esFuera: false,
           ));
           
           // Almacenar información del agujero individual (centro del disparo y radio individual)

@@ -252,7 +252,13 @@ class PdfService {
 
         final f = <String>["Serie ${i + 1}"];
         for (final t in ser) {
-          f.add(t.puntuacion >= 10 ? (t.esMosca ? "X" : "10") : t.puntuacion.floor().toString());
+          if (t.esFuera) {
+            f.add('F');
+          } else if (t.puntuacion >= 10) {
+            f.add(t.esMosca ? 'X' : '10');
+          } else {
+            f.add(t.puntuacion.floor().toString());
+          }
         }
         while (f.length <= bs) {
           f.add("-");
@@ -283,10 +289,26 @@ class PdfService {
   }
 
   pw.Widget _construirTablaFrecuencias(List<Disparo> d, {bool mostrarCabecera = true}) {
-    final c = <String, int>{"X": 0, "10": 0, "9": 0, "8": 0, "7": 0, "6": 0, "5": 0, "4": 0, "3": 0, "2": 0, "1": 0, "M": 0};
+    final c = <String, int>{
+      "X": 0,
+      "10": 0,
+      "9": 0,
+      "8": 0,
+      "7": 0,
+      "6": 0,
+      "5": 0,
+      "4": 0,
+      "3": 0,
+      "2": 0,
+      "1": 0,
+      "F": 0,
+      "M": 0,
+    };
     for (final x in d) {
       if (x.esMosca) {
         c["X"] = c["X"]! + 1;
+      } else if (x.esFuera) {
+        c["F"] = c["F"]! + 1;
       } else if (x.puntuacion < 1) {
         c["M"] = c["M"]! + 1;
       } else {
@@ -299,11 +321,13 @@ class PdfService {
 
     final h = ['Valor', 'Cantidad', 'Subtotal'];
     final da = <List<String>>[];
-    const o = ["X", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "M"];
+    const o = ["X", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "F", "M"];
     for (final k in o) {
       final cnt = c[k] ?? 0;
       if (cnt > 0) {
-        final s = k == "M" ? "0" : "${(k == "X" ? 10 : int.parse(k)) * cnt}";
+        final s = (k == "M" || k == "F")
+            ? "0"
+            : "${(k == "X" ? 10 : int.parse(k)) * cnt}";
         da.add([k, "$cnt", s]);
       }
     }

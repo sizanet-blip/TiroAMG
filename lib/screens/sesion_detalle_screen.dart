@@ -186,7 +186,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
   }) {
     final distancia = sqrt((x * x) + (y * y));
     if (distancia > 1.0) {
-      return const _ScoredShot(puntuacion: 0, esMosca: false);
+      return const _ScoredShot(puntuacion: 0, esMosca: false, esFuera: true);
     }
 
     final totalZonas = (11 - _valorMinimo) <= 0 ? 1 : (11 - _valorMinimo);
@@ -195,7 +195,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
     if (valor > 10) valor = 10;
 
     final esMosca = _tieneMosca && distancia < (0.05 * (10 / totalZonas));
-    return _ScoredShot(puntuacion: valor, esMosca: esMosca);
+    return _ScoredShot(puntuacion: valor, esMosca: esMosca, esFuera: false);
   }
 
   String _formatearPuntuacionEditable(double value) {
@@ -341,7 +341,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                         children: [
                           Chip(
                               label: Text(
-                                  'Auto: ${auto.puntuacion}${auto.esMosca ? 'X' : ''}')),
+                                  'Auto: ${auto.esFuera ? 'F' : '${auto.puntuacion}${auto.esMosca ? 'X' : ''}'}')),
                           Chip(label: Text('X: ${xTemp.toStringAsFixed(3)}')),
                           Chip(label: Text('Y: ${yTemp.toStringAsFixed(3)}')),
                           Chip(
@@ -412,9 +412,11 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
               ),
               OutlinedButton(
                 onPressed: () {
+                  final dist = sqrt(xTemp * xTemp + yTemp * yTemp);
                   setDialogState(() {
                     row.x = xTemp;
                     row.y = yTemp;
+                    row.esFuera = dist > 1.0;
                   });
                   Navigator.pop(ctx);
                 },
@@ -427,6 +429,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                     row.y = yTemp;
                     row.puntuacion = auto.puntuacion.toDouble();
                     row.esMosca = auto.esMosca;
+                    row.esFuera = auto.esFuera;
                   });
                   Navigator.pop(ctx);
                 },
@@ -451,6 +454,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
             y: d.y,
             puntuacion: d.puntuacion,
             esMosca: d.esMosca,
+            esFuera: d.esFuera,
           ),
         )
         .toList();
@@ -494,6 +498,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                                       row.puntuacion =
                                           calc.puntuacion.toDouble();
                                       row.esMosca = calc.esMosca;
+                                      row.esFuera = calc.esFuera;
                                     }
                                   });
                                 },
@@ -609,6 +614,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                                 y: e.y,
                                 puntuacion: e.puntuacion,
                                 esMosca: e.esMosca,
+                                esFuera: e.esFuera,
                               ),
                             )
                             .toList();
@@ -1401,7 +1407,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                 itemCount: _disparos.length,
                 itemBuilder: (context, index) {
                   final tiro = _disparos[index];
-                  final esAlto = tiro.puntuacion >= 9;
+                  final esAlto = !tiro.esFuera && tiro.puntuacion >= 9;
                   final cardW = ultraCompact ? 54.0 : (compact ? 58.0 : 64.0);
                   final hMargin =
                       ultraCompact ? 1.0 : (compact ? 2.0 : 4.0);
@@ -1428,23 +1434,28 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                           height: innerH,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: tiro.esMosca
-                                  ? Colors.amber
-                                      .withValues(alpha: isDark ? 0.2 : 0.1)
-                                  : esAlto
-                                      ? colorScheme.primary.withValues(
-                                          alpha: isDark ? 0.18 : 0.10)
-                                      : colorScheme.surfaceContainer,
+                              color: tiro.esFuera
+                                  ? Colors.orange
+                                      .withValues(alpha: isDark ? 0.22 : 0.12)
+                                  : tiro.esMosca
+                                      ? Colors.amber
+                                          .withValues(alpha: isDark ? 0.2 : 0.1)
+                                      : esAlto
+                                          ? colorScheme.primary.withValues(
+                                              alpha: isDark ? 0.18 : 0.10)
+                                          : colorScheme.surfaceContainer,
                               borderRadius: BorderRadius.circular(
                                   ultraCompact ? 14 : 16),
                               border: Border.all(
-                                color: tiro.esMosca
-                                    ? Colors.amber.withValues(alpha: 0.5)
-                                    : esAlto
-                                        ? colorScheme.primary
-                                            .withValues(alpha: 0.45)
-                                        : colorScheme.outlineVariant
-                                            .withValues(alpha: 0.5),
+                                color: tiro.esFuera
+                                    ? Colors.orange.withValues(alpha: 0.55)
+                                    : tiro.esMosca
+                                        ? Colors.amber.withValues(alpha: 0.5)
+                                        : esAlto
+                                            ? colorScheme.primary
+                                                .withValues(alpha: 0.45)
+                                            : colorScheme.outlineVariant
+                                                .withValues(alpha: 0.5),
                               ),
                             ),
                             child: Padding(
@@ -1468,17 +1479,23 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                                       SizedBox(height: ultraCompact ? 0 : 2),
                                     ],
                                     Text(
-                                      '${tiro.puntuacion.toInt()}',
+                                      tiro.esFuera
+                                          ? 'F'
+                                          : '${tiro.puntuacion.toInt()}',
                                       style: TextStyle(
                                         fontSize: ultraCompact
                                             ? 15
                                             : (compact ? 17 : 22),
                                         fontWeight: FontWeight.w900,
-                                        color: tiro.esMosca
+                                        color: tiro.esFuera
                                             ? (isDark
-                                                ? Colors.amber.shade200
-                                                : Colors.amber.shade800)
-                                            : colorScheme.onSurface,
+                                                ? Colors.orange.shade200
+                                                : Colors.orange.shade800)
+                                            : tiro.esMosca
+                                                ? (isDark
+                                                    ? Colors.amber.shade200
+                                                    : Colors.amber.shade800)
+                                                : colorScheme.onSurface,
                                         height: 1.0,
                                       ),
                                     ),
@@ -1716,6 +1733,7 @@ class _EditableDisparo {
   double y;
   double puntuacion;
   bool esMosca;
+  bool esFuera;
 
   _EditableDisparo({
     required this.id,
@@ -1724,15 +1742,18 @@ class _EditableDisparo {
     required this.y,
     required this.puntuacion,
     required this.esMosca,
+    this.esFuera = false,
   });
 }
 
 class _ScoredShot {
   final int puntuacion;
   final bool esMosca;
+  final bool esFuera;
 
   const _ScoredShot({
     required this.puntuacion,
     required this.esMosca,
+    required this.esFuera,
   });
 }

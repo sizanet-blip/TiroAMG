@@ -170,6 +170,7 @@ class DataSeederService {
         'coordenada_y': impacto['coordenada_y'],
         'puntuacion': impacto['puntuacion'],
         'es_mosca': impacto['es_mosca'],
+        'es_fuera': impacto['es_fuera'],
       });
       disparosGenerados++;
     }
@@ -513,12 +514,14 @@ class DataSeederService {
     final puntos = double.parse(puntosRaw.clamp(0.0, 10.9).toStringAsFixed(1));
     final esMosca = puntos >= 10.3;
 
+    final fuera = radio > 1.0;
     return {
       'numero_disparo': numero,
       'coordenada_x': x,
       'coordenada_y': y,
       'puntuacion': puntos,
       'es_mosca': esMosca ? 1 : 0,
+      'es_fuera': fuera ? 1 : 0,
     };
   }
 

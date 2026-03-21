@@ -319,6 +319,7 @@ class EntrenamientoService {
           'coordenada_y': disparo.y,
           'puntuacion': disparo.puntuacion,
           'es_mosca': disparo.esMosca ? 1 : 0,
+          'es_fuera': disparo.esFuera ? 1 : 0,
         };
 
         if (disparo.id != null) {

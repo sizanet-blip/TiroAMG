@@ -85,20 +85,50 @@ class EstadisticasService {
     List<Disparo> disparos = res.map((e) => Disparo.fromMap(e)).toList();
     if (disparos.isEmpty) return AnalisisAgrupacion(disparosValidos: [], disparosDescartados: [], puntuacionRealMedia: 0, puntuacionPotencialMedia: 0, mpi: const Point(0,0), radioDisperson: 0, consejoTendencia: "Sin datos");
 
-    double sumX = 0, sumY = 0, sumPuntos = 0;
-    for (var d in disparos) { sumX += d.x; sumY += d.y; sumPuntos += d.puntuacion; }
-    double mpiX = sumX / disparos.length; double mpiY = sumY / disparos.length;
-    
-    List<Disparo> validos = []; List<Disparo> descartados = [];
-    if (disparos.length < 5) { validos = List.from(disparos); } else {
+    // Tiros declarados fuera del blanco no entran en MPI / dispersión.
+    final disparosFuera = disparos.where((d) => d.esFuera).toList();
+    final disparosEnBlanco =
+        disparos.where((d) => !d.esFuera).toList();
+
+    double sumPuntos = 0;
+    for (var d in disparos) {
+      sumPuntos += d.puntuacion;
+    }
+
+    if (disparosEnBlanco.isEmpty) {
+      return AnalisisAgrupacion(
+        disparosValidos: [],
+        disparosDescartados: disparos,
+        puntuacionRealMedia: disparos.isEmpty ? 0 : sumPuntos / disparos.length,
+        puntuacionPotencialMedia: 0,
+        mpi: const Point(0, 0),
+        radioDisperson: 0,
+        consejoTendencia: 'Sin impactos en blanco (solo fueras o sin datos)',
+      );
+    }
+
+    double sumX = 0, sumY = 0;
+    for (var d in disparosEnBlanco) {
+      sumX += d.x;
+      sumY += d.y;
+    }
+    double mpiX = sumX / disparosEnBlanco.length;
+    double mpiY = sumY / disparosEnBlanco.length;
+
+    final List<Disparo> descartados = List<Disparo>.from(disparosFuera);
+    List<Disparo> validos = [];
+
+    if (disparosEnBlanco.length < 5) {
+      validos = List<Disparo>.from(disparosEnBlanco);
+    } else {
       double sumaDistancias = 0;
-      for (var d in disparos) {
+      for (var d in disparosEnBlanco) {
         sumaDistancias += sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
       }
-      double distanciaMedia = sumaDistancias / disparos.length;
-      double umbral = distanciaMedia * 2.5; 
-      for (var d in disparos) {
-        double dist = sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
+      final distanciaMedia = sumaDistancias / disparosEnBlanco.length;
+      final umbral = distanciaMedia * 2.5;
+      for (var d in disparosEnBlanco) {
+        final dist = sqrt(pow(d.x - mpiX, 2) + pow(d.y - mpiY, 2));
         if (dist > umbral && dist > 0.15) {
           descartados.add(d);
         } else {

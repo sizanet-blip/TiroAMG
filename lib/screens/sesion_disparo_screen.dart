@@ -550,15 +550,17 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     }
     if (!_puedeRegistrarDisparoConFeedback()) return;
 
-    setState(() {
-      final centro = Offset(tamanoDiana.width / 2, tamanoDiana.height / 2);
-      final radioMax =
-          radioPuntuacionPx(tamanoDiana.width / 2, _mostrarCartulina);
-      final pos = _normalizarPosicionEnDiana(localPosition, tamanoDiana);
-      final xn = (pos.dx - centro.dx) / radioMax;
-      final yn = (pos.dy - centro.dy) / radioMax;
-      final valor = _calcularPuntuacionDesdeXY(xn, yn);
+    final centro = Offset(tamanoDiana.width / 2, tamanoDiana.height / 2);
+    final radioMax =
+        radioPuntuacionPx(tamanoDiana.width / 2, _mostrarCartulina);
+    final pos = _normalizarPosicionEnDiana(localPosition, tamanoDiana);
+    final xn = (pos.dx - centro.dx) / radioMax;
+    final yn = (pos.dy - centro.dy) / radioMax;
+    final distNorm = sqrt(xn * xn + yn * yn);
+    final valor = _calcularPuntuacionDesdeXY(xn, yn);
+    final esFuera = distNorm > 1.0;
 
+    setState(() {
       _puntosTotal += valor;
 
       _listaDisparos.add(Disparo(
@@ -567,11 +569,61 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         y: yn,
         puntuacion: valor,
         esMosca: false,
+        esFuera: esFuera,
       ));
     });
     final n = _listaDisparos.length;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _mostrarFeedbackConteoTiros(n);
+      if (!mounted) return;
+      _mostrarFeedbackConteoTiros(n);
+      if (esFuera) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fuera del blanco: 0 puntos.'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+  }
+
+  /// Registra un tiro explícitamente fuera del círculo de puntuación (0, marcado como F).
+  void _registrarDisparoFuera() {
+    if (widget.usarEntradaManualPuntos) return;
+    if (_ajusteActivo) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Finaliza el ajuste para registrar nuevos tiros.'),
+        duration: Duration(milliseconds: 700),
+      ));
+      return;
+    }
+    if (!_puedeRegistrarDisparoConFeedback()) return;
+
+    const xFuera = 1.45;
+    const yFuera = 0.0;
+
+    setState(() {
+      _listaDisparos.add(Disparo(
+        numero: _listaDisparos.length + 1,
+        x: xFuera,
+        y: yFuera,
+        puntuacion: 0,
+        esMosca: false,
+        esFuera: true,
+      ));
+    });
+    final n = _listaDisparos.length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _mostrarFeedbackConteoTiros(n);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tiro fuera del blanco registrado (0).'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     });
   }
 
@@ -586,6 +638,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         y: 0,
         puntuacion: valor,
         esMosca: esMosca,
+        esFuera: false,
       ));
     });
     final n = _listaDisparos.length;
@@ -595,6 +648,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   }
 
   String _formatearMarcaDisparo(Disparo disparo) {
+    if (disparo.esFuera) return 'F';
     if (disparo.esMosca) return 'X';
     if (disparo.puntuacion % 1 == 0) return disparo.puntuacion.toInt().toString();
     return disparo.puntuacion.toStringAsFixed(1);
@@ -818,6 +872,9 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     final nuevaPuntuacion = _recalcularPuntosAjuste
         ? _calcularPuntuacionDesdeXY(x, y)
         : tiro.puntuacion;
+    final esFuera = _recalcularPuntosAjuste
+        ? (sqrt(x * x + y * y) > 1.0)
+        : tiro.esFuera;
     setState(() {
       _listaDisparos[idx] = Disparo(
         id: tiro.id,
@@ -827,6 +884,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         y: y,
         puntuacion: nuevaPuntuacion,
         esMosca: tiro.esMosca,
+        esFuera: esFuera,
       );
       _puntosTotal += (nuevaPuntuacion - tiro.puntuacion);
     });
@@ -849,6 +907,9 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     final nuevaPuntuacion = _recalcularPuntosAjuste
         ? _calcularPuntuacionDesdeXY(x, y)
         : tiro.puntuacion;
+    final esFuera = _recalcularPuntosAjuste
+        ? (sqrt(x * x + y * y) > 1.0)
+        : tiro.esFuera;
 
     setState(() {
       _listaDisparos[idx] = Disparo(
@@ -859,6 +920,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         y: y,
         puntuacion: nuevaPuntuacion,
         esMosca: tiro.esMosca,
+        esFuera: esFuera,
       );
       _puntosTotal += (nuevaPuntuacion - tiro.puntuacion);
     });
@@ -1659,6 +1721,16 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                   compact: tightIcons,
                   micro: microIcons,
                 ),
+                SizedBox(width: microIcons ? 8 : 16),
+                _buildBottomButton(
+                  icon: Icons.highlight_off_rounded,
+                  color: Colors.orangeAccent,
+                  onPressed:
+                      widget.usarEntradaManualPuntos ? null : _registrarDisparoFuera,
+                  tooltip: 'Fuera del blanco (0)',
+                  compact: tightIcons,
+                  micro: microIcons,
+                ),
               ],
             );
 
@@ -1734,6 +1806,16 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                               ? null
                               : _seleccionarTiroParaAjuste),
                       tooltip: 'Lista de tiros a ajustar',
+                      compact: tightIcons,
+                      micro: microIcons,
+                    ),
+                    _buildBottomButton(
+                      icon: Icons.highlight_off_rounded,
+                      color: Colors.orangeAccent,
+                      onPressed: widget.usarEntradaManualPuntos
+                          ? null
+                          : _registrarDisparoFuera,
+                      tooltip: 'Fuera del blanco (0)',
                       compact: tightIcons,
                       micro: microIcons,
                     ),
@@ -1848,9 +1930,11 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                             child: Text(
                               '${disparo.numero}: ${_formatearMarcaDisparo(disparo)}',
                               style: TextStyle(
-                                color: disparo.esMosca
-                                    ? Colors.amberAccent
-                                    : Colors.white,
+                                color: disparo.esFuera
+                                    ? Colors.orangeAccent
+                                    : disparo.esMosca
+                                        ? Colors.amberAccent
+                                        : Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

@@ -425,6 +425,7 @@ Future<void> _recreateQuickTrainingSession(
       'coordenada_y': 0.02 * i,
       'puntuacion': 8.0 + (i * 0.2),
       'es_mosca': 0,
+      'es_fuera': 0,
     });
   }
 }

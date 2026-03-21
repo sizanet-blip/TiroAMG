@@ -6,6 +6,8 @@ class Disparo {
   final double y; // coordenada_y
   final double puntuacion;
   final bool esMosca;
+  /// Impacto fuera del círculo de puntuación (miss / no en blanco).
+  final bool esFuera;
 
   Disparo({
     this.id,
@@ -15,6 +17,7 @@ class Disparo {
     required this.y,
     required this.puntuacion,
     required this.esMosca,
+    this.esFuera = false,
   });
 
   // --- ¡AQUÍ ESTABA EL ERROR! FALTABA ESTE MÉTODO ---
@@ -28,6 +31,7 @@ class Disparo {
       y: (map['coordenada_y'] as num).toDouble(),
       puntuacion: (map['puntuacion'] as num).toDouble(),
       esMosca: map['es_mosca'] == 1,
+      esFuera: (map['es_fuera'] as num?)?.toInt() == 1,
     );
   }
 
@@ -40,6 +44,7 @@ class Disparo {
       'coordenada_y': y,
       'puntuacion': puntuacion,
       'es_mosca': esMosca ? 1 : 0,
+      'es_fuera': esFuera ? 1 : 0,
     };
   }
 }

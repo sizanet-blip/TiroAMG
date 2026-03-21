@@ -10,7 +10,7 @@ extension AppDataProfileX on AppDataProfile {
 }
 
 class DatabaseProvider {
-  static const int schemaVersion = 8;
+  static const int schemaVersion = 9;
   static const String _profilePrefKey = 'app_data_profile';
   static const String _dbNamePersonal = 'tiro_deportivo.db';
   static const String _dbNameDemo = 'tiro_deportivo_demo.db';
@@ -274,7 +274,8 @@ class DatabaseProvider {
         coordenada_x REAL,
         coordenada_y REAL,
         puntuacion REAL,
-        es_mosca INTEGER
+        es_mosca INTEGER,
+        es_fuera INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -303,6 +304,9 @@ class DatabaseProvider {
     }
     if (oldVersion < 8) {
       await _migrarV7aV8(db);
+    }
+    if (oldVersion < 9) {
+      await _migrarV8aV9(db);
     }
   }
 
@@ -375,6 +379,14 @@ class DatabaseProvider {
       db,
       'CatalogoDianas',
       'mostrar_cartulina INTEGER NOT NULL DEFAULT 0',
+    );
+  }
+
+  Future<void> _migrarV8aV9(Database db) async {
+    await _agregarColumnaSiNoExiste(
+      db,
+      'Disparos',
+      'es_fuera INTEGER NOT NULL DEFAULT 0',
     );
   }
 
