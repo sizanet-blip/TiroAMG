@@ -10,6 +10,12 @@ import 'package:tiro_deportivo_amg/services/license_service.dart';
 
 const _quickCompetitionName = 'AAA E2E Torneo Rapido';
 
+/// `true` con `--dart-define=E2E_PORTRAIT_ONLY=true` → solo capturas verticales (sin `_landscape`).
+const bool _e2ePortraitOnly = bool.fromEnvironment(
+  'E2E_PORTRAIT_ONLY',
+  defaultValue: false,
+);
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -25,17 +31,19 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Captura automatica de pantallas principales (landscape)',
-    (tester) async {
-      await _runCaptureFlow(
-        tester: tester,
-        binding: binding,
-        suffix: '_landscape',
-        landscape: true,
-      );
-    },
-  );
+  if (!_e2ePortraitOnly) {
+    testWidgets(
+      'Captura automatica de pantallas principales (landscape)',
+      (tester) async {
+        await _runCaptureFlow(
+          tester: tester,
+          binding: binding,
+          suffix: '_landscape',
+          landscape: true,
+        );
+      },
+    );
+  }
 }
 
 Future<void> _runCaptureFlow({
@@ -71,13 +79,13 @@ Future<void> _runCaptureFlow({
   );
 
   await _scrollToMoreOptions(tester);
-  await _openSectionFromHome(
+  await _openConfigAndCaptureSubscreens(
     tester: tester,
     binding: binding,
-    homeLabel: 'Configuración',
-    openShotName: _name('09_configuracion', suffix),
-    lockShotName: _name('09_configuracion_bloqueado', suffix),
+    suffix: suffix,
   );
+
+  await _captureEstadisticasEntrenamiento(tester, binding, suffix: suffix);
 }
 
 Future<void> _enableScreenshotSupport(
@@ -146,6 +154,133 @@ Future<void> _openSectionFromHome({
   }
 
   await _takeShot(binding, openShotName);
+  await _goBack(tester);
+  await _settleApp(tester);
+  await _returnToHome(tester);
+}
+
+/// Abre Configuración, captura la pantalla principal y cada submenú (perfil, armas, etc.).
+Future<void> _openConfigAndCaptureSubscreens({
+  required WidgetTester tester,
+  required IntegrationTestWidgetsFlutterBinding binding,
+  required String suffix,
+}) async {
+  final configTarget = find.text('Configuración');
+  if (configTarget.evaluate().isEmpty) {
+    debugPrint('No se encontro "Configuracion" para capturar.');
+    return;
+  }
+
+  await tester.ensureVisible(configTarget.first);
+  await tester.tap(configTarget.first);
+  await _settleApp(tester);
+
+  final lockHome = find.text('Función bloqueada por licencia');
+  if (lockHome.evaluate().isNotEmpty) {
+    await _takeShot(binding, _name('09_configuracion_bloqueado', suffix));
+    await _closeLicenseDialog(tester);
+    await _settleApp(tester);
+    await _returnToHome(tester);
+    return;
+  }
+
+  await _takeShot(binding, _name('09_configuracion', suffix));
+
+  await _captureConfigSubscreens(tester, binding, suffix: suffix);
+  await _returnToHome(tester);
+}
+
+Future<void> _captureConfigSubscreens(
+  WidgetTester tester,
+  IntegrationTestWidgetsFlutterBinding binding, {
+  required String suffix,
+}) async {
+  const submenus = <Map<String, String>>[
+    {'label': 'Mis Datos (Perfil)', 'shot': '10_mis_datos_perfil'},
+    {'label': 'Gestión de Armas (Equipos)', 'shot': '11_mis_armas'},
+    {'label': 'Gestión de Munición', 'shot': '12_mis_municiones'},
+    {'label': 'Plantillas de Tiempos/Series', 'shot': '13_plantillas_tiempos'},
+    {'label': 'Catálogo Tipos de Arma', 'shot': '14_catalogo_tipos_arma'},
+    {'label': 'Catálogo de Calibres', 'shot': '15_catalogo_calibres'},
+    {'label': 'Catálogo de Dianas', 'shot': '16_catalogo_dianas'},
+  ];
+
+  for (final item in submenus) {
+    final label = item['label']!;
+    final shot = item['shot']!;
+    await _scrollConfigUntilVisible(tester, label);
+    final target = find.text(label);
+    if (target.evaluate().isEmpty) {
+      debugPrint('Config: omitido (no visible): $label');
+      continue;
+    }
+    await tester.ensureVisible(target.first);
+    await tester.tap(target.first);
+    await _settleApp(tester);
+
+    if (_findLicenseLockDialog().evaluate().isNotEmpty) {
+      await _takeShot(binding, _name('${shot}_bloqueado', suffix));
+      await _closeLicenseDialog(tester);
+      await _settleApp(tester);
+      continue;
+    }
+
+    await _takeShot(binding, _name(shot, suffix));
+    await _goBack(tester);
+    await _settleApp(tester);
+  }
+}
+
+Finder _findLicenseLockDialog() {
+  return find.textContaining('bloqueada por licencia');
+}
+
+Future<void> _scrollConfigUntilVisible(WidgetTester tester, String text) async {
+  await _scrollConfigTowardsTop(tester);
+  final finder = find.text(text);
+  final scrollFinder = find.byType(Scrollable);
+  if (scrollFinder.evaluate().isEmpty) return;
+
+  for (var i = 0; i < 32; i++) {
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder.first);
+      return;
+    }
+    await tester.drag(scrollFinder.first, const Offset(0, -380));
+    await _settleApp(tester);
+  }
+}
+
+Future<void> _scrollConfigTowardsTop(WidgetTester tester) async {
+  final scrollFinder = find.byType(Scrollable);
+  if (scrollFinder.evaluate().isEmpty) return;
+  for (var i = 0; i < 18; i++) {
+    await tester.drag(scrollFinder.first, const Offset(0, 420));
+    await _settleApp(tester);
+  }
+}
+
+/// Desde el inicio: Historial → icono de estadísticas → pantalla de análisis de entrenamientos.
+Future<void> _captureEstadisticasEntrenamiento(
+  WidgetTester tester,
+  IntegrationTestWidgetsFlutterBinding binding, {
+  required String suffix,
+}) async {
+  if (!await _tapTextIfExists(tester, 'Historial y análisis')) return;
+  await _settleApp(tester);
+
+  final statsIcon = find.byIcon(Icons.bar_chart_rounded);
+  if (statsIcon.evaluate().isEmpty) {
+    debugPrint('Historial: sin acceso a estadisticas (icono no visible).');
+    await _returnToHome(tester);
+    return;
+  }
+
+  await tester.tap(statsIcon.first);
+  await _settleApp(tester);
+  await tester.pump(const Duration(seconds: 2));
+
+  await _takeShot(binding, _name('17_analisis_entrenamientos', suffix));
   await _goBack(tester);
   await _settleApp(tester);
   await _returnToHome(tester);

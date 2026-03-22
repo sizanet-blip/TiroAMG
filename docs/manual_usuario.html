@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Manual de usuario de Tiro Deportivo AMG: entrenamiento, competición, historial, copia de seguridad y configuración.">
+  <title>Manual de usuario — Tiro Deportivo AMG</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-elev: #1e293b;
+      --text: #f1f5f9;
+      --text-soft: #cbd5e1;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --border: rgba(255,255,255,0.08);
+      --radius: 12px;
+      --maxw: 720px;
+      --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 17px;
+    }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    .doc-note {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.15rem;
+      font-size: 0.92rem;
+      color: var(--text-soft);
+      margin-bottom: 2rem;
+    }
+    .doc-note code { font-size: 0.85em; color: var(--accent); }
+    header { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+    header h1 { font-size: clamp(1.5rem, 4vw, 1.85rem); margin: 0 0 0.5rem; letter-spacing: -0.02em; }
+    header .sub { color: var(--muted); font-size: 0.95rem; margin: 0; }
+    header .back { margin-top: 1rem; }
+    header a { color: var(--accent); text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    nav.toc {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.2rem;
+      margin-bottom: 2.5rem;
+    }
+    nav.toc h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 0 0 0.6rem; }
+    nav.toc ol { margin: 0; padding-left: 1.2rem; color: var(--text-soft); font-size: 0.95rem; }
+    nav.toc a { color: var(--accent); text-decoration: none; }
+    nav.toc a:hover { text-decoration: underline; }
+    section { margin-bottom: 2.25rem; }
+    section h2 {
+      font-size: 1.2rem;
+      color: var(--accent);
+      margin: 0 0 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
+    }
+    section:first-of-type h2 { border-top: 0; padding-top: 0; }
+    .lead { color: var(--text-soft); margin: 0 0 1rem; font-size: 0.98rem; }
+    .steps { margin: 0; padding-left: 1.2rem; color: var(--text-soft); }
+    .steps li { margin-bottom: 0.55rem; }
+    .steps strong { color: var(--text); }
+    figure.screenshot {
+      margin: 1rem 0 1.25rem;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #000;
+    }
+    figure.screenshot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      vertical-align: middle;
+    }
+    figure.screenshot figcaption {
+      font-size: 0.8rem;
+      color: var(--muted);
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-elev);
+      border-top: 1px solid var(--border);
+    }
+    .hint {
+      font-size: 0.88rem;
+      color: var(--muted);
+      font-style: italic;
+      margin: 0.5rem 0 0;
+    }
+    table.plan-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 1rem 0 1.25rem;
+      color: var(--text-soft);
+    }
+    table.plan-table th,
+    table.plan-table td {
+      border: 1px solid var(--border);
+      padding: 0.55rem 0.7rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    table.plan-table th {
+      background: var(--bg-elev);
+      color: var(--accent);
+      font-weight: 600;
+      width: 28%;
+    }
+    table.plan-table td strong { color: var(--text); }
+    section#planes h2 { border-top: 0; padding-top: 0; }
+    footer {
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f8fafc;
+        --bg-elev: #fff;
+        --text: #0f172a;
+        --text-soft: #334155;
+        --muted: #64748b;
+        --border: rgba(15,23,42,0.1);
+      }
+      figure.screenshot { background: #e2e8f0; }
+    }
+    @media print {
+      body { background: #fff; color: #000; }
+      .doc-note, nav.toc { break-inside: avoid; }
+      figure.screenshot { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header id="top">
+      <p class="back"><a href="presentacion_web.html">← Volver a funcionalidades del producto</a></p>
+      <h1>Manual de usuario</h1>
+      <p class="sub"><strong>Tiro Deportivo AMG</strong> — Guía paso a paso (no técnica)</p>
+    </header>
+
+    <p class="doc-note">
+      <strong>Sobre las imágenes:</strong> cada apartado indica el <strong>nombre del archivo</strong> de captura que puedes generar con la app.
+      Coloca los archivos <code>.png</code> en la carpeta <code>docs/screenshots/</code> con esos nombres para verlas en este documento al abrirlo en el navegador.
+      También existen versiones en horizontal para tablet, con el sufijo <code>_landscape</code> (opcional).
+      <strong>Capturas automáticas (desarrollo):</strong> para que salgan <strong>todas</strong> las pantallas sin avisos de licencia, el comando de integración debe usar el plan simulado <code>completo</code> (véase <a href="#planes">Planes de licencia</a> y <a href="PASOS_CAPTURAS.md"><code>PASOS_CAPTURAS.md</code></a>).
+    </p>
+
+    <nav class="toc" aria-labelledby="toc-h">
+      <h2 id="toc-h">Contenido</h2>
+      <ol>
+        <li><a href="#planes">Planes de licencia (qué incluye cada uno)</a></li>
+        <li><a href="#inicio">Panel de control e inicio</a></li>
+        <li><a href="#entrenamiento">Entrenamiento</a></li>
+        <li><a href="#disparo">Pantalla de disparo (serie)</a></li>
+        <li><a href="#historial">Historial</a></li>
+        <li><a href="#estadisticas">Estadísticas y análisis</a></li>
+        <li><a href="#detalle">Detalle de una tirada</a></li>
+        <li><a href="#competicion">Competición — lista de torneos</a></li>
+        <li><a href="#setup">Preparar un torneo</a></li>
+        <li><a href="#runner">Durante el torneo</a></li>
+        <li><a href="#serie-comp">Serie en competición</a></li>
+        <li><a href="#resultados">Resultados finales</a></li>
+        <li><a href="#backup">Copia de seguridad</a></li>
+        <li><a href="#config">Configuración y licencia</a></li>
+        <li><a href="#tablet">Uso en tablet (horizontal)</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="planes">
+        <h2>Planes de licencia</h2>
+        <p class="lead">En <strong>Configuración</strong> verás el plan activo. Los nombres comerciales pueden variar según el distribuidor; en la app suelen mostrarse como en la tabla. El <strong>servidor</strong> puede enviar permisos extra (<em>features</em>) que amplían lo incluido en tu contrato.</p>
+        <table class="plan-table">
+          <thead>
+            <tr>
+              <th scope="col">Plan en la app</th>
+              <th scope="col">Qué incluye (resumen)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Entrenamiento</strong></td>
+              <td>Sesiones de <strong>entrenamiento</strong>, <strong>perfil</strong> del tirador y <strong>plantillas de tiempos/series</strong> (reglas de práctica). No incluye el modo competición con torneos.</td>
+            </tr>
+            <tr>
+              <td><strong>Competición</strong></td>
+              <td>Todo lo anterior más <strong>competiciones</strong>: modalidades, fases, series y flujo de torneo.</td>
+            </tr>
+            <tr>
+              <td><strong>Competición Plus</strong></td>
+              <td>Todo lo anterior más <strong>estadísticas avanzadas</strong> (gráficos, filtros en historial), <strong>copia de seguridad</strong> (exportar/importar la base de datos) y <strong>catálogos</strong> editables (tipos de arma, calibres, dianas). En mensajes de «plan requerido» a veces verás la etiqueta <strong>Pro</strong> para estas funciones.</td>
+            </tr>
+            <tr>
+              <td><strong>Completo</strong></td>
+              <td>Máximo nivel comercial en la app: todo lo de Competición Plus más las <strong>funciones premium</strong> que tu licencia active (por ejemplo <strong>detección avanzada en diana</strong> u otras capacidades reservadas al plan más alto). Algunos contratos usan nombres alternativos (p. ej. visión élite / táctica).</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="hint">Si una opción está bloqueada, la app indica el <strong>plan mínimo</strong> necesario. La validación puede requerir conexión en algún momento según la política de tu licencia.</p>
+        <p class="lead" style="margin-top:1.25rem;"><strong>Generar todas las capturas del manual por comando</strong> (solo entorno de desarrollo/pruebas): el test de integración simula una licencia con <code>--dart-define=E2E_PLAN=completo</code> junto con <code>DEV_PLAN_SELECTOR=true</code>, de modo que se muestren competición, backup, estadísticas, plantillas, catálogos, etc. Si usas otro valor de <code>E2E_PLAN</code>, faltarán secciones o aparecerán pantallas de «bloqueado». Detalle en <a href="PASOS_CAPTURAS.md"><code>docs/PASOS_CAPTURAS.md</code></a>.</p>
+      </section>
+
+      <section id="inicio">
+        <h2>1. Panel de control e inicio</h2>
+        <p class="lead">Al abrir la aplicación verás el <strong>panel de control</strong>: desde aquí accedes a lo esencial — entrenar, competir, revisar el pasado, hacer copias de seguridad y ajustar la app.</p>
+        <ul class="steps">
+          <li><strong>Entrenamiento:</strong> sesiones de práctica sin estructura de campeonato.</li>
+          <li><strong>Competición:</strong> torneos con fases y series (según tu plan).</li>
+          <li><strong>Historial y análisis:</strong> listado de entrenos y competiciones pasadas; acceso a estadísticas si tu plan lo permite.</li>
+          <li><strong>Más opciones:</strong> copia de seguridad y configuración.</li>
+        </ul>
+        <p class="hint">Si ves un candado o un mensaje de «plan», esa función requiere una licencia superior; la app te indica qué nivel necesitas.</p>
+        <figure class="screenshot">
+          <img src="screenshots/01_home_panel_control.png" alt="Panel de control de Tiro Deportivo AMG" width="1080" height="1920" loading="lazy">
+          <figcaption>Archivo sugerido: <code>01_home_panel_control.png</code> — Vista vertical (móvil)</figcaption>
+        </figure>
+      </section>
+
+      <section id="entrenamiento">
+        <h2>2. Entrenamiento</h2>
+        <p class="lead">Aquí preparas la sesión: eliges el <strong>arma</strong>, la <strong>disciplina</strong> (plantilla de tiempos), cómo quieres <strong>puntuar</strong> (con o sin décimas) y si prefieres <strong>tocar la diana</strong> o usar el <strong>teclado de puntuación</strong>. Opcionalmente puedes indicar munición y condiciones del tiro (lugar, distancia, clima).</p>
+        <ul class="steps">
+          <li>Pulsa <strong>EMPEZAR ENTRENAMIENTO</strong> cuando todo esté listo.</li>
+          <li>Si falta un arma o una plantilla, la app te lo dirá: primero debes crearlos en <strong>Configuración</strong>.</li>
+        </ul>
+        <figure class="screenshot">
+          <img src="screenshots/02_entrenamiento.png" alt="Pantalla de configurar entrenamiento" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>02_entrenamiento.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="disparo">
+        <h2>3. Pantalla de disparo (serie)</h2>
+        <p class="lead">Es la pantalla donde registras los impactos: cronómetro, diana (o teclado si lo activaste), total de puntos y botón para <strong>finalizar</strong> la serie cuando termines.</p>
+        <ul class="steps">
+          <li>Sigue las indicaciones de tiempo de tu disciplina.</li>
+          <li>Al pulsar <strong>FINALIZAR</strong> se guarda la serie y vuelves al flujo anterior.</li>
+        </ul>
+        <figure class="screenshot">
+          <img src="screenshots/03_sesion_disparo_entrenamiento.png" alt="Pantalla de disparo con diana" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>03_sesion_disparo_entrenamiento.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="historial">
+        <h2>4. Historial</h2>
+        <p class="lead">Aquí ves tus <strong>entrenamientos</strong> y, si tu licencia lo permite, tus <strong>competiciones</strong>. Puedes filtrar por fechas (hoy, mes, año, rango personalizado).</p>
+        <ul class="steps">
+          <li>Toca una fila para abrir el detalle de esa sesión o torneo.</li>
+          <li>Mantén pulsado un elemento si la app ofrece borrar (según pantalla).</li>
+          <li>El icono de gráfico en la parte superior lleva a estadísticas cuando está disponible.</li>
+        </ul>
+        <figure class="screenshot">
+          <img src="screenshots/04_historial.png" alt="Lista de historial" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>04_historial.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="estadisticas">
+        <h2>5. Estadísticas y análisis (entrenamientos)</h2>
+        <p class="lead">Desde <strong>Historial y análisis</strong>, el icono de gráfico abre el análisis agregado: filtros por fechas, arma, diana, munición, gráficos de progreso y diagnóstico. El título de la pantalla es <strong>Análisis Entrenamientos</strong> (en la pestaña de entrenamientos).</p>
+        <p class="hint">Con la pestaña de competiciones activa, el mismo icono lleva a <strong>Análisis Competiciones</strong> (no incluido en la captura automática por defecto).</p>
+        <figure class="screenshot">
+          <img src="screenshots/17_analisis_entrenamientos.png" alt="Pantalla de análisis de entrenamientos" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>17_analisis_entrenamientos.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="detalle">
+        <h2>6. Detalle de una tirada</h2>
+        <p class="lead">Muestra la diana con los impactos, totales, y acciones como editar datos de la sesión, editar tiros o abrir análisis / informes según tu plan.</p>
+        <figure class="screenshot">
+          <img src="screenshots/05_detalle_tirada.png" alt="Detalle de tirada de entrenamiento" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>05_detalle_tirada.png</code> — En competiciones el título puede ser distinto (<code>05_detalle_competicion.png</code>).</figcaption>
+        </figure>
+      </section>
+
+      <section id="competicion">
+        <h2>7. Competición — lista de torneos</h2>
+        <p class="lead">Aparecen las <strong>modalidades</strong> disponibles (oficiales y las que hayas creado tú). Toca una fila para <strong>empezar</strong> un torneo o <strong>editar</strong> una modalidad personal. El botón flotante permite crear una competición nueva.</p>
+        <figure class="screenshot">
+          <img src="screenshots/06_competicion.png" alt="Lista de competiciones" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>06_competicion.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="setup">
+        <h2>8. Preparar un torneo</h2>
+        <p class="lead">Antes de disparar eliges arma, munición opcional, tipo de puntuación y si usar teclado o diana. Cuando estés listo, pulsa <strong>COMENZAR TORNEO</strong>.</p>
+        <figure class="screenshot">
+          <img src="screenshots/07_competicion_setup.png" alt="Preparación del torneo" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>07_competicion_setup.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="runner">
+        <h2>9. Durante el torneo</h2>
+        <p class="lead">Ves la puntuación acumulada del torneo, la fase en curso y un botón para <strong>disparar la siguiente serie</strong>. Abajo suele aparecer un resumen de lo ya realizado.</p>
+        <figure class="screenshot">
+          <img src="screenshots/07a_competicion_runner.png" alt="Pantalla principal del torneo en curso" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>07a_competicion_runner.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="serie-comp">
+        <h2>10. Serie en competición</h2>
+        <p class="lead">Igual que en entrenamiento, pero dentro del torneo: misma diana o teclado, cronómetro y <strong>FINALIZAR</strong> al acabar la serie.</p>
+        <figure class="screenshot">
+          <img src="screenshots/07b_competicion_serie.png" alt="Serie de disparo en competición" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>07b_competicion_serie.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="resultados">
+        <h2>11. Resultados finales</h2>
+        <p class="lead">Al terminar todas las fases verás el resumen del torneo y la puntuación total. Puedes volver al menú de competición cuando quieras.</p>
+        <figure class="screenshot">
+          <img src="screenshots/07c_competicion_resultados_finales.png" alt="Resultados finales del torneo" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>07c_competicion_resultados_finales.png</code> — Puede aparecer primero un mensaje de felicitación; la pantalla de resultados con título «Resultados Finales» es la referencia para el manual.</figcaption>
+        </figure>
+      </section>
+
+      <section id="backup">
+        <h2>12. Copia de seguridad</h2>
+        <p class="lead">Desde aquí puedes <strong>exportar</strong> una copia de tu base de datos (guardarla en la nube, el ordenador o enviarla por correo) y <strong>importar</strong> una copia anterior. La importación sustituye los datos actuales: léeme bien las advertencias antes de confirmar.</p>
+        <p class="hint">Según tu plan, esta sección puede mostrar un aviso de licencia.</p>
+        <figure class="screenshot">
+          <img src="screenshots/08_backup.png" alt="Herramientas y copia de seguridad" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>08_backup.png</code> — Si está bloqueado: <code>08_backup_bloqueado.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="config">
+        <h2>13. Configuración y licencia</h2>
+        <p class="lead">Desde el listado principal eliges cada bloque: <strong>datos del tirador</strong>, <strong>armas</strong>, <strong>munición</strong>, <strong>plantillas de tiempos/series</strong>, <strong>catálogos</strong> (tipos de arma, calibres, dianas), además de <strong>feedback al disparar</strong>, <strong>licencia</strong> y <strong>actualizaciones</strong>. Lo que veas depende de tu plan.</p>
+        <figure class="screenshot">
+          <img src="screenshots/09_configuracion.png" alt="Pantalla de configuración" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>09_configuracion.png</code> — Si hay bloqueo al abrir: <code>09_configuracion_bloqueado.png</code></figcaption>
+        </figure>
+
+        <h3 style="font-size:1.05rem; color: var(--accent); margin: 1.5rem 0 0.35rem;">Mis datos (perfil)</h3>
+        <p class="lead" style="margin-bottom:0.75rem;">Nombre, licencia federativa, club y datos que identifican al tirador en informes.</p>
+        <figure class="screenshot">
+          <img src="screenshots/10_mis_datos_perfil.png" alt="Formulario de datos del tirador" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>10_mis_datos_perfil.png</code></figcaption>
+        </figure>
+
+        <h3 style="font-size:1.05rem; color: var(--accent); margin: 1.5rem 0 0.35rem;">Gestión de armas (equipos)</h3>
+        <p class="lead" style="margin-bottom:0.75rem;">Alta, edición y borrado de armas que usarás en entrenamiento y competición.</p>
+        <figure class="screenshot">
+          <img src="screenshots/11_mis_armas.png" alt="Lista de armas" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>11_mis_armas.png</code></figcaption>
+        </figure>
+
+        <h3 style="font-size:1.05rem; color: var(--accent); margin: 1.5rem 0 0.35rem;">Gestión de munición</h3>
+        <p class="lead" style="margin-bottom:0.75rem;">Lotes, compras y uso de munición vinculados a tus sesiones.</p>
+        <figure class="screenshot">
+          <img src="screenshots/12_mis_municiones.png" alt="Gestión de munición" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>12_mis_municiones.png</code></figcaption>
+        </figure>
+
+        <h3 style="font-size:1.05rem; color: var(--accent); margin: 1.5rem 0 0.35rem;">Plantillas de tiempos y series</h3>
+        <p class="lead" style="margin-bottom:0.75rem;">Reglas de preparación, exposición, duelo, disparos por serie, etc.</p>
+        <figure class="screenshot">
+          <img src="screenshots/13_plantillas_tiempos.png" alt="Plantillas de tiempos" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>13_plantillas_tiempos.png</code> — Requiere plan con acceso a reglas; si no: <code>13_plantillas_tiempos_bloqueado.png</code></figcaption>
+        </figure>
+
+        <h3 style="font-size:1.05rem; color: var(--accent); margin: 1.5rem 0 0.35rem;">Catálogos del sistema</h3>
+        <p class="lead" style="margin-bottom:0.75rem;">Tipos de arma, calibres y tipos de diana personalizados.</p>
+        <figure class="screenshot">
+          <img src="screenshots/14_catalogo_tipos_arma.png" alt="Catálogo tipos de arma" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>14_catalogo_tipos_arma.png</code></figcaption>
+        </figure>
+        <figure class="screenshot">
+          <img src="screenshots/15_catalogo_calibres.png" alt="Catálogo calibres" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>15_catalogo_calibres.png</code></figcaption>
+        </figure>
+        <figure class="screenshot">
+          <img src="screenshots/16_catalogo_dianas.png" alt="Catálogo dianas" width="1080" height="1920" loading="lazy" onerror="this.style.display='none'">
+          <figcaption><code>16_catalogo_dianas.png</code></figcaption>
+        </figure>
+      </section>
+
+      <section id="tablet">
+        <h2>14. Uso en tablet (horizontal)</h2>
+        <p class="lead">La misma aplicación adapta el diseño cuando giras el dispositivo o usas una tablet. Puedes generar un segundo juego de capturas añadiendo <code>_landscape</code> al nombre del archivo, por ejemplo <code>01_home_panel_control_landscape.png</code>, para documentación orientada a pantallas anchas.</p>
+        <figure class="screenshot">
+          <img src="screenshots/01_home_panel_control_landscape.png" alt="Panel de control en horizontal" width="1920" height="1080" loading="lazy" onerror="this.style.display='none'">
+          <figcaption>Ejemplo: <code>01_home_panel_control_landscape.png</code> — Repite el patrón para el resto de pantallas si lo necesitas.</figcaption>
+        </figure>
+      </section>
+    </main>
+
+    <footer>
+      <p><strong>Tiro Deportivo AMG</strong> — Manual de usuario orientativo. Los textos de botones y el aspecto pueden variar ligeramente según la versión de la aplicación.</p>
+      <p style="margin-top:0.75rem;"><a href="presentacion_web.html">Funcionalidades del producto</a> · <a href="#top" onclick="window.scrollTo(0,0);return false;">Subir ↑</a></p>
+    </footer>
+  </div>
+</body>
+</html>

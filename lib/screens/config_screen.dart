@@ -14,6 +14,7 @@ import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
 import '../utils/license_ui_helper.dart';
+import '../services/impact_feedback_prefs.dart';
 
 class ConfigScreen extends StatefulWidget {
   const ConfigScreen({super.key});
@@ -41,6 +42,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
   String _planDevSeleccionado = 'basic';
   AppDataProfile _perfilDatos = AppDataProfile.personal;
 
+  /// Preferencias de feedback en pantalla de disparo (SharedPreferences).
+  bool _sonidoImpacto = false;
+  bool _vibracionImpacto = true;
+
   bool get _bloqueoDemoSoloLectura {
     final lic = _licenciaActual;
     if (lic != null) return lic.esDemoSinPlan;
@@ -54,6 +59,17 @@ class _ConfigScreenState extends State<ConfigScreen> {
     _cargarPerfilDatos();
     _cargarInfoSistema();
     _cargarEstadoLicencia();
+    _cargarFeedbackImpacto();
+  }
+
+  Future<void> _cargarFeedbackImpacto() async {
+    final s = await ImpactFeedbackPrefs.sonidoHabilitado();
+    final v = await ImpactFeedbackPrefs.vibracionHabilitada();
+    if (!mounted) return;
+    setState(() {
+      _sonidoImpacto = s;
+      _vibracionImpacto = v;
+    });
   }
 
   Future<void> _cargarPerfilDatos() async {
@@ -1046,6 +1062,66 @@ class _ConfigScreenState extends State<ConfigScreen> {
                             ),
                           ),
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                _buildModernSectionHeader('Feedback al disparar', colorScheme),
+                Container(
+                  decoration: _modernContainerDecoration(colorScheme),
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        secondary: Icon(
+                          Icons.volume_up_rounded,
+                          color: Colors.cyan.shade700,
+                        ),
+                        title: const Text('Sonido al registrar impacto'),
+                        subtitle: Text(
+                          'Tonos cortos al marcar tiro (agudo = acierto o manual; grave = fuera). '
+                          'Funciona en Windows y móvil. Desactivado por defecto en galería.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.25,
+                          ),
+                        ),
+                        value: _sonidoImpacto,
+                        onChanged: (value) async {
+                          await ImpactFeedbackPrefs.setSonidoHabilitado(value);
+                          if (mounted) setState(() => _sonidoImpacto = value);
+                        },
+                      ),
+                      _buildDivider(colorScheme),
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        secondary: Icon(
+                          Icons.vibration_rounded,
+                          color: Colors.amber.shade800,
+                        ),
+                        title: const Text('Vibración al registrar impacto'),
+                        subtitle: Text(
+                          'Respuesta háptica al marcar cada impacto.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.25,
+                          ),
+                        ),
+                        value: _vibracionImpacto,
+                        onChanged: (value) async {
+                          await ImpactFeedbackPrefs.setVibracionHabilitada(value);
+                          if (mounted) setState(() => _vibracionImpacto = value);
+                        },
                       ),
                     ],
                   ),

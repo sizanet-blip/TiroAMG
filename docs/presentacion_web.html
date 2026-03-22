@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Tiro Deportivo AMG: registro, análisis y gestión de entrenamientos y competiciones de tiro deportivo ISSF. Diana virtual, estadísticas, informes PDF y competición con cronómetro.">
+  <meta name="theme-color" content="#0a1628">
+  <meta property="og:title" content="Tiro Deportivo AMG — Funcionalidades">
+  <meta property="og:description" content="Aplicación profesional para tiradores y clubes: diana interactiva, torneos, estadísticas e informes.">
+  <meta property="og:type" content="website">
+  <title>Tiro Deportivo AMG — Funcionalidades y características</title>
+  <style>
+    :root {
+      --bg: #0a1628;
+      --bg-elev: #111f35;
+      --text: #eef2f7;
+      --text-soft: #b8c0cc;
+      --muted: #7a8699;
+      --accent: #22d3ee;
+      --accent-hover: #67e8f9;
+      --accent-bg: rgba(34, 211, 238, 0.12);
+      --border: rgba(255, 255, 255, 0.07);
+      --radius: 14px;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      --maxw: 880px;
+      --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 120% 80% at 50% -30%, rgba(34, 211, 238, 0.14), transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(99, 102, 241, 0.08), transparent);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 17px;
+      font-optical-sizing: auto;
+    }
+    a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    .skip {
+      position: absolute;
+      left: -9999px;
+      top: auto;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
+    .skip:focus {
+      left: 1rem;
+      top: 1rem;
+      width: auto;
+      height: auto;
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: #042f2e;
+      z-index: 100;
+      font-weight: 600;
+    }
+    .wrap {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3.5rem;
+    }
+    /* —— Hero —— */
+    .hero {
+      padding: 2.25rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+    .hero-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-bg);
+      border: 1px solid rgba(34, 211, 238, 0.25);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      font-size: clamp(1.75rem, 4vw, 2.15rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin: 0 0 1rem;
+    }
+    .lead {
+      color: var(--text-soft);
+      font-size: 1.08rem;
+      margin: 0 0 1.25rem;
+      max-width: 62ch;
+    }
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1.25rem;
+    }
+    .pill {
+      font-size: 0.82rem;
+      color: var(--muted);
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+    }
+    /* —— TOC —— */
+    nav.toc {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--shadow);
+    }
+    nav.toc h2 {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin: 0 0 0.75rem;
+      font-weight: 700;
+    }
+    nav.toc ol {
+      margin: 0;
+      padding-left: 1.2rem;
+      color: var(--text-soft);
+      font-size: 0.95rem;
+    }
+    nav.toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    nav.toc a:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+    /* —— Sections —— */
+    section {
+      margin-bottom: 2.5rem;
+    }
+    section > h2 {
+      font-size: 1.28rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .section-intro {
+      color: var(--text-soft);
+      margin: 0 0 1rem;
+      font-size: 0.98rem;
+    }
+    .card {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.15rem 1.25rem 1.05rem;
+      margin-bottom: 0.75rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      border-color: rgba(34, 211, 238, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+    .card h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin: 0 0 0.5rem;
+      color: var(--text);
+    }
+    ul {
+      margin: 0;
+      padding-left: 1.2rem;
+    }
+    .card ul {
+      margin: 0;
+    }
+    li {
+      margin-bottom: 0.5rem;
+      color: var(--text-soft);
+    }
+    li:last-child { margin-bottom: 0; }
+    li strong { color: var(--text); font-weight: 600; }
+    .badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: var(--accent-bg);
+      color: var(--accent);
+      padding: 0.2rem 0.45rem;
+      border-radius: 4px;
+      vertical-align: 0.1em;
+      margin-left: 0.35rem;
+    }
+    h2.config-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 2.5rem 0 1rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    h2.config-title:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+    h3.sub {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 1.5rem 0 0.65rem;
+    }
+    h3.sub:first-child { margin-top: 0; }
+    hr.sep {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2.5rem 0;
+    }
+    footer {
+      margin-top: 2.75rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f0f4f8;
+        --bg-elev: #ffffff;
+        --text: #0f172a;
+        --text-soft: #334155;
+        --muted: #64748b;
+        --border: rgba(15, 23, 42, 0.08);
+        --accent: #0891b2;
+        --accent-hover: #0e7490;
+        --accent-bg: rgba(8, 145, 178, 0.1);
+      }
+      body {
+        background-image:
+          radial-gradient(ellipse 100% 60% at 50% -20%, rgba(8, 145, 178, 0.12), transparent 50%);
+      }
+    }
+    @media print {
+      body { background: #fff; color: #000; }
+      .hero-badge, .pill-row, nav.toc { display: none; }
+      .card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
+      a { color: #000; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#contenido">Ir al contenido</a>
+  <div class="wrap">
+    <header class="hero">
+      <span class="hero-badge">Tiro deportivo · ISSF</span>
+      <h1 id="top">Tiro Deportivo AMG</h1>
+      <p class="lead">
+        Herramienta <strong>profesional</strong> para el registro, el análisis y la gestión de
+        <strong>entrenamientos</strong> y <strong>competiciones</strong> de tiro deportivo, alineada con modalidades
+        <abbr title="International Shooting Sport Federation">ISSF</abbr>. Diana interactiva, cronómetro de competición,
+        estadísticas avanzadas e informes listos para club y tirador.
+      </p>
+      <p class="lead" style="margin-top: 1rem;">
+        <a href="manual_usuario.html" style="color: var(--accent); font-weight: 600; text-decoration: none;">Manual de usuario (guía paso a paso con pantallazos)</a>
+        — lenguaje sencillo, sin tecnicismos.
+      </p>
+      <div class="pill-row" aria-label="Resumen">
+        <span class="pill">Panel de control</span>
+        <span class="pill">Diana virtual + lupa</span>
+        <span class="pill">Torneos y fases</span>
+        <span class="pill">Historial y estadísticas</span>
+        <span class="pill">Copia de seguridad</span>
+        <span class="pill">PDF y Excel</span>
+        <span class="pill">Munición y stock</span>
+        <span class="pill">Planes y licencia</span>
+        <span class="pill">Windows y móvil / tablet</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-labelledby="toc-heading">
+      <h2 id="toc-heading">En esta página</h2>
+      <ol>
+        <li><a href="#panel">Inicio y panel de control</a></li>
+        <li><a href="#competicion">Competición</a></li>
+        <li><a href="#entrenamiento">Entrenamiento libre</a></li>
+        <li><a href="#diana">Diana virtual</a></li>
+        <li><a href="#historial">Historial y sesiones</a></li>
+        <li><a href="#estadisticas">Análisis estadístico</a></li>
+        <li><a href="#diagnostico">Diagnóstico técnico</a></li>
+        <li><a href="#evolucion">Evolución</a></li>
+        <li><a href="#informes">Informes y exportación</a></li>
+        <li><a href="#municion">Munición y lotes</a></li>
+        <li><a href="#configuracion">Configuración</a></li>
+        <li><a href="#datos">Datos, planes y licencia</a></li>
+        <li><a href="manual_usuario.html">Manual de usuario con capturas</a></li>
+      </ol>
+    </nav>
+
+    <main id="contenido">
+
+      <section id="panel" aria-labelledby="h-panel">
+        <h2 id="h-panel">Inicio y panel de control</h2>
+        <p class="section-intro">La app se organiza desde una pantalla principal con accesos claros: <strong>Entrenamiento</strong>, <strong>Competición</strong> (si tu plan lo incluye), <strong>Historial y análisis</strong>, y en «Más opciones» la <strong>copia de seguridad</strong> y la <strong>configuración</strong> (perfil, armas, plantillas, licencia). En tablet o con el dispositivo en horizontal el diseño se adapta para aprovechar el ancho.</p>
+        <div class="card">
+          <h3>Documentación para el tirador</h3>
+          <ul>
+            <li><strong><a href="manual_usuario.html">Manual de usuario</a>:</strong> guía detallada en lenguaje cotidiano, con nombres de pantallazos para que puedas ilustrar cada paso (entrenar, competir, revisar historial, respaldo y ajustes).</li>
+            <li><strong>Licencia:</strong> si ves funciones bloqueadas o un distintivo de plan en la cabecera, tu suscripción marca qué está disponible; la app indica el plan mínimo cuando hace falta.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="competicion" aria-labelledby="h-competicion">
+        <h2 id="h-competicion">Competición</h2>
+        <p class="section-intro">Simula competiciones con estructura de <strong>fases</strong> y <strong>series</strong> configurables, cronómetro y señales acústicas.</p>
+        <div class="card">
+          <h3>Qué incluye</h3>
+          <ul>
+            <li><strong>Modalidades y torneos:</strong> Estructuras preconfiguradas (p. ej. pistola, carabina aire) y catálogo ampliable.</li>
+            <li><strong>Competiciones propias:</strong> Crea modalidades con fases de <em>ensayo</em> y de <em>competición</em>.</li>
+            <li><strong>Fases en cadena:</strong> Precisión, duelo, estándar / velocidad, cada una con su plantilla de tiempos.</li>
+            <li><strong>Cronómetro:</strong> Preparación, espera, fuego, ocultación y cierre de serie según la disciplina.</li>
+            <li><strong>Voz (TTS):</strong> Anuncios tipo pista — <em>Preparación, Atención, ¡YA!, fin de serie</em>.</li>
+            <li><strong>Ensayo vs oficial:</strong> Las series de ensayo se identifican claramente y no suman al marcador oficial del torneo.</li>
+            <li><strong>Pantalla de torneo:</strong> Fase, serie, puntuación total y próxima acción; interfaz adaptable a pantallas estrechas.</li>
+            <li><strong>Munición (opcional):</strong> Puedes asociar un lote al iniciar el torneo; queda registrado en la sesión y en el stock (ver <a href="#municion">Munición y lotes</a>).</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="entrenamiento" aria-labelledby="h-entrenamiento">
+        <h2 id="h-entrenamiento">Entrenamiento libre</h2>
+        <p class="section-intro">Sesiones de práctica sin el esquema rígido de un campeonato; mismo motor de diana y tiempos que en competición cuando lo necesites.</p>
+        <div class="card">
+          <h3>Experiencia de tiro</h3>
+          <ul>
+            <li><strong>Preparación de sesión:</strong> Arma, plantilla de tiempos / disciplina, munición y datos de contexto (lugar, distancia, condiciones) cuando la app los solicite.</li>
+            <li><strong>Diana interactiva:</strong> Toques y gestos sobre una diana proporcional a la disciplina.</li>
+            <li><strong>Lupa:</strong> Arrastra para ampliar la zona y colocar el impacto con precisión.</li>
+            <li><strong>Puntuación:</strong> Por zona de anillo; compensación por calibre cuando está configurada.</li>
+            <li><strong>Mosca (X):</strong> Según reglas de la diana elegida.</li>
+            <li><strong>Control de serie:</strong> Indicador <strong>N / M</strong> (registrados / previstos por plantilla), franja de progreso en la tarjeta de arma y avisos al completar la serie o al primer tiro extra — sin impedir más disparos.</li>
+            <li><strong>Fuera del blanco:</strong> Impacto fuera del círculo de puntuación o botón dedicado; marca <strong>F</strong> en listas, sesiones, PDF y base de datos; los fueras no entran en el MPI / agrupación estadística.</li>
+            <li><strong>Feedback:</strong> Pulso en el último impacto, vibración y sonido corto opcionales (incluido escritorio <strong>Windows</strong>); mensajes de texto unificados para no saturar.</li>
+            <li><strong>Entrada manual:</strong> Teclado numérico de puntuación cuando no uses la diana.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="diana" aria-labelledby="h-diana">
+        <h2 id="h-diana">Diana virtual profesional</h2>
+        <div class="card">
+          <ul>
+            <li><strong>Catálogo:</strong> Precisión (1–10), duelo (5–10), aire comprimido, dimensiones en milímetros.</li>
+            <li><strong>Apariencia:</strong> Fondo claro u oscuro, zona negra, mosca, guías; opción de <strong>cartulina</strong> alrededor del disco.</li>
+            <li><strong>Fidelidad:</strong> Cálculos basados en tamaño exterior de diana y, si aplica, calibre para el tamaño del impacto (el calibre del <strong>lote de munición</strong> elegido en la sesión puede tener prioridad sobre el del arma cuando ambos están definidos).</li>
+            <li><strong>Numeración:</strong> Ejes coherentes con el tipo de diana seleccionado.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="historial" aria-labelledby="h-historial">
+        <h2 id="h-historial">Historial y sesiones</h2>
+        <div class="card">
+          <ul>
+            <li><strong>Pestañas</strong> para entrenamientos y competiciones (esta última según licencia), con <strong>filtros por fecha</strong> (hoy, mes, año, últimos días o rango personalizado).</li>
+            <li><strong>Detalle de tirada:</strong> diana con impactos, totales, edición de datos y de tiros, e iconos para análisis o PDF según tu plan.</li>
+            <li><strong>Datos en el dispositivo:</strong> tu historial se guarda localmente; la copia de seguridad permite respaldar o restaurar (véase <a href="#datos">Datos, licencia y buenas prácticas</a>).</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="estadisticas" aria-labelledby="h-estadisticas">
+        <h2 id="h-estadisticas">Análisis estadístico</h2>
+        <div class="card">
+          <ul>
+            <li><strong>Mapa de calor</strong> y representación de la nube de impactos.</li>
+            <li><strong>MPI</strong> (punto medio de impacto) referido a la diana.</li>
+            <li><strong>Corrección de miras:</strong> Orientación en clics horizontal / vertical según datos del arma.</li>
+            <li><strong>Dispersión:</strong> Indicación de tendencia circular, horizontal o vertical.</li>
+            <li><strong>Fueras declarados:</strong> Excluidos del análisis de agrupación para no falsear el MPI.</li>
+            <li><strong>Filtro por munición:</strong> Restringe gráficos y tablas a sesiones disparadas con un lote concreto; incluye un <strong>resumen por munición</strong> (sesiones, disparos, puntos y media) para comparar lotes.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="diagnostico" aria-labelledby="h-diagnostico">
+        <h2 id="h-diagnostico">Diagnóstico técnico</h2>
+        <div class="card">
+          <ul>
+            <li><strong>Patrones de error</strong> y vista circular de frecuencias.</li>
+            <li><strong>Mano dominante:</strong> Ajuste del razonamiento para tiradores diestros o zurdos.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="evolucion" aria-labelledby="h-evolucion">
+        <h2 id="h-evolucion">Evolución</h2>
+        <div class="card">
+          <ul>
+            <li><strong>Serie temporal</strong> del rendimiento entre sesiones y curva de tendencia suavizada.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="informes" aria-labelledby="h-informes">
+        <h2 id="h-informes">Informes y exportación</h2>
+        <div class="card">
+          <ul>
+            <li><strong>PDF:</strong> Acta con datos de tirador, equipo, munición (marca y lote cuando la sesión lleva lote asociado), series y totales; tablas de frecuencias con distinción de <strong>F</strong> (fuera) frente a otros ceros cuando corresponda.</li>
+            <li><strong>Excel:</strong> Exportación compatible con los flujos de análisis de la aplicación.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="municion" aria-labelledby="h-municion">
+        <h2 id="h-municion">Munición y lotes</h2>
+        <p class="section-intro">Inventario de cartuchos por <strong>marca</strong> y <strong>número de lote</strong>, con seguimiento de stock y vínculo a entrenamientos, competiciones, informes y estadísticas.</p>
+        <div class="card">
+          <h3>Gestión («Mis Municiones»)</h3>
+          <ul>
+            <li><strong>Alta y edición:</strong> Marca, número de lote, <strong>calibre</strong> (tomado del catálogo) y <strong>stock actual</strong> en unidades; contador acumulado de cartuchos disparados en sesiones.</li>
+            <li><strong>Compras y ajustes manuales:</strong> Registrar entradas de stock (compras) o salidas no ligadas a una sesión (uso manual), con cantidad y nota opcional — útil para ajustes de inventario.</li>
+            <li><strong>Historial de uso por lote:</strong> Consulta en qué sesiones se ha empleado un lote: fecha, lugar, número de disparos y datos de contexto (distancia, interior/exterior, temperatura, humedad, viento) cuando consten en la sesión.</li>
+            <li><strong>Eliminación:</strong> Borrado con confirmación; accesible desde Configuración → Gestión de munición.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>En entrenamiento y competición</h3>
+          <ul>
+            <li><strong>Selección opcional:</strong> Al preparar la sesión puedes elegir un lote registrado o dejar la munición sin asociar.</li>
+            <li><strong>Descuento automático de stock:</strong> Al guardar la sesión con disparos, se descuenta del stock del lote el número de disparos registrados (sin superar el stock disponible) y queda un movimiento de tipo uso vinculado a la sesión.</li>
+            <li><strong>Coherencia en la diana:</strong> Si el lote tiene calibre definido, puede usarse para el tamaño del impacto en la diana (ver sección <a href="#diana">Diana virtual</a>).</li>
+          </ul>
+        </div>
+      </section>
+
+      <hr class="sep">
+
+      <section id="configuracion" aria-labelledby="h-config">
+        <h2 class="config-title" id="h-config">Configuración</h2>
+
+        <h3 class="sub">A. Equipo personal</h3>
+        <div class="card">
+          <ul>
+            <li><strong>Perfil:</strong> Identificación del tirador (nombre, licencia, club).</li>
+            <li><strong>Armas / equipos:</strong> Inventario y datos técnicos por arma.</li>
+            <li><strong>Munición:</strong> Acceso a <strong>Gestión de munición</strong> — mismas capacidades que la <a href="#municion">sección 9</a> (lotes, stock, movimientos e historial por lote).</li>
+          </ul>
+        </div>
+
+        <h3 class="sub">B. Reglas y disciplinas</h3>
+        <div class="card">
+          <ul>
+            <li><strong>Plantillas de tiempos:</strong> Preparación, exposición, ocultación, número de disparos por serie y tipo de diana asociado.</li>
+          </ul>
+        </div>
+
+        <h3 class="sub">C. Catálogos</h3>
+        <div class="card">
+          <ul>
+            <li><strong>Tipos de arma, calibres y dianas</strong> editables y reutilizables en plantillas.</li>
+          </ul>
+        </div>
+
+        <h3 class="sub">D. Experiencia al disparar <span class="badge">Destacado</span></h3>
+        <div class="card">
+          <ul>
+            <li><strong>Sonido al impacto:</strong> Tono breve, activable por el usuario; reproducción fiable también en <strong>Windows</strong> (no depende solo del sonido del sistema).</li>
+            <li><strong>Vibración:</strong> Feedback háptico por impacto, activable o desactivable de forma independiente al sonido.</li>
+          </ul>
+        </div>
+      </section>
+
+      <hr class="sep">
+
+      <section id="datos" aria-labelledby="h-datos">
+        <h2 class="config-title" id="h-datos" style="margin-top: 0; padding-top: 0; border: 0;">Datos, licencia y buenas prácticas</h2>
+
+        <h3 class="sub" id="planes-licencia">Planes y licencias</h3>
+        <p class="section-intro" style="margin-top: 0;">La aplicación distingue <strong>niveles de plan</strong> (según la clave de licencia o el contrato). El servidor puede además enviar <strong>permisos puntuales</strong> (<em>features</em>) que amplían lo incluido en tu plan. Lo siguiente es <strong>orientativo</strong>; los nombres comerciales exactos y el catálogo vigente los confirma tu proveedor o la pantalla de licencia en la app.</p>
+        <div class="card">
+          <ul>
+            <li><strong>Entrenamiento</strong> (plan inicial / «básico»): pensado para sesiones de práctica y reglas de entrenamiento; suele ser el punto de partida.</li>
+            <li><strong>Competición:</strong> añade el modo competición (torneos, fases y cronos), además de lo anterior.</li>
+            <li><strong>Competición Plus</strong> (en la app a veces referido como <strong>Pro</strong> en mensajes de «plan requerido»): estadísticas avanzadas, respaldo/exportación ampliada y gestión de catálogos (armas, calibres, dianas), según política de licencia.</li>
+            <li><strong>Completo</strong> (incluye denominaciones tipo visión élite / táctica en entornos comerciales): nivel superior, con funciones como detección avanzada sobre diana cuando estén activadas en tu licencia.</li>
+          </ul>
+          <p style="margin: 0.75rem 0 0; font-size: 0.92rem; color: var(--text-soft);">Si una función aparece bloqueada, la app indica el <strong>plan mínimo</strong> necesario; la validación puede requerir conexión periódica y contempla un margen de gracia para uso sin red.</p>
+          <p style="margin: 0.75rem 0 0; font-size: 0.92rem; color: var(--text-soft);">Tabla resumida y criterios por función: <a href="manual_usuario.html#planes">Manual de usuario — Planes de licencia</a>. Para capturas automáticas del manual en desarrollo se usa el plan simulado <code>completo</code> (véase <a href="PASOS_CAPTURAS.md"><code>PASOS_CAPTURAS.md</code></a>).</p>
+        </div>
+
+        <h3 class="sub" id="modo-demo">Modo demostración</h3>
+        <div class="card">
+          <ul>
+            <li><strong>¿Para qué sirve?</strong> Existe una <strong>licencia de demostración</strong> para quien quiera <strong>probar la interfaz y el flujo</strong> sin compromiso, con datos de ejemplo.</li>
+            <li><strong>Demo sin plan de pago:</strong> la app puede activar el <strong>perfil de datos «Demo»</strong> y limitar acciones a <strong>solo lectura</strong> en gran parte de la herramienta (evitando que se mezclen pruebas con tu historial real).</li>
+            <li><strong>Licencia de pago + bandera demo:</strong> si tu contrato lo permite, puedes tener plan activo y aun así <strong>alternar</strong> entre perfil personal y perfil demo para formación o presentaciones.</li>
+            <li><strong>Cómo obtenerla:</strong> solicita una clave o acceso demo a quien distribuya <strong>Tiro Deportivo AMG</strong> (mismo canal que el soporte o la venta de licencias).</li>
+          </ul>
+        </div>
+
+        <h3 class="sub">Respaldo y privacidad</h3>
+        <div class="card">
+          <ul>
+            <li><strong>Copia de seguridad en la app:</strong> desde el panel principal, «Más opciones» → <strong>Copia de seguridad</strong> puedes exportar o importar la base de datos completa (según plan). La importación reemplaza lo que tengas: confirma antes de continuar.</li>
+            <li><strong>Informes:</strong> PDF y Excel complementan el respaldo para compartir sesiones concretas (véase <a href="#informes">Informes y exportación</a>).</li>
+            <li><strong>Eliminación:</strong> la app pide confirmación antes de borrar datos importantes.</li>
+          </ul>
+        </div>
+      </section>
+
+    </main>
+
+    <footer>
+      <p><strong>Tiro Deportivo AMG</strong> — documentación de producto orientativa. Las funciones exactas pueden variar según versión de la aplicación y plataforma.</p>
+      <p style="margin-top: 0.75rem;">Para uso diario: <a href="manual_usuario.html">Manual de usuario</a> (guía con pantallazos, lenguaje sencillo).</p>
+      <p style="margin-top: 0.75rem;"><a href="#top">Volver arriba ↑</a></p>
+    </footer>
+  </div>
+</body>
+</html>

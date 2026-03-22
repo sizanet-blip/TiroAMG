@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../constants/diana_layout.dart';
 import '../models/equipo_model.dart';
 import '../models/plantilla_tiempos_model.dart';
@@ -10,6 +11,8 @@ import '../models/disparo_model.dart';
 import '../services/catalogo_service.dart';
 import '../services/entrenamiento_service.dart';
 import '../services/audio_service.dart';
+import '../services/impact_feedback_prefs.dart';
+import '../services/impact_sound_player.dart';
 
 enum FaseSesion { stop, preparacion, espera, fuego, fin }
 
@@ -62,7 +65,8 @@ class SesionDisparoScreen extends StatefulWidget {
   State<SesionDisparoScreen> createState() => _SesionDisparoScreenState();
 }
 
-class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
+class _SesionDisparoScreenState extends State<SesionDisparoScreen>
+    with SingleTickerProviderStateMixin {
   final _catalogoService = CatalogoService();
   final _entrenamientoService = EntrenamientoService();
   final _audioService = AudioService();
@@ -102,6 +106,9 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   double _pasoAjuste = 0.01;
   bool _recalcularPuntosAjuste = true;
 
+  /// Pulso visual en el último impacto registrado.
+  late AnimationController _impactoPulseController;
+
   bool get _enCurso =>
       !_estaPausado &&
       _faseActual != FaseSesion.stop &&
@@ -136,28 +143,93 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     return Colors.tealAccent.shade200;
   }
 
-  void _mostrarFeedbackConteoTiros(int totalTrasAnadir) {
+  /// Un solo mensaje flotante: serie / tiro extra + fuera si aplica (evita cola de SnackBars).
+  void _mostrarFeedbackPostDisparo({
+    required int totalTiros,
+    required bool esFuera,
+    bool esBotonFuera = false,
+  }) {
+    if (!mounted) return;
     final m = _tirosPrevistos;
-    if (m <= 0 || !mounted) return;
-    if (totalTrasAnadir == m) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Serie completada: $m/$m disparos.'),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else if (totalTrasAnadir == m + 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Tiro extra: la plantilla prevé $m disparos por serie. Puedes seguir registrando.',
-          ),
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-        ),
+    final partes = <String>[];
+
+    if (m > 0) {
+      if (totalTiros == m) {
+        partes.add('Serie completada: $m/$m disparos.');
+      } else if (totalTiros == m + 1) {
+        partes.add(
+          'Tiro extra: la plantilla prevé $m disparos por serie. Puedes seguir registrando.',
+        );
+      }
+    }
+    if (esFuera) {
+      partes.add(
+        esBotonFuera
+            ? 'Marcado fuera del blanco (0).'
+            : 'Fuera del blanco: 0 pt.',
       );
     }
+    if (partes.isEmpty) return;
+
+    final texto = partes.join(' ');
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(texto),
+        duration: Duration(seconds: texto.length > 72 ? 4 : 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// Sonido del sistema + vibración según [ImpactFeedbackPrefs].
+  Future<void> _aplicarFeedbackSensorial({
+    required bool esFuera,
+    required bool entradaManual,
+  }) async {
+    final sonido = await ImpactFeedbackPrefs.sonidoHabilitado();
+    final vibracion = await ImpactFeedbackPrefs.vibracionHabilitada();
+
+    if (sonido) {
+      // SystemSound no es audible en Windows desktop; usamos WAV vía audioplayers.
+      await ImpactSoundPlayer.play(
+        esFuera: esFuera,
+        entradaManual: entradaManual,
+      );
+    }
+
+    if (vibracion) {
+      if (entradaManual) {
+        HapticFeedback.selectionClick();
+      } else if (esFuera) {
+        HapticFeedback.mediumImpact();
+      } else {
+        HapticFeedback.lightImpact();
+      }
+    }
+  }
+
+  void _onRegistroImpactoCompleto({
+    required bool esFuera,
+    bool esBotonFuera = false,
+    bool entradaManual = false,
+  }) {
+    unawaited(_aplicarFeedbackSensorial(
+      esFuera: esFuera,
+      entradaManual: entradaManual,
+    ));
+    if (_listaDisparos.isNotEmpty) {
+      _impactoPulseController.forward(from: 0);
+    }
+    final n = _listaDisparos.length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _mostrarFeedbackPostDisparo(
+        totalTiros: n,
+        esFuera: esFuera,
+        esBotonFuera: esBotonFuera,
+      );
+    });
   }
 
   Widget _buildContadorTirosSerie(bool narrow) {
@@ -325,6 +397,10 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   @override
   void initState() {
     super.initState();
+    _impactoPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
     _cargarConfiguracionDiana();
     _resetearValoresTiempo();
     _audioService.init();
@@ -333,6 +409,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _impactoPulseController.dispose();
     _audioService.stop();
     super.dispose();
   }
@@ -572,20 +649,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         esFuera: esFuera,
       ));
     });
-    final n = _listaDisparos.length;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _mostrarFeedbackConteoTiros(n);
-      if (esFuera) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Fuera del blanco: 0 puntos.'),
-            duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    });
+    _onRegistroImpactoCompleto(esFuera: esFuera);
   }
 
   /// Registra un tiro explícitamente fuera del círculo de puntuación (0, marcado como F).
@@ -613,18 +677,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         esFuera: true,
       ));
     });
-    final n = _listaDisparos.length;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _mostrarFeedbackConteoTiros(n);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tiro fuera del blanco registrado (0).'),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    });
+    _onRegistroImpactoCompleto(esFuera: true, esBotonFuera: true);
   }
 
   void _agregarDisparoManual(double puntuacion, {bool esMosca = false}) {
@@ -641,10 +694,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         esFuera: false,
       ));
     });
-    final n = _listaDisparos.length;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _mostrarFeedbackConteoTiros(n);
-    });
+    _onRegistroImpactoCompleto(esFuera: false, entradaManual: true);
   }
 
   String _formatearMarcaDisparo(Disparo disparo) {
@@ -652,6 +702,33 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     if (disparo.esMosca) return 'X';
     if (disparo.puntuacion % 1 == 0) return disparo.puntuacion.toInt().toString();
     return disparo.puntuacion.toStringAsFixed(1);
+  }
+
+  Widget _buildDianaCustomPaint(Size size, List<Offset> impactosPixels) {
+    return AnimatedBuilder(
+      animation: _impactoPulseController,
+      builder: (context, child) {
+        return CustomPaint(
+          size: size,
+          painter: DianaPainter(
+            impactos: impactosPixels,
+            valorMinimo: _valorMinimo,
+            anilloNegroInicio: _anilloNegroInicio,
+            esFondoNegro: _esFondoNegro,
+            tieneMosca: _tieneMosca,
+            tieneGuias: _tieneGuias,
+            esEstiloDuelo: _esEstiloDuelo,
+            diametroImpactoMm: _calibreMm,
+            diametroDianaMm: _dianaAnchoExteriorMm,
+            mostrarCartulina: _mostrarCartulina,
+            pulsoUltimo:
+                _listaDisparos.isEmpty ? null : _impactoPulseController.value,
+            ultimoEsFuera:
+                _listaDisparos.isNotEmpty && _listaDisparos.last.esFuera,
+          ),
+        );
+      },
+    );
   }
 
   void _borrarUltimo() {
@@ -1371,21 +1448,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                                       )
                                     ],
                                   ),
-                                  child: CustomPaint(
-                                    size: size,
-                                    painter: DianaPainter(
-                                      impactos: impactosPixels,
-                                      valorMinimo: _valorMinimo,
-                                      anilloNegroInicio: _anilloNegroInicio,
-                                      esFondoNegro: _esFondoNegro,
-                                      tieneMosca: _tieneMosca,
-                                      tieneGuias: _tieneGuias,
-                                      esEstiloDuelo: _esEstiloDuelo,
-                                      diametroImpactoMm: _calibreMm,
-                                      diametroDianaMm: _dianaAnchoExteriorMm,
-                                      mostrarCartulina: _mostrarCartulina,
-                                    ),
-                                  ),
+                                  child: _buildDianaCustomPaint(size, impactosPixels),
                                 ),
                               ),
 
@@ -1425,24 +1488,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                                           child: SizedBox(
                                             width: size.width,
                                             height: size.height,
-                                            child: CustomPaint(
-                                              size: size,
-                                              painter: DianaPainter(
-                                                impactos: impactosPixels,
-                                                valorMinimo: _valorMinimo,
-                                                anilloNegroInicio:
-                                                    _anilloNegroInicio,
-                                                esFondoNegro: _esFondoNegro,
-                                                tieneMosca: _tieneMosca,
-                                                tieneGuias: _tieneGuias,
-                                                esEstiloDuelo: _esEstiloDuelo,
-                                                diametroImpactoMm: _calibreMm,
-                                                diametroDianaMm:
-                                                    _dianaAnchoExteriorMm,
-                                                mostrarCartulina:
-                                                    _mostrarCartulina,
-                                              ),
-                                            ),
+                                            child: _buildDianaCustomPaint(
+                                                size, impactosPixels),
                                           ),
                                         ),
                                       ),
@@ -2021,6 +2068,9 @@ class DianaPainter extends CustomPainter {
   final double? diametroImpactoMm;
   final double? diametroDianaMm;
   final bool mostrarCartulina;
+  /// 0–1 animación del último impacto (null = sin pulso).
+  final double? pulsoUltimo;
+  final bool ultimoEsFuera;
 
   DianaPainter({
     required this.impactos,
@@ -2033,6 +2083,8 @@ class DianaPainter extends CustomPainter {
     this.diametroImpactoMm,
     this.diametroDianaMm,
     this.mostrarCartulina = false,
+    this.pulsoUltimo,
+    this.ultimoEsFuera = false,
   });
 
   @override
@@ -2165,10 +2217,36 @@ class DianaPainter extends CustomPainter {
       radioImpacto = radius * (diametroImpactoMm! / diametroDianaMm!);
       radioImpacto = radioImpacto.clamp(1.4, radius * 0.14);
     }
-    for (var p in impactos) {
-      canvas.drawCircle(p, radioImpacto + 0.8, paintBordeOscuro);
-      canvas.drawCircle(p, radioImpacto + 0.2, paintBordeClaro);
-      canvas.drawCircle(p, radioImpacto, paintImpacto);
+    for (var i = 0; i < impactos.length; i++) {
+      final p = impactos[i];
+      final esUltimo = i == impactos.length - 1;
+      final t = pulsoUltimo;
+      final boost = esUltimo && t != null && t > 0.01
+          ? 1.0 + 0.22 * (1.0 - Curves.easeOut.transform(t))
+          : 1.0;
+      final r = radioImpacto * boost;
+      final paintFill = (esUltimo && ultimoEsFuera)
+          ? (Paint()
+            ..color = Colors.orangeAccent.withValues(alpha: 0.92)
+            ..style = PaintingStyle.fill)
+          : paintImpacto;
+      canvas.drawCircle(p, r + 0.8, paintBordeOscuro);
+      canvas.drawCircle(p, r + 0.2, paintBordeClaro);
+      canvas.drawCircle(p, r, paintFill);
+    }
+
+    final pt = pulsoUltimo;
+    if (pt != null && pt > 0.01 && impactos.isNotEmpty) {
+      final p = impactos.last;
+      final ease = Curves.easeOut.transform(pt);
+      final ringR = radioImpacto + 6 + 28 * ease;
+      final opacity = (1.0 - pt) * 0.82;
+      final col = ultimoEsFuera ? Colors.orangeAccent : Colors.tealAccent;
+      final paintRing = Paint()
+        ..color = col.withValues(alpha: opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0 + ease * 0.8;
+      canvas.drawCircle(p, ringR, paintRing);
     }
   }
 
@@ -2206,5 +2284,17 @@ class DianaPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant DianaPainter oldDelegate) => true;
+  bool shouldRepaint(covariant DianaPainter oldDelegate) {
+    if (oldDelegate.pulsoUltimo != pulsoUltimo ||
+        oldDelegate.ultimoEsFuera != ultimoEsFuera ||
+        oldDelegate.impactos.length != impactos.length ||
+        oldDelegate.valorMinimo != valorMinimo ||
+        oldDelegate.mostrarCartulina != mostrarCartulina) {
+      return true;
+    }
+    for (var i = 0; i < impactos.length; i++) {
+      if (oldDelegate.impactos[i] != impactos[i]) return true;
+    }
+    return false;
+  }
 }
