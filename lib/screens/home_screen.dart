@@ -326,6 +326,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(mensaje),
                   const SizedBox(height: 12),
+                  Text(
+                    'Tu correo solo se usa para la gestión y control de la licencia '
+                    'en este dispositivo. No se recoge ni se utiliza para ningún otro fin '
+                    '(ni publicidad, ni datos del perfil del tirador).',
+                    style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: userController,
                     keyboardType: TextInputType.emailAddress,
