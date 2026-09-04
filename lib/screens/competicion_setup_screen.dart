@@ -5,6 +5,8 @@ import '../models/municion_model.dart';
 import '../services/equipo_service.dart';
 import '../services/municion_service.dart';
 import 'competicion_runner_screen.dart'; // El Director de Orquesta
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 
 class CompeticionSetupScreen extends StatefulWidget {
   final Modalidad modalidad;
@@ -110,61 +112,73 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cargando) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_cargando) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.modalidad.nombre), backgroundColor: Colors.amber[700]),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+    return AppPageScaffold(
+      title: widget.modalidad.nombre,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-            const Text('Prepara tu equipo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            
-            // Selector Arma
-            DropdownButtonFormField<EquipoDetalle>(
-              decoration: const InputDecoration(labelText: 'Arma', border: OutlineInputBorder()),
-              isExpanded: true,
-              value: _equipoSeleccionado,
-              items: _equipos
-                  .map((e) => DropdownMenuItem(
-                        value: e,
-                        child: Text(e.nombre, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _equipoSeleccionado = v),
+          Text(
+            'Prepara tu equipo',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: AppColors.title,
             ),
-            const SizedBox(height: 20),
+          ),
+          const SizedBox(height: 16),
 
-            // Selector Munición
-            DropdownButtonFormField<MunicionDetalle>(
-              decoration: const InputDecoration(labelText: 'Munición (Opcional)', border: OutlineInputBorder()),
-              isExpanded: true,
-              value: _municionSeleccionada,
-              items: [
-                const DropdownMenuItem(
-                  value: null,
-                  child: Text('Sin especificar', maxLines: 1, overflow: TextOverflow.ellipsis),
+          AppSectionCard(
+            title: 'Sesión',
+            titleIcon: Icons.emoji_events_outlined,
+            titleIconColor: AppColors.accentCompetition,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DropdownButtonFormField<EquipoDetalle>(
+                  decoration: const InputDecoration(labelText: 'Arma'),
+                  isExpanded: true,
+                  value: _equipoSeleccionado,
+                  items: _equipos
+                      .map((e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(e.nombre, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setState(() => _equipoSeleccionado = v),
                 ),
-                ..._municiones.map(
-                  (m) => DropdownMenuItem(
-                    value: m,
-                    child: Text(
-                      '${m.marca} (${m.lote}) - Stock ${m.cantidadActual}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 16),
+                DropdownButtonFormField<MunicionDetalle>(
+                  decoration: const InputDecoration(labelText: 'Munición (opcional)'),
+                  isExpanded: true,
+                  value: _municionSeleccionada,
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Sin especificar', maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
-                  ),
+                    ..._municiones.map(
+                      (m) => DropdownMenuItem(
+                        value: m,
+                        child: Text(
+                          '${m.marca} (${m.lote}) - Stock ${m.cantidadActual}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _municionSeleccionada = v),
                 ),
-              ],
-              onChanged: (v) => setState(() => _municionSeleccionada = v),
-            ),
-            const SizedBox(height: 20),
-
-            Card(
-              elevation: 1,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: SwitchListTile(
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
                   title: Text(
                     _usarEntradaManualPuntos
                         ? 'Puntuar por números'
@@ -178,102 +192,108 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
                   ),
                   secondary: Icon(
                     _usarEntradaManualPuntos ? Icons.pin : Icons.adjust,
-                    color: Colors.amber[800],
+                    color: AppColors.primary,
                   ),
                   value: _usarEntradaManualPuntos,
                   onChanged: (v) =>
                       setState(() => _usarEntradaManualPuntos = v),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 20),
+          ),
 
-            TextFormField(
-              controller: _lugarController,
-              decoration: const InputDecoration(labelText: 'Lugar / Campo', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _distanciaController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Distancia (m)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 8),
-            Row(
+          const SizedBox(height: 16),
+
+          AppSectionCard(
+            title: 'Condiciones de tiro',
+            titleIcon: Icons.thermostat_outlined,
+            titleIconColor: AppColors.subtitle,
+            child: Column(
               children: [
-                const Text('Interior'),
-                Switch(
-                  value: _esInterior,
-                  onChanged: (v) => setState(() => _esInterior = v),
+                TextFormField(
+                  controller: _lugarController,
+                  decoration: const InputDecoration(labelText: 'Lugar / Campo'),
                 ),
-                Text(_esInterior ? 'Si' : 'No'),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _distanciaController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Distancia (m)'),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text('Interior', style: TextStyle(color: AppColors.title)),
+                    Switch(
+                      value: _esInterior,
+                      onChanged: (v) => setState(() => _esInterior = v),
+                    ),
+                    Text(_esInterior ? 'Si' : 'No', style: TextStyle(color: AppColors.subtitle)),
+                  ],
+                ),
+                DropdownButtonFormField<String>(
+                  value: _posicionTiro,
+                  decoration: const InputDecoration(labelText: 'Posicion de tiro'),
+                  items: const [
+                    DropdownMenuItem(value: 'Pie', child: Text('Pie')),
+                    DropdownMenuItem(value: 'Rodilla', child: Text('Rodilla')),
+                    DropdownMenuItem(value: 'Tendido', child: Text('Tendido')),
+                    DropdownMenuItem(value: 'Banco', child: Text('Banco')),
+                  ],
+                  onChanged: (v) => setState(() => _posicionTiro = v),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _iluminacion,
+                  decoration: const InputDecoration(labelText: 'Iluminacion'),
+                  items: const [
+                    DropdownMenuItem(value: 'Artificial', child: Text('Artificial')),
+                    DropdownMenuItem(value: 'Natural', child: Text('Natural')),
+                    DropdownMenuItem(value: 'Mixta', child: Text('Mixta')),
+                  ],
+                  onChanged: (v) => setState(() => _iluminacion = v),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _tempController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Temperatura (°C)'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _humedadController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Humedad (%)'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _presionController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Presion (hPa)'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _vientoController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Viento (m/s)'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _vientoDirController,
+                  decoration: const InputDecoration(labelText: 'Direccion del viento'),
+                ),
               ],
             ),
-            DropdownButtonFormField<String>(
-              value: _posicionTiro,
-              decoration: const InputDecoration(labelText: 'Posicion de tiro', border: OutlineInputBorder()),
-              items: const [
-                DropdownMenuItem(value: 'Pie', child: Text('Pie')),
-                DropdownMenuItem(value: 'Rodilla', child: Text('Rodilla')),
-                DropdownMenuItem(value: 'Tendido', child: Text('Tendido')),
-                DropdownMenuItem(value: 'Banco', child: Text('Banco')),
-              ],
-              onChanged: (v) => setState(() => _posicionTiro = v),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _iluminacion,
-              decoration: const InputDecoration(labelText: 'Iluminacion', border: OutlineInputBorder()),
-              items: const [
-                DropdownMenuItem(value: 'Artificial', child: Text('Artificial')),
-                DropdownMenuItem(value: 'Natural', child: Text('Natural')),
-                DropdownMenuItem(value: 'Mixta', child: Text('Mixta')),
-              ],
-              onChanged: (v) => setState(() => _iluminacion = v),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _tempController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Temperatura (°C)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _humedadController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Humedad (%)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _presionController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Presion (hPa)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _vientoController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Viento (m/s)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _vientoDirController,
-              decoration: const InputDecoration(labelText: 'Direccion del viento', border: OutlineInputBorder()),
-            ),
-            
-            const SizedBox(height: 20),
-            
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green, 
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.all(15)
-              ),
-              icon: const Icon(Icons.play_circle_filled, size: 30),
-              label: const Text('COMENZAR TORNEO', style: TextStyle(fontSize: 18)),
-              onPressed: _empezar,
-            )
-          ],
+          ),
+
+          const SizedBox(height: 28),
+
+          AppPrimaryButton(
+            label: 'Comenzar torneo',
+            icon: Icons.play_circle_filled,
+            onPressed: _empezar,
+          ),
+        ],
       ),
     );
   }

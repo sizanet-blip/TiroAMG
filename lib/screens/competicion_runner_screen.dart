@@ -8,6 +8,7 @@ import '../models/disparo_model.dart';
 import '../services/competicion_service.dart';
 import '../services/entrenamiento_service.dart';
 import '../services/plantilla_tiempos_service.dart';
+import '../theme/app_theme.dart';
 import 'sesion_disparo_screen.dart'; // La pantalla de la diana
 
 class CompeticionRunnerScreen extends StatefulWidget {
@@ -237,10 +238,9 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
 
     if (_fases.isEmpty) {
       return Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(widget.modalidad.nombre),
-          backgroundColor: Colors.blueGrey[900],
-          foregroundColor: Colors.white,
         ),
         body: const Center(
           child: Padding(
@@ -258,20 +258,19 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     // Si terminamos, mostramos pantalla final estática
     if (_torneoFinalizado) {
       return Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('Resultados'),
-          backgroundColor: Colors.blueGrey,
-          foregroundColor: Colors.white,
         ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('TORNEO COMPLETADO', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              Text('TORNEO COMPLETADO', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.title)),
               const SizedBox(height: 20),
-              Text('$_puntosTotales Puntos', style: const TextStyle(fontSize: 48, color: Colors.amber)),
+              Text('$_puntosTotales Puntos', style: TextStyle(fontSize: 48, color: AppColors.accentCompetition)),
               const SizedBox(height: 40),
-              ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('VOLVER AL MENÚ'))
+              FilledButton(onPressed: () => Navigator.pop(context), child: const Text('VOLVER AL MENÚ'))
             ],
           ),
         ),
@@ -283,11 +282,9 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     final esEnsayo = faseActual.fase.esEnsayo;
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(widget.modalidad.nombre),
-        backgroundColor: Colors.blueGrey[900],
-        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [

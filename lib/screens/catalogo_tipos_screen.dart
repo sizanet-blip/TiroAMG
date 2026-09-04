@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/catalogo_model.dart';
 import '../services/catalogo_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 
 class CatalogoTiposScreen extends StatefulWidget {
   const CatalogoTiposScreen({super.key});
@@ -26,106 +28,96 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
     });
   }
 
-  // Función para agregar un nuevo tipo
   void _agregarTipo() {
     final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Nuevo Tipo de Arma'),
+      builder: (context) => AppDialog(
+        title: 'Nuevo tipo de arma',
+        icon: Icons.category_outlined,
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(hintText: 'Ej: Rifle Aire'),
+          decoration: const InputDecoration(
+            labelText: 'Nombre',
+            hintText: 'Ej: Rifle aire',
+          ),
           autofocus: true,
           textCapitalization: TextCapitalization.sentences,
+          onSubmitted: (_) => _guardarNuevo(controller, context),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (controller.text.trim().isNotEmpty) {
-                await _service.crearTipoArma(TipoArma(nombre: controller.text.trim()));
-                _cargarDatos();
-                if (mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
+        actions: appDialogActions(
+          context: context,
+          confirmLabel: 'Guardar',
+          onConfirm: () => _guardarNuevo(controller, context),
+        ),
       ),
     );
   }
 
-  // --- NUEVA FUNCIÓN: EDITAR ---
+  Future<void> _guardarNuevo(
+      TextEditingController controller, BuildContext dialogContext) async {
+    if (controller.text.trim().isEmpty) return;
+    await _service.crearTipoArma(TipoArma(nombre: controller.text.trim()));
+    _cargarDatos();
+    if (dialogContext.mounted) Navigator.pop(dialogContext);
+  }
+
   void _editarTipo(TipoArma item) {
-    // Pre-llenamos el texto con el nombre actual
     final controller = TextEditingController(text: item.nombre);
-    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Editar Tipo de Arma'),
+      builder: (context) => AppDialog(
+        title: 'Editar tipo de arma',
+        icon: Icons.edit_outlined,
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(labelText: 'Nombre'),
           autofocus: true,
           textCapitalization: TextCapitalization.sentences,
+          onSubmitted: (_) => _guardarEdicion(item, controller, context),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (controller.text.trim().isNotEmpty) {
-                // Llamamos a actualizar pasando el mismo ID pero el nuevo nombre
-                await _service.actualizarTipoArma(
-                  TipoArma(id: item.id, nombre: controller.text.trim())
-                );
-                _cargarDatos();
-                if (mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text('Actualizar'),
-          ),
-        ],
+        actions: appDialogActions(
+          context: context,
+          confirmLabel: 'Guardar',
+          onConfirm: () => _guardarEdicion(item, controller, context),
+        ),
       ),
     );
+  }
+
+  Future<void> _guardarEdicion(TipoArma item, TextEditingController controller,
+      BuildContext dialogContext) async {
+    if (controller.text.trim().isEmpty) return;
+    await _service.actualizarTipoArma(
+      TipoArma(id: item.id, nombre: controller.text.trim()),
+    );
+    _cargarDatos();
+    if (dialogContext.mounted) Navigator.pop(dialogContext);
   }
 
   void _confirmarBorrado(TipoArma item) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar eliminación'),
-        content: Text('¿Estás seguro de que quieres borrar "${item.nombre}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await _service.borrarTipoArma(item.id!);
-              _cargarDatos();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${item.nombre} eliminado')),
-                );
-              }
-            },
-            child: const Text('Borrar'),
-          ),
-        ],
+      builder: (ctx) => AppDialog(
+        title: 'Eliminar tipo',
+        icon: Icons.delete_outline,
+        iconColor: AppColors.accentDanger,
+        content: Text('¿Borrar «${item.nombre}»? Esta acción no se puede deshacer.'),
+        actions: appDialogActions(
+          context: ctx,
+          confirmLabel: 'Borrar',
+          danger: true,
+          onConfirm: () async {
+            Navigator.of(ctx).pop();
+            await _service.borrarTipoArma(item.id!);
+            _cargarDatos();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${item.nombre} eliminado')),
+              );
+            }
+          },
+        ),
       ),
     );
   }
@@ -133,55 +125,85 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Catálogo: Tipos de Arma'),
-        backgroundColor: Colors.blueGrey,
       ),
       body: _lista.isEmpty
           ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.category_outlined, size: 60, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text('No hay tipos definidos', style: TextStyle(color: Colors.grey)),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.category_outlined,
+                      size: 60,
+                      color: AppColors.subtitleSoft,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No hay tipos definidos',
+                      style: TextStyle(color: AppColors.subtitle),
+                    ),
+                  ],
+                ),
               ),
             )
-          : ListView.separated(
-              itemCount: _lista.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = _lista[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.blueGrey.withOpacity(0.1),
-                    child: const Icon(Icons.category, color: Colors.blueGrey, size: 20),
-                  ),
-                  title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.w500)),
-                  
-                  onLongPress: () => _confirmarBorrado(item),
-
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min, // Ocupa solo el espacio necesario
-                    children: [
-                      // BOTÓN EDITAR (Lápiz)
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () => _editarTipo(item),
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                  itemCount: _lista.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final item = _lista[index];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.12),
+                          child: Icon(
+                            Icons.category,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          item.nombre,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.title,
+                          ),
+                        ),
+                        onLongPress: () => _confirmarBorrado(item),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit, color: AppColors.primary),
+                              onPressed: () => _editarTipo(item),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: AppColors.accentDanger,
+                              ),
+                              onPressed: () => _confirmarBorrado(item),
+                            ),
+                          ],
+                        ),
                       ),
-                      // BOTÓN BORRAR (Papelera)
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () => _confirmarBorrado(item),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.blueGrey,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         onPressed: _agregarTipo,
         child: const Icon(Icons.add),
       ),

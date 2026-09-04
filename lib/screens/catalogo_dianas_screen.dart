@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/tipo_diana_model.dart';
 import '../services/catalogo_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 import 'tipo_diana_form_screen.dart'; // Crearemos este formulario ahora
 
 class CatalogoDianasScreen extends StatefulWidget {
@@ -36,21 +38,21 @@ class _CatalogoDianasScreenState extends State<CatalogoDianasScreen> {
   void _borrarDiana(TipoDiana item) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar borrado'),
-        content: Text('¿Eliminar la diana "${item.nombre}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _service.borrarTipoDiana(item.id!);
-              _cargarDatos();
-            },
-            child: const Text('Borrar'),
-          ),
-        ],
+      builder: (ctx) => AppDialog(
+        title: 'Eliminar diana',
+        icon: Icons.delete_outline,
+        iconColor: AppColors.accentDanger,
+        content: Text('¿Borrar «${item.nombre}»? Esta acción no se puede deshacer.'),
+        actions: appDialogActions(
+          context: ctx,
+          confirmLabel: 'Borrar',
+          danger: true,
+          onConfirm: () async {
+            Navigator.pop(ctx);
+            await _service.borrarTipoDiana(item.id!);
+            _cargarDatos();
+          },
+        ),
       ),
     );
   }
@@ -58,34 +60,85 @@ class _CatalogoDianasScreenState extends State<CatalogoDianasScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Catálogo de Dianas'), backgroundColor: Colors.blueGrey),
-      body: ListView.separated(
-        itemCount: _lista.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final item = _lista[index];
-          return ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: Colors.black12,
-              child: Icon(Icons.adjust, color: Colors.black),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('Catálogo de Dianas')),
+      body: _lista.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.adjust,
+                      size: 60,
+                      color: AppColors.subtitleSoft,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No hay dianas definidas',
+                      style: TextStyle(color: AppColors.subtitle),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                  itemCount: _lista.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final item = _lista[index];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.12),
+                          child: Icon(
+                            Icons.adjust,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        title: Text(
+                          item.nombre,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.title,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Negro desde el ${item.anilloNegroInicio} • ${item.tieneMosca ? "Con Mosca" : "Sin Mosca"}',
+                          style: TextStyle(color: AppColors.subtitleSoft),
+                        ),
+                        onLongPress: () => _borrarDiana(item),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit, color: AppColors.primary),
+                              onPressed: () => _abrirFormulario(item),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: AppColors.accentDanger,
+                              ),
+                              onPressed: () => _borrarDiana(item),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
-            title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('Negro desde el ${item.anilloNegroInicio} • ${item.tieneMosca ? "Con Mosca" : "Sin Mosca"}'),
-            
-            onLongPress: () => _borrarDiana(item),
-            
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _abrirFormulario(item)),
-                IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _borrarDiana(item)),
-              ],
-            ),
-          );
-        },
-      ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.blueGrey,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         onPressed: () => _abrirFormulario(),
         child: const Icon(Icons.add),
       ),

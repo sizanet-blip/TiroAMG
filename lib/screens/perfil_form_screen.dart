@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/perfil_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 
 class PerfilFormScreen extends StatefulWidget {
   const PerfilFormScreen({super.key});
@@ -56,56 +58,74 @@ class _PerfilFormScreenState extends State<PerfilFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cargando) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_cargando) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Mis Datos de Tirador'), backgroundColor: Colors.blueGrey),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Estos datos aparecerán automáticamente en tus Actas y PDFs.", style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 20),
-              
-              TextFormField(
-                controller: _nombreCtrl,
-                decoration: const InputDecoration(labelText: 'Nombre y Apellidos', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
-              ),
-              const SizedBox(height: 15),
-              
-              TextFormField(
-                controller: _licenciaCtrl,
-                decoration: const InputDecoration(labelText: 'Nº Licencia Federativa', border: OutlineInputBorder(), prefixIcon: Icon(Icons.badge)),
-              ),
-              const SizedBox(height: 15),
-              
-              TextFormField(
-                controller: _clubCtrl,
-                decoration: const InputDecoration(labelText: 'Club / Federación', border: OutlineInputBorder(), prefixIcon: Icon(Icons.groups)),
-              ),
-              const SizedBox(height: 15),
-              
-              TextFormField(
-                controller: _catCtrl,
-                decoration: const InputDecoration(labelText: 'Categoría (Senior, Veterano...)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.stars)),
-              ),
+    return AppPageScaffold(
+      title: 'Mis Datos de Tirador',
+      body: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Estos datos aparecerán automáticamente en tus Actas y PDFs.',
+              style: TextStyle(color: AppColors.subtitle),
+            ),
+            const SizedBox(height: 16),
 
-              const SizedBox(height: 30),
-              
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.save),
-                  label: const Text('GUARDAR PERFIL'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey, foregroundColor: Colors.white, padding: const EdgeInsets.all(15)),
-                  onPressed: _guardar,
-                ),
-              )
-            ],
-          ),
+            AppSectionCard(
+              title: 'Datos personales',
+              titleIcon: Icons.person_outline,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _nombreCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre y Apellidos',
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _licenciaCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Nº Licencia Federativa',
+                      prefixIcon: Icon(Icons.badge),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _clubCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Club / Federación',
+                      prefixIcon: Icon(Icons.groups),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _catCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Categoría (Senior, Veterano...)',
+                      prefixIcon: Icon(Icons.stars),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 28),
+
+            AppPrimaryButton(
+              label: 'Guardar perfil',
+              icon: Icons.save,
+              onPressed: _guardar,
+            ),
+          ],
         ),
       ),
     );

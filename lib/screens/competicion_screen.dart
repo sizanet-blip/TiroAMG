@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/competicion_model.dart';
 import '../services/competicion_service.dart';
+import '../theme/app_theme.dart';
 // Importamos las pantallas de destino
 import 'competicion_detalle_screen.dart'; // Para editar
-import 'competicion_setup_screen.dart';   // Para empezar (Setup)
+import 'competicion_setup_screen.dart'; // Para empezar (Setup)
 
 class CompeticionScreen extends StatefulWidget {
   const CompeticionScreen({super.key});
@@ -41,41 +42,49 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              item.nombre, 
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), 
-              textAlign: TextAlign.center
+              item.nombre,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: AppColors.title,
+              ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             Text(
               item.descripcion ?? 'Selecciona una acción',
-              style: const TextStyle(color: Colors.grey),
+              style: TextStyle(color: AppColors.subtitle),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
-            
             Row(
               children: [
                 // BOTÓN EDITAR
                 Expanded(
                   child: OutlinedButton.icon(
-                    icon: const Icon(Icons.edit, color: Colors.blueGrey),
-                    label: const Text('EDITAR FASES', style: TextStyle(color: Colors.blueGrey)),
+                    icon: Icon(Icons.edit, color: AppColors.primary),
+                    label: Text(
+                      'EDITAR FASES',
+                      style: TextStyle(color: AppColors.primary),
+                    ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 15),
-                      side: const BorderSide(color: Colors.blueGrey),
+                      side: BorderSide(color: AppColors.primary),
                     ),
                     onPressed: () {
                       Navigator.pop(ctx); // Cerrar menú
                       // Ir al editor de fases
                       Navigator.push(
-                        context, 
-                        MaterialPageRoute(builder: (_) => CompeticionDetalleScreen(modalidad: item))
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              CompeticionDetalleScreen(modalidad: item),
+                        ),
                       ).then((_) => _cargarDatos());
                     },
                   ),
                 ),
                 const SizedBox(width: 15),
-                
                 // BOTÓN EMPEZAR
                 Expanded(
                   child: ElevatedButton.icon(
@@ -91,14 +100,17 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
                       Navigator.pop(ctx); // Cerrar menú
                       // Ir al Setup para elegir arma y empezar
                       Navigator.push(
-                        context, 
-                        MaterialPageRoute(builder: (_) => CompeticionSetupScreen(modalidad: item))
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              CompeticionSetupScreen(modalidad: item),
+                        ),
                       );
                     },
                   ),
                 ),
               ],
-            )
+            ),
           ],
         ),
       ),
@@ -115,25 +127,27 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
-            labelText: 'Nombre del Torneo', 
-            hintText: 'Ej: Mi Entrenamiento Mixto'
+            labelText: 'Nombre del Torneo',
+            hintText: 'Ej: Mi Entrenamiento Mixto',
           ),
           autofocus: true,
           textCapitalization: TextCapitalization.sentences,
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context), 
-            child: const Text('Cancelar')
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () async {
               if (controller.text.trim().isNotEmpty) {
-                await _service.crearModalidad(Modalidad(
-                  nombre: controller.text.trim(),
-                  descripcion: 'Personalizado',
-                  esOficial: false, 
-                ));
+                await _service.crearModalidad(
+                  Modalidad(
+                    nombre: controller.text.trim(),
+                    descripcion: 'Personalizado',
+                    esOficial: false,
+                  ),
+                );
                 _cargarDatos();
                 if (mounted) Navigator.pop(context);
               }
@@ -152,9 +166,15 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
         title: const Text('Borrar Competición'),
         content: Text('¿Eliminar "${item.nombre}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               Navigator.pop(ctx);
               await _service.borrarModalidadCompleta(item.id!);
@@ -170,47 +190,81 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Competiciones'), 
-        backgroundColor: Colors.amber[700],
+        title: const Text('Competiciones'),
       ),
       body: _lista.isEmpty
-          ? const Center(child: Text('Cargando competiciones...'))
-          : ListView.builder(
-              itemCount: _lista.length,
-              itemBuilder: (context, index) {
-                final item = _lista[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: item.esOficial ? Colors.amber.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
-                      child: Icon(
-                        item.esOficial ? Icons.emoji_events : Icons.edit_note,
-                        color: item.esOficial ? Colors.amber[800] : Colors.blue,
-                      ),
-                    ),
-                    title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(item.esOficial ? 'Oficial ISSF' : 'Personalizada'),
-                    
-                    // Solo permitimos borrar si NO es oficial
-                    trailing: item.esOficial 
-                      ? const Icon(Icons.lock_outline, color: Colors.grey, size: 20)
-                      : IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () => _borrarModalidad(item),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  'Cargando competiciones...',
+                  style: TextStyle(color: AppColors.subtitle),
+                ),
+              ),
+            )
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                  itemCount: _lista.length,
+                  itemBuilder: (context, index) {
+                    final item = _lista[index];
+                    final accent = item.esOficial
+                        ? AppColors.accentCompetition
+                        : AppColors.accentAnalytics;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: accent.withValues(alpha: 0.12),
+                          child: Icon(
+                            item.esOficial
+                                ? Icons.emoji_events
+                                : Icons.edit_note,
+                            color: accent,
+                          ),
                         ),
-                    
-                    // AQUÍ ESTÁ LA CLAVE: Al tocar, abre el menú de opciones
-                    onTap: () => _mostrarOpciones(item),
-                  ),
-                );
-              },
+                        title: Text(
+                          item.nombre,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.title,
+                          ),
+                        ),
+                        subtitle: Text(
+                          item.esOficial ? 'Oficial ISSF' : 'Personalizada',
+                          style: TextStyle(color: AppColors.subtitleSoft),
+                        ),
+                        // Solo permitimos borrar si NO es oficial
+                        trailing: item.esOficial
+                            ? Icon(
+                                Icons.lock_outline,
+                                color: AppColors.chevron,
+                                size: 20,
+                              )
+                            : IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: AppColors.accentDanger,
+                                ),
+                                onPressed: () => _borrarModalidad(item),
+                              ),
+                        // AQUÍ ESTÁ LA CLAVE: Al tocar, abre el menú de opciones
+                        onTap: () => _mostrarOpciones(item),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.amber[700],
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         onPressed: _crearModalidad,
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add),
       ),
     );
   }

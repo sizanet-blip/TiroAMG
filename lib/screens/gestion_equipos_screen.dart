@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/equipo_model.dart';
 import '../services/equipo_service.dart';
-import 'equipo_form_screen.dart'; 
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
+import 'equipo_form_screen.dart';
 
 class GestionEquiposScreen extends StatefulWidget {
   const GestionEquiposScreen({super.key});
@@ -33,37 +35,29 @@ class _GestionEquiposScreenState extends State<GestionEquiposScreen> {
     _cargarDatos();
   }
 
-  // Función de confirmar y borrar
   void _confirmarBorrado(EquipoDetalle item) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar borrado'),
-        content: Text('¿Eliminar el arma "${item.nombre}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx), 
-            child: const Text('Cancelar')
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx); // Cerrar alerta
-              await _service.borrar(item.id); // Borrar en BD
-              _cargarDatos(); // Refrescar lista
-              
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${item.nombre} eliminado')),
-                );
-              }
-            },
-            child: const Text('Borrar'),
-          ),
-        ],
+      builder: (ctx) => AppDialog(
+        title: 'Eliminar arma',
+        icon: Icons.delete_outline,
+        iconColor: AppColors.accentDanger,
+        content: Text('¿Borrar «${item.nombre}»? Esta acción no se puede deshacer.'),
+        actions: appDialogActions(
+          context: ctx,
+          confirmLabel: 'Borrar',
+          danger: true,
+          onConfirm: () async {
+            Navigator.pop(ctx);
+            await _service.borrar(item.id);
+            _cargarDatos();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${item.nombre} eliminado')),
+              );
+            }
+          },
+        ),
       ),
     );
   }
@@ -71,65 +65,92 @@ class _GestionEquiposScreenState extends State<GestionEquiposScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Mis Armas'), 
-        backgroundColor: Colors.teal,
+        title: const Text('Mis Armas'),
       ),
       body: _lista.isEmpty
           ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.hardware, size: 60, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text('No tienes armas registradas', style: TextStyle(color: Colors.grey)),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.hardware, size: 60, color: AppColors.subtitleSoft),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No tienes armas registradas',
+                      style: TextStyle(color: AppColors.subtitle),
+                    ),
+                  ],
+                ),
               ),
             )
-          : ListView.builder(
-              itemCount: _lista.length,
-              itemBuilder: (context, index) {
-                final item = _lista[index];
-                // Lógica visual simple para el icono
-                final esAire = item.nombreTipo.toLowerCase().contains('aire');
-                
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.teal.withOpacity(0.1),
-                      child: Icon(
-                        esAire ? Icons.air : Icons.local_fire_department, 
-                        color: Colors.teal,
-                      ),
-                    ),
-                    title: Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('${item.nombreTipo} • ${item.nombreCalibre}\n${item.marca ?? ""}'),
-                    isThreeLine: true,
-                    
-                    onLongPress: () => _confirmarBorrado(item),
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                  itemCount: _lista.length,
+                  itemBuilder: (context, index) {
+                    final item = _lista[index];
+                    // Lógica visual simple para el icono
+                    final esAire = item.nombreTipo.toLowerCase().contains('aire');
 
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.teal),
-                          onPressed: () => _abrirFormulario(item.id),
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor:
+                              AppColors.accentTraining.withValues(alpha: 0.12),
+                          child: Icon(
+                            esAire ? Icons.air : Icons.local_fire_department,
+                            color: AppColors.accentTraining,
+                          ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () => _confirmarBorrado(item),
+                        title: Text(
+                          item.nombre,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.title,
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                        subtitle: Text(
+                          '${item.nombreTipo} • ${item.nombreCalibre}\n${item.marca ?? ""}',
+                          style: TextStyle(color: AppColors.subtitleSoft),
+                        ),
+                        isThreeLine: true,
+                        onLongPress: () => _confirmarBorrado(item),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.edit,
+                                color: AppColors.accentTraining,
+                              ),
+                              onPressed: () => _abrirFormulario(item.id),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: AppColors.accentDanger,
+                              ),
+                              onPressed: () => _confirmarBorrado(item),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         onPressed: () => _abrirFormulario(),
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add),
       ),
     );
   }

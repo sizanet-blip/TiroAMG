@@ -64,6 +64,7 @@ flutter:
      - assets/logo.png
      - assets/logo_wordmark.png
      - assets/sounds/
+     - assets/help/
 
 # --- CONFIGURACIÓN DEL ICONO DE LA APP ---
 flutter_launcher_icons:

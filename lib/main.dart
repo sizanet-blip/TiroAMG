@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'screens/home_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   // 1. Inicializar bindings de Flutter
@@ -59,10 +60,7 @@ class _TiroTrackerAppState extends State<TiroTrackerApp>
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'TiroAMG', 
-      theme: ThemeData(
-        primarySwatch: Colors.blueGrey,
-        useMaterial3: true,
-      ),
+      theme: buildTiroAmgTheme(),
       // --- CONFIGURACIÓN DE IDIOMA (¡NUEVO!) ---
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

@@ -5,12 +5,15 @@ import 'entrenamiento_screen.dart';
 import 'historial_screen.dart';
 import 'backup_screen.dart';
 import 'config_screen.dart';
+import 'ayuda_screen.dart';
 import 'recorte_diana_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../services/app_update_service.dart';
 import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -381,10 +384,20 @@ class _HomeScreenState extends State<HomeScreen> {
           MaterialPageRoute(builder: (_) => const ConfigScreen()),
         ),
       ),
+      _HomeMenuItem(
+        title: 'Ayuda',
+        subtitle: 'Guía, manual y preguntas frecuentes',
+        icon: Icons.help_outline,
+        color: Colors.blueGrey.shade500,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AyudaScreen()),
+        ),
+      ),
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -394,33 +407,17 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _buildBrandHeader(),
                 const SizedBox(height: 28),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8EE)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+                AppNavGroup(
+                  children: [
+                    for (final item in items)
+                      AppNavTile(
+                        title: item.title,
+                        subtitle: item.subtitle,
+                        icon: item.icon,
+                        color: item.color,
+                        onTap: item.onTap,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      for (var i = 0; i < items.length; i++) ...[
-                        if (i > 0)
-                          const Divider(
-                            height: 1,
-                            indent: 68,
-                            endIndent: 16,
-                            color: Color(0xFFE8EEF2),
-                          ),
-                        _buildMenuTile(items[i]),
-                      ],
-                    ],
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -467,64 +464,10 @@ class _HomeScreenState extends State<HomeScreen> {
             fontSize: 14,
             height: 1.35,
             fontWeight: FontWeight.w500,
-            color: Colors.blueGrey.shade500,
+            color: AppColors.subtitle,
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMenuTile(_HomeMenuItem item) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: item.onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(item.icon, size: 22, color: item.color),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blueGrey.shade900,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.subtitle,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: Colors.blueGrey.shade400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.blueGrey.shade300,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
