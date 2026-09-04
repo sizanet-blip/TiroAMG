@@ -325,7 +325,7 @@ abstract final class HelpContent {
     HelpFaqItem(
       question: '¿Cómo identifico mi instalación?',
       answer:
-          'Configuración → Estado de la aplicación → Identificar (email).',
+          'Al abrir la app debes aceptar la política de privacidad (obligatorio). El email es opcional; puedes añadirlo luego en Configuración → Estado de la aplicación → Identificar (email).',
     ),
     HelpFaqItem(
       question: '¿Qué es una plantilla de tiempos?',

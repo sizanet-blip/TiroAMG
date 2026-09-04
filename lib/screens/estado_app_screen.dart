@@ -8,6 +8,7 @@ import '../services/license_permissions_service.dart';
 import '../services/license_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
+import '../widgets/identificar_instalacion_dialog.dart';
 
 class EstadoAppScreen extends StatefulWidget {
   const EstadoAppScreen({super.key});
@@ -97,38 +98,22 @@ class _EstadoAppScreenState extends State<EstadoAppScreen> {
   }
 
   Future<void> _identificarEmailDialog() async {
-    final ctrl =
-        TextEditingController(text: _licenciaActual?.contactEmail ?? '');
-    final email = await showDialog<String>(
+    final ok = await showIdentificarInstalacionDialog(
       context: context,
-      builder: (ctx) => AppDialog(
-        title: 'Identificar instalación',
-        icon: Icons.email_outlined,
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Email'),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancelar', style: TextStyle(color: AppColors.subtitle)),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
+      licenseService: _licenseService,
+      emailInicial: _licenciaActual?.contactEmail,
+      permitirOmitir: false,
+      emailOpcional: false,
+      privacidadYaAceptada: _licenciaActual?.privacyAccepted == true,
     );
-    if (email == null || email.isEmpty || !mounted) return;
-    final res = await _licenseService.identificarEmail(email: email);
     if (!mounted) return;
     await _cargarEstadoLicencia();
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(res.mensaje)));
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Instalación identificada.')),
+      );
+    }
   }
 
   Future<void> _buscarActualizacionesManual() async {

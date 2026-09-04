@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 // Importamos las pantallas de destino
 import 'competicion_screen.dart';
 import 'entrenamiento_screen.dart';
@@ -14,6 +15,7 @@ import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
+import '../widgets/identificar_instalacion_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,7 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final LicensePermissionsService _permissions = const LicensePermissionsService();
   final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
   bool _updateDialogShown = false;
+  bool _identificacionLista = false;
   LicenciaLocal? _licenciaActual;
+
+  bool get _puedeUsarApp => _licenciaActual?.puedeUsarApp == true;
 
   @override
   void initState() {
@@ -44,6 +49,9 @@ class _HomeScreenState extends State<HomeScreen> {
           .timeout(const Duration(seconds: 4));
       if (!mounted) return;
       _actualizarLicencia(quick.licencia);
+      if (_puedeUsarApp) {
+        setState(() => _identificacionLista = true);
+      }
     } catch (_) {}
 
     if (!mounted) return;
@@ -76,8 +84,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _maybeShowIdentifyPrompt() async {
     final show = await _licenseService.shouldShowIdentifyPrompt();
-    if (!show || !mounted) return;
-    await _showIdentifyDialog();
+    if (!mounted) return;
+    if (!show) {
+      setState(() => _identificacionLista = true);
+      return;
+    }
+    final ok = await _showIdentifyDialog();
+    if (!mounted) return;
+    if (ok) {
+      setState(() => _identificacionLista = true);
+      return;
+    }
+    // Sin aceptar privacidad no se usa la app.
+    SystemNavigator.pop();
   }
 
   void _actualizarLicencia(LicenciaLocal? licencia) {
@@ -213,98 +232,57 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showIdentifyDialog() async {
-    final userController = TextEditingController(
-      text: _licenciaActual?.contactEmail ?? '',
-    );
-    String mensaje =
-        'Opcional: asocia un email para localizar esta instalación en el panel.';
-    bool cargando = false;
-
-    if (!mounted) return;
-
-    await showDialog<void>(
+  Future<bool> _showIdentifyDialog() async {
+    if (!mounted) return false;
+    final ok = await showIdentificarInstalacionDialog(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setStateDialog) {
-            return AlertDialog(
-              title: const Text('Identificar instalación'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(mensaje),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: userController,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    decoration: const InputDecoration(
-                      labelText: 'Email (opcional)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: cargando
-                      ? null
-                      : () async {
-                          await _licenseService.neverAskIdentifyPrompt();
-                          if (ctx.mounted) Navigator.of(ctx).pop();
-                        },
-                  child: const Text('No volver a preguntar'),
-                ),
-                TextButton(
-                  onPressed: cargando
-                      ? null
-                      : () async {
-                          await _licenseService.snoozeIdentifyPrompt(days: 7);
-                          if (ctx.mounted) Navigator.of(ctx).pop();
-                        },
-                  child: const Text('Ahora no'),
-                ),
-                FilledButton(
-                  onPressed: cargando
-                      ? null
-                      : () async {
-                          final email = userController.text.trim();
-                          if (!_emailRegex.hasMatch(email)) {
-                            setStateDialog(() {
-                              mensaje =
-                                  'Introduce un email válido o pulsa «Ahora no».';
-                            });
-                            return;
-                          }
-                          setStateDialog(() => cargando = true);
-                          final res = await _licenseService.identificarEmail(
-                            email: email,
-                          );
-                          if (!ctx.mounted) return;
-                          setStateDialog(() {
-                            cargando = false;
-                            mensaje = res.mensaje;
-                          });
-                          if (res.licencia != null) {
-                            _actualizarLicencia(res.licencia);
-                          }
-                          if (ctx.mounted) Navigator.of(ctx).pop();
-                        },
-                  child: const Text('Guardar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      licenseService: _licenseService,
+      emailInicial: _licenciaActual?.contactEmail,
+      permitirOmitir: false,
+      salirAlCancelar: true,
+      emailOpcional: true,
+      privacidadYaAceptada: _licenciaActual?.privacyAccepted == true,
+      emailRegex: _emailRegex,
     );
+    if (!ok || !mounted) return false;
+    final quick = await _licenseService.revisarLicencia(forzarServidor: false);
+    if (!mounted) return false;
+    _actualizarLicencia(quick.licencia);
+    return _licenciaActual?.puedeUsarApp == true;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_identificacionLista || !_puedeUsarApp) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildBrandHeader(),
+                  const SizedBox(height: 28),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Esperando aceptación de privacidad…',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.subtitle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final items = <_HomeMenuItem>[
       if (_permissions.canAccess(
           _licenciaActual, LicenseCapability.targetDetection))

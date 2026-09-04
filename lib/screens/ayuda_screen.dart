@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
 import 'ayuda_documento_screen.dart';
 import 'ayuda_faq_screen.dart';
+import '../widgets/identificar_instalacion_dialog.dart';
 
 class AyudaScreen extends StatelessWidget {
   const AyudaScreen({super.key});
@@ -95,6 +96,18 @@ class AyudaScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const AyudaFaqScreen(),
+                      ),
+                    ),
+                  ),
+                  AppNavTile(
+                    title: 'Política de privacidad',
+                    subtitle: 'Datos personales y derechos (RGPD)',
+                    icon: Icons.privacy_tip_outlined,
+                    color: AppColors.primary,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PoliticaPrivacidadScreen(),
                       ),
                     ),
                   ),

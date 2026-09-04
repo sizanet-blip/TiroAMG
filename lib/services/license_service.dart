@@ -656,16 +656,11 @@ class LicenseService {
     }
   }
 
+  /// Identificación obligatoria: sin email o sin privacidad aceptada.
   Future<bool> shouldShowIdentifyPrompt() async {
     final local = await obtenerLicenciaLocal();
     if (local == null) return true;
-    if (local.isIdentified) return false;
-    if (local.identifyNeverAsk) return false;
-    final snooze = local.identifySnoozeUntil;
-    if (snooze != null && snooze.isAfter(DateTime.now().toUtc())) {
-      return false;
-    }
-    return true;
+    return !local.puedeUsarApp;
   }
 
   Future<void> snoozeIdentifyPrompt({int days = 7}) async {
@@ -684,6 +679,21 @@ class LicenseService {
     final meta = Map<String, dynamic>.from(local.features);
     meta['identify_never'] = true;
     meta.remove('identify_snooze_until');
+    await _guardarPayloadLicencia({
+      ...local.toMap(),
+      'features_json': jsonEncode(meta),
+    });
+  }
+
+  /// Guarda la aceptación de la política de privacidad (versión + fecha UTC).
+  Future<void> registrarAceptacionPrivacidad({
+    required String version,
+  }) async {
+    final local = await _ensureLocalDefaultInstallation();
+    final meta = Map<String, dynamic>.from(local.features);
+    meta['privacy_accepted'] = true;
+    meta['privacy_version'] = version;
+    meta['privacy_accepted_at'] = DateTime.now().toUtc().toIso8601String();
     await _guardarPayloadLicencia({
       ...local.toMap(),
       'features_json': jsonEncode(meta),
