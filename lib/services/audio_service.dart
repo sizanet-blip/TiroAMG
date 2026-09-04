@@ -233,6 +233,19 @@ class AudioService {
     await _hablar('$segundos segundos.');
   }
 
+  /// Aviso al intentar marcar más tiros del límite de serie.
+  Future<void> avisarSerieCompleta({
+    required int actual,
+    required int maximo,
+  }) async {
+    if (_mute) return;
+    await _haptico(HapticFeedback.mediumImpact);
+    try {
+      await _flutterTts.stop();
+    } catch (_) {}
+    await _hablar('Serie completa. $actual de $maximo.');
+  }
+
   Future<void> probarSenalFuego() => senalFuego();
 
   Future<void> _hablar(String texto) async {

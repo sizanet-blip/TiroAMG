@@ -64,6 +64,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
   final List<Disparo> _listaDisparos = [];
   final List<Offset> _puntosVisuales = [];
+  final GlobalKey _dianaPaintKey = GlobalKey();
+  final GlobalKey _dianaStackKey = GlobalKey();
   
   int _puntosTotal = 0;
   int _contadorMoscas = 0;
@@ -96,9 +98,27 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   // Control de Duelo
   int _contadorSeriesDuelo = 0;
   
-  // Lupa
+  // Lupa de puntería (arrastrar sobre diana)
+  static const double _lupaRadio = 60;
+  /// Desplaza la lupa hacia arriba para no tapar el puntero; el foco sigue en el ratón.
+  static const double _lupaDesfaseY = 72;
   Offset? _posicionDedo;
+  Offset? _posicionGlobalPuntero;
   bool _mostrandoLupa = false;
+  bool _impactoRegistradoEnPan = false;
+
+  // Inspección: ampliar diana para ver impactos
+  bool _modoInspeccion = false;
+  final TransformationController _inspeccionController =
+      TransformationController();
+
+  /// true = Serie (tope suave), false = Libre (sin límite)
+  bool _modoSerieLimitada = true;
+
+  int get _maxDisparosSerie => widget.plantilla.disparosPorSerie;
+  int get _disparosActuales => _listaDisparos.length;
+  bool get _serieCompleta =>
+      _modoSerieLimitada && _disparosActuales >= _maxDisparosSerie;
 
   bool get _enCurso => _faseActual != FaseSesion.stop && _faseActual != FaseSesion.fin;
   bool get _dianaCerrada =>
@@ -196,8 +216,43 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _inspeccionController.dispose();
     _audioService.stop();
     super.dispose();
+  }
+
+  void _toggleModoInspeccion() {
+    setState(() {
+      _modoInspeccion = !_modoInspeccion;
+      _mostrandoLupa = false;
+      _posicionDedo = null;
+      _posicionGlobalPuntero = null;
+      if (!_modoInspeccion) {
+        _inspeccionController.value = Matrix4.identity();
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _modoInspeccion
+              ? 'Inspección: pellizca o arrastra para ampliar la diana'
+              : 'Inspección desactivada',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _botonLupaInspeccion() {
+    return IconButton(
+      tooltip: _modoInspeccion ? 'Salir de inspección' : 'Ampliar diana',
+      onPressed: _toggleModoInspeccion,
+      icon: Icon(
+        _modoInspeccion ? Icons.zoom_out_map : Icons.search,
+        color: _modoInspeccion ? Colors.amberAccent : Colors.white,
+        size: 28,
+      ),
+    );
   }
 
   void _cargarConfiguracionDiana() async {
@@ -404,14 +459,40 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     if (!_haIniciado) return;
 
     // Bloqueo en fases de espera/preparación
-    if (_faseActual == FaseSesion.espera || _faseActual == FaseSesion.preparacion) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Alto! Diana cerrada.'), duration: Duration(milliseconds: 500), backgroundColor: Colors.red));
-        return;
+    if (_faseActual == FaseSesion.espera ||
+        _faseActual == FaseSesion.preparacion) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Alto! Diana cerrada.'),
+          duration: Duration(milliseconds: 500),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_serieCompleta) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Serie completa · $_disparosActuales/$_maxDisparosSerie',
+          ),
+          duration: const Duration(milliseconds: 1200),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+      // ignore: unawaited_futures
+      _audioService.avisarSerieCompleta(
+        actual: _disparosActuales,
+        maximo: _maxDisparosSerie,
+      );
+      return;
     }
 
     setState(() {
       _puntosVisuales.add(localPosition);
-      
+
       Offset centro = Offset(tamanoDiana.width / 2, tamanoDiana.height / 2);
       double distancia = (localPosition - centro).distance;
       double radioMax = tamanoDiana.width / 2;
@@ -421,25 +502,78 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         int totalZonas = 11 - _valorMinimo;
         double calculo = 11 - (distNorm * totalZonas);
         int valor = calculo.floor();
-        
+
         if (valor < _valorMinimo) valor = 0;
         if (valor > 10) valor = 10;
-        
+
         _puntosTotal += valor;
-        
-        if (_tieneMosca && distNorm < (0.05 * (10/totalZonas))) {
+
+        if (_tieneMosca && distNorm < (0.05 * (10 / totalZonas))) {
           _contadorMoscas++;
         }
-        
+
         _listaDisparos.add(Disparo(
           numero: _listaDisparos.length + 1,
           x: (localPosition.dx - centro.dx) / radioMax,
           y: (localPosition.dy - centro.dy) / radioMax,
           puntuacion: valor.toDouble(),
-          esMosca: false 
+          esMosca: false,
         ));
+      } else {
+        // Fuera de diana: quitar el punto visual recién añadido
+        _puntosVisuales.removeLast();
       }
     });
+  }
+
+  void _toggleModoSerieLibre() {
+    setState(() => _modoSerieLimitada = !_modoSerieLimitada);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _modoSerieLimitada
+              ? 'Modo Serie · límite $_maxDisparosSerie tiros'
+              : 'Modo Libre · sin límite de tiros',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _botonModoSerieLibre({bool compact = false}) {
+    return IconButton(
+      tooltip: _modoSerieLimitada
+          ? 'Serie (límite). Tocar para Libre'
+          : 'Libre (sin límite). Tocar para Serie',
+      onPressed: _toggleModoSerieLibre,
+      icon: Icon(
+        _modoSerieLimitada ? Icons.filter_1 : Icons.all_inclusive,
+        color: _modoSerieLimitada ? Colors.lightBlueAccent : Colors.white70,
+        size: compact ? 24 : 28,
+      ),
+    );
+  }
+
+  Widget _chipContadorTiros({bool compact = false}) {
+    if (!_modoSerieLimitada) {
+      return Text(
+        '$_disparosActuales tiros',
+        style: TextStyle(
+          color: Colors.white54,
+          fontSize: compact ? 12 : 13,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+    final completo = _serieCompleta;
+    return Text(
+      '$_disparosActuales / $_maxDisparosSerie',
+      style: TextStyle(
+        color: completo ? Colors.orangeAccent : Colors.lightBlueAccent,
+        fontSize: compact ? 13 : 15,
+        fontWeight: FontWeight.w800,
+      ),
+    );
   }
 
   void _borrarUltimo() {
@@ -454,36 +588,96 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     }
   }
 
-  void _guardarYSalir() async {
-     if (widget.onCompletar != null) {
-       widget.onCompletar!(_listaDisparos, _puntosTotal);
-       Navigator.pop(context);
-       return;
-     }
-     
-     final sesion = Sesion(
-        fecha: DateTime.now(),
-        idEquipo: widget.equipo.id,
-        idPlantilla: widget.plantilla.id!,
-        idMunicion: widget.municion?.id,
-        nota: widget.municion != null ? "${widget.municion!.marca} (${widget.municion!.lote})" : null,
-        lugar: widget.lugar,
-        distanciaMetros: widget.distanciaMetros,
-        posicionTiro: widget.posicionTiro,
-        esInterior: widget.esInterior,
-        temperaturaC: widget.temperaturaC,
-        humedadPct: widget.humedadPct,
-        presionHpa: widget.presionHpa,
-        vientoMs: widget.vientoMs,
-        vientoDireccion: widget.vientoDireccion,
-        iluminacion: widget.iluminacion,
-     );
-     
-     await _entrenamientoService.guardarSesionCompleta(sesion, _listaDisparos);
-     if (mounted) {
-       Navigator.pop(context);
-       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Guardado")));
-     }
+  Future<void> _guardarYSalir() async {
+    // Competición / series encadenadas: devolver resultado y salir.
+    if (widget.onCompletar != null) {
+      widget.onCompletar!(_listaDisparos, _puntosTotal);
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    final sesion = Sesion(
+      fecha: DateTime.now(),
+      idEquipo: widget.equipo.id,
+      idPlantilla: widget.plantilla.id!,
+      idMunicion: widget.municion?.id,
+      nota: widget.municion != null
+          ? "${widget.municion!.marca} (${widget.municion!.lote})"
+          : null,
+      lugar: widget.lugar,
+      distanciaMetros: widget.distanciaMetros,
+      posicionTiro: widget.posicionTiro,
+      esInterior: widget.esInterior,
+      temperaturaC: widget.temperaturaC,
+      humedadPct: widget.humedadPct,
+      presionHpa: widget.presionHpa,
+      vientoMs: widget.vientoMs,
+      vientoDireccion: widget.vientoDireccion,
+      iluminacion: widget.iluminacion,
+    );
+
+    await _entrenamientoService.guardarSesionCompleta(sesion, _listaDisparos);
+    if (!mounted) return;
+
+    final puntosGuardados = _puntosTotal;
+    final disparosGuardados = _listaDisparos.length;
+
+    final accion = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Entrenamiento guardado'),
+        content: Text(
+          'Puntuación: $puntosGuardados pts · $disparosGuardados disparos.\n\n'
+          '¿Qué quieres hacer ahora?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'menu'),
+            child: const Text('Volver al menú'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'nuevo'),
+            child: const Text('Nuevo entrenamiento'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (accion == 'nuevo') {
+      _prepararNuevaSerie();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sesión guardada. Lista para un nuevo entrenamiento.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Guardado')),
+      );
+    }
+  }
+
+  void _prepararNuevaSerie() {
+    _pausar();
+    _inspeccionController.value = Matrix4.identity();
+    setState(() {
+      _listaDisparos.clear();
+      _puntosVisuales.clear();
+      _puntosTotal = 0;
+      _contadorMoscas = 0;
+      _contadorSeriesDuelo = 0;
+      _modoInspeccion = false;
+      _mostrandoLupa = false;
+      _posicionDedo = null;
+      _posicionGlobalPuntero = null;
+      _resetearValoresTiempo();
+    });
   }
 
   void _reiniciarSerie() {
@@ -491,37 +685,80 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Reiniciar Serie?'),
-        content: const Text('Se borrarán los disparos actuales y el cronómetro volverá al inicio.'),
+        content: const Text(
+            'Se borrarán los disparos actuales y el cronómetro volverá al inicio.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
               Navigator.pop(ctx);
-              _pausar();
-              setState(() {
-                _listaDisparos.clear();
-                _puntosVisuales.clear();
-                _puntosTotal = 0;
-                _contadorMoscas = 0;
-                _resetearValoresTiempo();
-              });
+              _prepararNuevaSerie();
             },
-            child: const Text('Reiniciar', style: TextStyle(color: Colors.white)),
+            child: const Text('Reiniciar',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  // Gestos Lupa
-  void _onPanStart(DragStartDetails d, Offset offset, Size size) { setState(() { _mostrandoLupa = true; _posicionDedo = d.localPosition - offset; }); }
-  void _onPanUpdate(DragUpdateDetails d, Offset offset) { setState(() { _posicionDedo = d.localPosition - offset; }); }
-  void _onPanEnd(DragEndDetails d, Offset offset, Size size) { 
-    setState(() { _mostrandoLupa = false; });
-    if (_posicionDedo != null) _registrarImpacto(_posicionDedo!, size);
+  // Gestos Lupa — coordenadas respecto al CustomPaint real (no offset estimado).
+  Offset? _localEnDiana(Offset globalPosition) {
+    final box =
+        _dianaPaintKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.globalToLocal(globalPosition);
   }
-  void _onTapUp(TapUpDetails d, Offset offset, Size size) { _registrarImpacto(d.localPosition - offset, size); }
+
+  Offset? _localEnStack(Offset globalPosition) {
+    final box =
+        _dianaStackKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.globalToLocal(globalPosition);
+  }
+
+  void _actualizarPuntero(Offset globalPosition) {
+    final local = _localEnDiana(globalPosition);
+    if (local == null) return;
+    setState(() {
+      _posicionGlobalPuntero = globalPosition;
+      _posicionDedo = local;
+    });
+  }
+
+  void _onPanStart(DragStartDetails d, Size size) {
+    _impactoRegistradoEnPan = false;
+    setState(() => _mostrandoLupa = true);
+    _actualizarPuntero(d.globalPosition);
+  }
+
+  void _onPanUpdate(DragUpdateDetails d, Size size) {
+    _actualizarPuntero(d.globalPosition);
+  }
+
+  void _onPanEnd(DragEndDetails d, Size size) {
+    final local = _posicionDedo;
+    setState(() {
+      _mostrandoLupa = false;
+      _posicionGlobalPuntero = null;
+    });
+    if (local != null) {
+      _impactoRegistradoEnPan = true;
+      _registrarImpacto(local, size);
+    }
+  }
+
+  void _onTapUp(TapUpDetails d, Size size) {
+    if (_impactoRegistradoEnPan) {
+      _impactoRegistradoEnPan = false;
+      return;
+    }
+    final local = _localEnDiana(d.globalPosition);
+    if (local != null) _registrarImpacto(local, size);
+  }
 
 
   @override
@@ -543,6 +780,9 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                     widget.tituloSerie ?? widget.plantilla.nombreDisciplina,
                   ),
                   backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  iconTheme: const IconThemeData(color: Colors.white),
+                  actionsIconTheme: const IconThemeData(color: Colors.white),
                   actions: _buildAppBarActions(),
                 ),
           body: landscape ? _buildLandscapeBody() : _buildPortraitBody(),
@@ -627,6 +867,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          _chipContadorTiros(),
+          const SizedBox(width: 12),
           Text(
             '$_puntosTotal pts',
             style: const TextStyle(
@@ -701,26 +943,33 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
   Widget _buildControlesBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       color: Colors.grey[900],
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.red, size: 28),
+            icon: const Icon(Icons.refresh, color: Colors.red, size: 26),
             onPressed: _reiniciarSerie,
             tooltip: 'Reiniciar',
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(120, 44),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          _botonLupaInspeccion(),
+          _botonModoSerieLibre(),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                onPressed: _iniciarSecuencia,
+                child: Text(_enCurso ? 'PAUSA' : 'INICIAR'),
+              ),
             ),
-            onPressed: _iniciarSecuencia,
-            child: Text(_enCurso ? 'PAUSA' : 'INICIAR'),
           ),
           IconButton(
-            icon: const Icon(Icons.undo, color: Colors.white, size: 28),
+            icon: const Icon(Icons.undo, color: Colors.white, size: 26),
             onPressed: _borrarUltimo,
             tooltip: 'Deshacer',
           ),
@@ -829,6 +1078,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.amber, fontSize: 12),
           ),
+          const SizedBox(height: 4),
+          Center(child: _chipContadorTiros(compact: true)),
           const SizedBox(height: 6),
           _buildStatusBar(compact: true),
           Expanded(
@@ -885,7 +1136,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
           ),
           // Controles compactos en una sola fila (evita overflow).
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
             child: Row(
               children: [
                 IconButton(
@@ -893,6 +1144,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                   onPressed: _reiniciarSerie,
                   tooltip: 'Reiniciar',
                 ),
+                _botonLupaInspeccion(),
+                _botonModoSerieLibre(compact: true),
                 Expanded(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -924,59 +1177,184 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final diametro = min(constraints.maxWidth, constraints.maxHeight);
-      final offX = (constraints.maxWidth - diametro) / 2;
-      final offY = (constraints.maxHeight - diametro) / 2;
-      final offsetCorrection = Offset(offX, offY);
       final size = Size(diametro, diametro);
 
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onPanStart: (d) => _onPanStart(d, offsetCorrection, size),
-        onPanUpdate: (d) => _onPanUpdate(d, offsetCorrection),
-        onPanEnd: (d) => _onPanEnd(d, offsetCorrection, size),
-        onTapUp: (d) => _onTapUp(d, offsetCorrection, size),
-        child: Stack(
-          children: [
-            Center(
-              child: Container(
-                decoration: _faseActual == FaseSesion.fuego
-                    ? BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _cuentaAtrasFinal
-                              ? (_pulsoFinal
-                                  ? Colors.orangeAccent
-                                  : Colors.greenAccent)
-                              : Colors.greenAccent,
-                          width: _cuentaAtrasFinal ? (_pulsoFinal ? 8 : 5) : 5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (_cuentaAtrasFinal
-                                    ? Colors.orangeAccent
-                                    : Colors.greenAccent)
-                                .withValues(alpha: 0.35),
-                            blurRadius: _pulsoFinal ? 28 : 18,
-                            spreadRadius: _pulsoFinal ? 4 : 2,
+      final dianaCore = Center(
+        child: SizedBox(
+          width: diametro,
+          height: diametro,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CustomPaint(
+                key: _dianaPaintKey,
+                size: size,
+                painter: DianaPainter(
+                  impactos: _puntosVisuales,
+                  valorMinimo: _valorMinimo,
+                  anilloNegroInicio: _anilloNegroInicio,
+                  esFondoNegro: _esFondoNegro,
+                  tieneMosca: _tieneMosca,
+                  tieneGuias: _tieneGuias,
+                  esEstiloDuelo: _esEstiloDuelo,
+                  nombreCalibre: widget.equipo.nombreCalibre,
+                ),
+              ),
+              if (_faseActual == FaseSesion.fuego)
+                IgnorePointer(
+                  child: CustomPaint(
+                    size: size,
+                    painter: _BordeFuegoPainter(
+                      color: _cuentaAtrasFinal
+                          ? (_pulsoFinal
+                              ? Colors.orangeAccent
+                              : Colors.greenAccent)
+                          : Colors.greenAccent,
+                      grosor: _cuentaAtrasFinal
+                          ? (_pulsoFinal ? 8.0 : 5.0)
+                          : 5.0,
+                      pulso: _pulsoFinal,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+
+      return Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.none,
+        children: [
+          if (_modoInspeccion)
+            InteractiveViewer(
+              transformationController: _inspeccionController,
+              minScale: 1.0,
+              maxScale: 6.0,
+              boundaryMargin: const EdgeInsets.all(160),
+              child: SizedBox(
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                child: dianaCore,
+              ),
+            )
+          else
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanStart: (d) => _onPanStart(d, size),
+              onPanUpdate: (d) => _onPanUpdate(d, size),
+              onPanEnd: (d) => _onPanEnd(d, size),
+              onTapUp: (d) => _onTapUp(d, size),
+              child: Stack(
+                key: _dianaStackKey,
+                fit: StackFit.expand,
+                clipBehavior: Clip.none,
+                children: [
+                  dianaCore,
+                  if (_mostrandoLupa &&
+                      _posicionDedo != null &&
+                      _posicionGlobalPuntero != null &&
+                      !_dianaCerrada)
+                    Builder(
+                      builder: (context) {
+                        final enStack =
+                            _localEnStack(_posicionGlobalPuntero!);
+                        final stackBox = _dianaStackKey.currentContext
+                            ?.findRenderObject() as RenderBox?;
+                        if (enStack == null ||
+                            stackBox == null ||
+                            !stackBox.hasSize) {
+                          return const SizedBox.shrink();
+                        }
+
+                        final stackSize = stackBox.size;
+                        final margen = _lupaRadio + _lupaDesfaseY + 8;
+                        final ponerAbajo = enStack.dy < margen;
+                        final ponerArribaBorde =
+                            enStack.dy > stackSize.height - margen;
+                        final dyLoupe = (ponerAbajo && !ponerArribaBorde)
+                            ? _lupaDesfaseY
+                            : -_lupaDesfaseY;
+
+                        var dxLoupe = 0.0;
+                        if (enStack.dx < margen) {
+                          dxLoupe = _lupaDesfaseY * 0.55;
+                        } else if (enStack.dx >
+                            stackSize.width - margen) {
+                          dxLoupe = -_lupaDesfaseY * 0.55;
+                        }
+
+                        return Positioned(
+                          left: enStack.dx + dxLoupe - _lupaRadio,
+                          top: enStack.dy + dyLoupe - _lupaRadio,
+                          child: IgnorePointer(
+                            child: RawMagnifier(
+                              size: const Size(
+                                  _lupaRadio * 2, _lupaRadio * 2),
+                              magnificationScale: 2.5,
+                              focalPointOffset:
+                                  Offset(-dxLoupe, -dyLoupe),
+                              decoration: MagnifierDecoration(
+                                shape: CircleBorder(
+                                  side: BorderSide(
+                                    color: Colors.white
+                                        .withValues(alpha: 0.95),
+                                    width: 2.5,
+                                  ),
+                                ),
+                                shadows: const [
+                                  BoxShadow(
+                                    color: Colors.black54,
+                                    blurRadius: 8,
+                                    offset: Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: const CustomPaint(
+                                size: Size(_lupaRadio * 2, _lupaRadio * 2),
+                                painter: _CruzLupaPainter(),
+                              ),
+                            ),
                           ),
-                        ],
-                      )
-                    : null,
-                child: CustomPaint(
-                  size: size,
-                  painter: DianaPainter(
-                    impactos: _puntosVisuales,
-                    valorMinimo: _valorMinimo,
-                    anilloNegroInicio: _anilloNegroInicio,
-                    esFondoNegro: _esFondoNegro,
-                    tieneMosca: _tieneMosca,
-                    tieneGuias: _tieneGuias,
-                    esEstiloDuelo: _esEstiloDuelo,
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+          if (_modoInspeccion)
+            Positioned(
+              top: 10,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.amberAccent.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      child: Text(
+                        'INSPECCIÓN · pellizca o arrastra',
+                        style: TextStyle(
+                          color: Colors.amberAccent,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-            if (overlayOnDiana && _faseActual == FaseSesion.fuego)
+          if (overlayOnDiana && _faseActual == FaseSesion.fuego && !_modoInspeccion)
               Positioned(
                 top: 16,
                 left: 0,
@@ -1070,58 +1448,77 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                   ),
                 ),
               ),
-            if (_mostrandoLupa && _posicionDedo != null && !_dianaCerrada)
-              Positioned(
-                left: _posicionDedo!.dx + offX - 50,
-                top: _posicionDedo!.dy + offY - 120,
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                  child: ClipOval(
-                    child: Transform(
-                      transform: Matrix4.identity()
-                        ..translate(
-                            -_posicionDedo!.dx * 2 + 50,
-                            -_posicionDedo!.dy * 2 + 50)
-                        ..scale(2.0),
-                      child: CustomPaint(
-                        size: size,
-                        painter: DianaPainter(
-                          impactos: _puntosVisuales,
-                          valorMinimo: _valorMinimo,
-                          anilloNegroInicio: _anilloNegroInicio,
-                          esFondoNegro: _esFondoNegro,
-                          tieneMosca: _tieneMosca,
-                          tieneGuias: _tieneGuias,
-                          esEstiloDuelo: _esEstiloDuelo,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            if (_mostrandoLupa && _posicionDedo != null && !_dianaCerrada)
-              Positioned(
-                left: _posicionDedo!.dx + offX - 50,
-                top: _posicionDedo!.dy + offY - 120,
-                child: const SizedBox(
-                  width: 100,
-                  height: 100,
-                  child: Center(
-                    child: Icon(Icons.add, color: Colors.red, size: 20),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ],
       );
     });
   }
+}
+
+/// Solo el anillo de “fuego” (trazo + glow); no rellena la diana.
+class _BordeFuegoPainter extends CustomPainter {
+  final Color color;
+  final double grosor;
+  final bool pulso;
+
+  const _BordeFuegoPainter({
+    required this.color,
+    required this.grosor,
+    required this.pulso,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2 - grosor / 2;
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..color = color.withValues(alpha: pulso ? 0.45 : 0.3)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = grosor + (pulso ? 14 : 10)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, pulso ? 16 : 10),
+    );
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = grosor,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BordeFuegoPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.grosor != grosor ||
+      oldDelegate.pulso != pulso;
+}
+
+/// Cruz de mira en el centro exacto de la lupa (sin icono Material descentrado).
+class _CruzLupaPainter extends CustomPainter {
+  const _CruzLupaPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    const half = 10.0;
+    final paint = Paint()
+      ..color = Colors.redAccent
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.square;
+    canvas.drawLine(Offset(c.dx - half, c.dy), Offset(c.dx + half, c.dy), paint);
+    canvas.drawLine(Offset(c.dx, c.dy - half), Offset(c.dx, c.dy + half), paint);
+    canvas.drawCircle(
+      c,
+      2.2,
+      Paint()..color = Colors.redAccent,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CruzLupaPainter oldDelegate) => false;
 }
 
 class DianaPainter extends CustomPainter {
@@ -1132,6 +1529,7 @@ class DianaPainter extends CustomPainter {
   final bool tieneMosca;
   final bool tieneGuias;
   final bool esEstiloDuelo;
+  final String? nombreCalibre;
 
   DianaPainter({
     required this.impactos,
@@ -1141,7 +1539,42 @@ class DianaPainter extends CustomPainter {
     required this.tieneMosca,
     required this.tieneGuias,
     required this.esEstiloDuelo,
+    this.nombreCalibre,
   });
+
+  /// Radio del impacto respecto al ancho de un anillo de puntuación.
+  /// Referencia: diana 25 m (~25 mm/anillo) y .22 LR (~5,6 mm) ≈ 0,11.
+  double _fraccionRadioAnillo() {
+    final c = (nombreCalibre ?? '').toLowerCase();
+    if (c.contains('4.5') ||
+        c.contains('4,5') ||
+        c.contains('.177') ||
+        c.contains('aire')) {
+      return 0.09;
+    }
+    if (c.contains('.32') || c.contains('7.65') || c.contains('7,65')) {
+      return 0.13;
+    }
+    if (c.contains('9mm') ||
+        c.contains('9 mm') ||
+        c.contains('.38') ||
+        c.contains('.45') ||
+        c.contains('40') ||
+        c.contains('.44')) {
+      return 0.17;
+    }
+    // .22 / por defecto
+    return 0.11;
+  }
+
+  void _dibujarImpacto(Canvas canvas, Offset punto, double radio) {
+    // Rojo relleno: máximo contraste y lectura rápida en claro/negro.
+    canvas.drawCircle(
+      punto,
+      radio,
+      Paint()..color = const Color(0xFFE53935),
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1149,7 +1582,10 @@ class DianaPainter extends CustomPainter {
     final radius = size.width / 2;
 
     // 1. Fondo
-    final paintFondo = Paint()..color = esFondoNegro ? const Color(0xFF1A1A1A) : const Color(0xFFF5F3E0)..style = PaintingStyle.fill;
+    final paintFondo = Paint()
+      ..color =
+          esFondoNegro ? const Color(0xFF1A1A1A) : const Color(0xFFF5F3E0)
+      ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, paintFondo);
 
     // 2. Anillos y Números
@@ -1196,10 +1632,11 @@ class DianaPainter extends CustomPainter {
       canvas.drawLine(Offset(center.dx + radius, center.dy), Offset(center.dx + radius - largo, center.dy), guia);
     }
     
-    // 5. Impactos
-    final paintImpacto = Paint()..color = Colors.greenAccent;
-    for(var p in impactos) {
-       canvas.drawCircle(p, anchoZona * 0.3, paintImpacto);
+    // 5. Impactos encima de números (tapa local + doble contraste)
+    final radioImpacto =
+        (anchoZona * _fraccionRadioAnillo()).clamp(2.0, anchoZona * 0.22);
+    for (final p in impactos) {
+      _dibujarImpacto(canvas, p, radioImpacto);
     }
   }
 
@@ -1223,5 +1660,13 @@ class DianaPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant DianaPainter oldDelegate) => true;
+  bool shouldRepaint(covariant DianaPainter oldDelegate) =>
+      oldDelegate.impactos != impactos ||
+      oldDelegate.nombreCalibre != nombreCalibre ||
+      oldDelegate.valorMinimo != valorMinimo ||
+      oldDelegate.anilloNegroInicio != anilloNegroInicio ||
+      oldDelegate.esFondoNegro != esFondoNegro ||
+      oldDelegate.tieneMosca != tieneMosca ||
+      oldDelegate.tieneGuias != tieneGuias ||
+      oldDelegate.esEstiloDuelo != esEstiloDuelo;
 }
