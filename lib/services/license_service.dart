@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../database/database_provider.dart';
 import '../models/licencia_model.dart';
+import 'license_api_http.dart';
 
 class LicenseService {
   const LicenseService();
@@ -43,9 +44,9 @@ class LicenseService {
 
     if (licencia == null || licencia.licenciaKey.trim().isEmpty) {
       return const LicenseCapabilityServerResult(
-        known: true,
+        known: false,
         allowed: false,
-        message: 'Licencia no disponible para validar capacidad.',
+        message: 'Sin registro remoto aún. Usando módulos locales.',
       );
     }
 
@@ -54,24 +55,22 @@ class LicenseService {
       final deviceId = await _obtenerDeviceIdPersistente();
       final identifier = identificadorUsuario?.trim() ?? '';
 
-      final response = await http
-          .post(
-            Uri.parse('$base/licenses/can'),
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'license_key': licencia.licenciaKey,
-              'device_id': deviceId,
-              'capability': capability,
-              'platform': _platformKey,
-              'app_version': package.version,
-              'build_number': package.buildNumber,
-              if (identifier.isNotEmpty && identifier.contains('@'))
-                'email': identifier,
-              if (identifier.isNotEmpty && !identifier.contains('@'))
-                'username': identifier,
-            }),
-          )
-          .timeout(const Duration(seconds: 8));
+      final response = await LicenseApiHttp.postJson(
+        baseUrl: base,
+        path: '/licenses/can',
+        body: jsonEncode({
+          'license_key': licencia.licenciaKey,
+          'device_id': deviceId,
+          'capability': capability,
+          'platform': _platformKey,
+          'app_version': package.version,
+          'build_number': package.buildNumber,
+          if (identifier.isNotEmpty && identifier.contains('@'))
+            'email': identifier,
+          if (identifier.isNotEmpty && !identifier.contains('@'))
+            'username': identifier,
+        }),
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = jsonDecode(response.body);
@@ -154,22 +153,20 @@ class LicenseService {
 
     if (base.isNotEmpty && licencia != null && licencia.licenciaKey.trim().isNotEmpty) {
       try {
-        final response = await http
-            .post(
-              Uri.parse('$base/licenses/upgrade-request'),
-              headers: const {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'license_key': licencia.licenciaKey.trim(),
-                'device_id': deviceId,
-                'capability': capability,
-                'required_plan': requiredPlan,
-                'current_plan': currentPlan,
-                'platform': _platformKey,
-                'app_version': package.version,
-                'build_number': package.buildNumber,
-              }),
-            )
-            .timeout(const Duration(seconds: 8));
+        final response = await LicenseApiHttp.postJson(
+          baseUrl: base,
+          path: '/licenses/upgrade-request',
+          body: jsonEncode({
+            'license_key': licencia.licenciaKey.trim(),
+            'device_id': deviceId,
+            'capability': capability,
+            'required_plan': requiredPlan,
+            'current_plan': currentPlan,
+            'platform': _platformKey,
+            'app_version': package.version,
+            'build_number': package.buildNumber,
+          }),
+        );
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
           backendRegistrado = true;
@@ -185,7 +182,7 @@ class LicenseService {
       }
     }
 
-    const subject = 'Solicitud de mejora de plan - Tiro Deportivo AMG';
+    const subject = 'Solicitud de mejora de plan - TiroAMG';
     final body = [
       'Hola,',
       '',
@@ -324,7 +321,7 @@ class LicenseService {
     final exportItems = items.take(20).toList();
     final truncado = items.length > exportItems.length;
 
-    const subject = 'Historial de solicitudes de mejora de plan - Tiro Deportivo AMG';
+    const subject = 'Historial de solicitudes de mejora de plan - TiroAMG';
     final body = <String>[
       'Hola,',
       '',
@@ -363,61 +360,385 @@ class LicenseService {
   }
 
   Future<LicenciaCheckResult> revisarLicencia({bool forzarServidor = false}) async {
+    LicenciaLocal licencia;
+    try {
+      licencia = await _ensureLocalDefaultInstallation();
+    } catch (e) {
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: true,
+        requiereActivacion: false,
+        mensaje: 'Instalación local con limitaciones: $e',
+        licencia: null,
+      );
+    }
+
     if (apiBaseUrl.trim().isEmpty) {
-      return const LicenciaCheckResult(
+      return LicenciaCheckResult(
         esValida: true,
         enGraciaOffline: false,
         requiereActivacion: false,
-        mensaje: 'Licencias desactivadas (LICENSE_API_URL sin configurar).',
-        licencia: null,
+        mensaje: 'Modo local (sin servidor). Módulo Inicio activo.',
+        licencia: licencia,
       );
     }
-    final licenciaLocal = await obtenerLicenciaLocal();
-    if (licenciaLocal == null || licenciaLocal.licenciaKey.trim().isEmpty) {
-      return const LicenciaCheckResult(
-        esValida: false,
-        enGraciaOffline: false,
-        requiereActivacion: true,
-        mensaje: 'Activa una licencia para continuar.',
-        licencia: null,
-      );
-    }
-    var licencia = licenciaLocal;
 
+    // En arranque normal no bloqueamos por red: solo sync si toca o forzamos.
     final ahora = DateTime.now().toUtc();
+    final sinClave = licencia.licenciaKey.trim().isEmpty;
     final tocaValidar = forzarServidor ||
+        sinClave ||
         licencia.proximaValidacion == null ||
         !licencia.proximaValidacion!.isAfter(ahora);
 
+    if (!tocaValidar) {
+      return _evaluarLicenciaLocal(licencia, huboErrorRed: false);
+    }
+
+    if (!forzarServidor && sinClave) {
+      // Deja la UI libre; el sync forzado en background registrará.
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: true,
+        requiereActivacion: false,
+        mensaje: 'Pendiente de registro en servidor.',
+        licencia: licencia,
+      );
+    }
+
+    if (sinClave) {
+      final reg = await registrarInstalacion();
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: !reg.esValida || reg.enGraciaOffline,
+        requiereActivacion: false,
+        mensaje: reg.mensaje,
+        licencia: reg.licencia ?? await obtenerLicenciaLocal() ?? licencia,
+      );
+    }
+
     var huboErrorRed = false;
-    if (tocaValidar) {
-      try {
-        licencia = await _validarEnServidor(licencia);
-      } on _LicenseServerException catch (e) {
-        if (e.statusCode >= 500) {
-          huboErrorRed = true;
-        } else {
-          await _marcarLicenciaInvalidaEnLocal(licencia);
-          return LicenciaCheckResult(
-            esValida: false,
-            enGraciaOffline: false,
-            requiereActivacion: true,
-            mensaje: _mensajeServidorAmigable(e.statusCode, contexto: 'validate'),
-            licencia: licencia,
-          );
-        }
-      } on SocketException {
+    try {
+      licencia = await _validarEnServidor(licencia);
+    } on _LicenseServerException catch (e) {
+      if (e.statusCode >= 500) {
         huboErrorRed = true;
-      } on TimeoutException {
-        huboErrorRed = true;
-      } on http.ClientException {
-        huboErrorRed = true;
-      } catch (_) {
+      } else if (e.statusCode == 404) {
+        final reg = await registrarInstalacion();
+        return LicenciaCheckResult(
+          esValida: true,
+          enGraciaOffline: false,
+          requiereActivacion: false,
+          mensaje: reg.mensaje,
+          licencia: reg.licencia ?? await obtenerLicenciaLocal() ?? licencia,
+        );
+      } else if (e.statusCode == 403) {
+        await _marcarLicenciaInvalidaEnLocal(licencia);
+        // B+C: no tumbar la app; Inicio local sigue usable.
+        final local = await obtenerLicenciaLocal() ?? licencia;
+        return LicenciaCheckResult(
+          esValida: true,
+          enGraciaOffline: false,
+          requiereActivacion: false,
+          mensaje: 'Servidor indicó bloqueo; operando con módulos locales.',
+          licencia: local.copyWithFeatures({
+            ...LicenciaLocal.defaultModulesFeatures(),
+            ...local.features,
+            'inicio': true,
+          }),
+        );
+      } else {
         huboErrorRed = true;
       }
+    } on SocketException {
+      huboErrorRed = true;
+    } on TimeoutException {
+      huboErrorRed = true;
+    } on http.ClientException {
+      huboErrorRed = true;
+    } catch (_) {
+      huboErrorRed = true;
     }
 
     return _evaluarLicenciaLocal(licencia, huboErrorRed: huboErrorRed);
+  }
+
+  /// Registro silencioso B+C (sin email).
+  Future<LicenciaCheckResult> registrarInstalacion({
+    String nombreApp = 'TiroAMG',
+  }) async {
+    var local = await _ensureLocalDefaultInstallation();
+    final base = apiBaseUrl.trim();
+    if (base.isEmpty) {
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: false,
+        requiereActivacion: false,
+        mensaje: 'Instalación local lista.',
+        licencia: local,
+      );
+    }
+
+    try {
+      final package = await _packageInfoSafe();
+      final deviceId = await _obtenerDeviceIdPersistente();
+      final body = jsonEncode({
+        'device_id': deviceId,
+        'platform': _platformKey,
+        'app_version': package?.version ?? '0.0.0',
+        'build_number': package?.buildNumber ?? '0',
+        'app_name': nombreApp,
+      });
+
+      Future<http.Response> post(String path) {
+        return LicenseApiHttp.postJson(
+          baseUrl: base,
+          path: path,
+          body: body,
+          timeout: const Duration(seconds: 8),
+        );
+      }
+
+      var response = await post('/installations/register');
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        response = await post('/licenses/register');
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        // Último intento: request sin email (compat).
+        response = await post('/licenses/request');
+      }
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          '[License] registro HTTP ${response.statusCode} → ${response.body}',
+        );
+        return LicenciaCheckResult(
+          esValida: true,
+          enGraciaOffline: true,
+          requiereActivacion: false,
+          mensaje: 'Sin registro en servidor. Operando con Inicio en local.',
+          licencia: local,
+        );
+      }
+
+      final data = jsonDecode(response.body);
+      final payload = _normalizarPayloadLicencia(
+        data,
+        licenciaKey: '',
+        deviceId: deviceId,
+        mergeLocalMeta: local,
+      );
+      local = await _guardarPayloadLicencia(payload);
+      debugPrint('[License] instalación registrada: ${local.licenciaKey}');
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: false,
+        requiereActivacion: false,
+        mensaje: 'Instalación registrada.',
+        licencia: local,
+      );
+    } catch (e, st) {
+      debugPrint('[License] registro falló: $e\n$st');
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: true,
+        requiereActivacion: false,
+        mensaje: 'Sin red. Operando con Inicio en local.',
+        licencia: local,
+      );
+    }
+  }
+
+  Future<PackageInfo?> _packageInfoSafe() async {
+    try {
+      return await PackageInfo.fromPlatform()
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Asocia email opcional a la instalación.
+  Future<LicenciaCheckResult> identificarEmail({
+    required String email,
+  }) async {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty || !trimmed.contains('@')) {
+      return const LicenciaCheckResult(
+        esValida: false,
+        enGraciaOffline: false,
+        requiereActivacion: false,
+        mensaje: 'Introduce un email válido.',
+        licencia: null,
+      );
+    }
+
+    var local = await _ensureLocalDefaultInstallation();
+    final base = apiBaseUrl.trim();
+
+    // Guarda email en local siempre.
+    final meta = Map<String, dynamic>.from(local.features);
+    meta['contact_email'] = trimmed;
+    meta.remove('identify_snooze_until');
+    meta['identify_never'] = false;
+    local = await _guardarPayloadLicencia({
+      ...local.toMap(),
+      'features_json': jsonEncode(meta),
+    });
+
+    if (base.isEmpty) {
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: false,
+        requiereActivacion: false,
+        mensaje: 'Email guardado en local.',
+        licencia: local,
+      );
+    }
+
+    try {
+      final package = await PackageInfo.fromPlatform();
+      final deviceId = await _obtenerDeviceIdPersistente();
+      final response = await LicenseApiHttp.postJson(
+        baseUrl: base,
+        path: '/installations/identify',
+        body: jsonEncode({
+          'device_id': deviceId,
+          'email': trimmed,
+          'platform': _platformKey,
+          'app_version': package.version,
+          'build_number': package.buildNumber,
+          if (local.licenciaKey.trim().isNotEmpty)
+            'license_key': local.licenciaKey.trim(),
+        }),
+        timeout: const Duration(seconds: 10),
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return LicenciaCheckResult(
+          esValida: true,
+          enGraciaOffline: false,
+          requiereActivacion: false,
+          mensaje:
+              'Email guardado localmente. El servidor no respondió (${response.statusCode}).',
+          licencia: local,
+        );
+      }
+
+      final data = jsonDecode(response.body);
+      final payload = _normalizarPayloadLicencia(
+        data,
+        licenciaKey: local.licenciaKey,
+        deviceId: deviceId,
+        mergeLocalMeta: local,
+      );
+      // Conserva contact_email local.
+      final features = jsonDecode(payload['features_json'] as String)
+          as Map<String, dynamic>;
+      features['contact_email'] = trimmed;
+      payload['features_json'] = jsonEncode(features);
+      local = await _guardarPayloadLicencia(payload);
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: false,
+        requiereActivacion: false,
+        mensaje: 'Instalación identificada.',
+        licencia: local,
+      );
+    } catch (_) {
+      return LicenciaCheckResult(
+        esValida: true,
+        enGraciaOffline: true,
+        requiereActivacion: false,
+        mensaje: 'Email guardado en local (sin red).',
+        licencia: local,
+      );
+    }
+  }
+
+  Future<bool> shouldShowIdentifyPrompt() async {
+    final local = await obtenerLicenciaLocal();
+    if (local == null) return true;
+    if (local.isIdentified) return false;
+    if (local.identifyNeverAsk) return false;
+    final snooze = local.identifySnoozeUntil;
+    if (snooze != null && snooze.isAfter(DateTime.now().toUtc())) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> snoozeIdentifyPrompt({int days = 7}) async {
+    final local = await _ensureLocalDefaultInstallation();
+    final meta = Map<String, dynamic>.from(local.features);
+    meta['identify_snooze_until'] =
+        DateTime.now().toUtc().add(Duration(days: days)).toIso8601String();
+    await _guardarPayloadLicencia({
+      ...local.toMap(),
+      'features_json': jsonEncode(meta),
+    });
+  }
+
+  Future<void> neverAskIdentifyPrompt() async {
+    final local = await _ensureLocalDefaultInstallation();
+    final meta = Map<String, dynamic>.from(local.features);
+    meta['identify_never'] = true;
+    meta.remove('identify_snooze_until');
+    await _guardarPayloadLicencia({
+      ...local.toMap(),
+      'features_json': jsonEncode(meta),
+    });
+  }
+
+  Future<LicenciaLocal> _ensureLocalDefaultInstallation() async {
+    final existing = await obtenerLicenciaLocal();
+    if (existing != null) {
+      // Asegura módulos por defecto si faltan.
+      final features = Map<String, dynamic>.from(existing.features);
+      var changed = false;
+      if (!features.containsKey('inicio')) {
+        features['inicio'] = true;
+        changed = true;
+      }
+      if (!features.containsKey('target_shot_detection')) {
+        features['target_shot_detection'] = false;
+        changed = true;
+      }
+      if (changed) {
+        return _guardarPayloadLicencia({
+          ...existing.toMap(),
+          'features_json': jsonEncode(features),
+          if ((existing.estado).isEmpty || existing.estado == 'inactive')
+            'estado': 'active',
+        });
+      }
+      if (existing.estado.toLowerCase() == 'inactive' &&
+          existing.licenciaKey.trim().isEmpty) {
+        return _guardarPayloadLicencia({
+          ...existing.toMap(),
+          'estado': 'active',
+        });
+      }
+      return existing;
+    }
+
+    final deviceId = await _obtenerDeviceIdPersistente();
+    final now = DateTime.now().toUtc().toIso8601String();
+    return _guardarPayloadLicencia({
+      'id': 1,
+      'license_key': '',
+      'estado': 'active',
+      'fecha_inicio': now,
+      'fecha_fin': null,
+      'plan': 'pro',
+      'features_json': jsonEncode(LicenciaLocal.defaultModulesFeatures()),
+      'device_id': deviceId,
+      'ultima_validacion': now,
+      'proxima_validacion': null,
+      'dias_gracia_offline': 3,
+      'max_dispositivos': 1,
+      'firma': null,
+    });
   }
 
   Future<LicenciaCheckResult> activarLicencia({
@@ -450,23 +771,22 @@ class LicenseService {
       final deviceId = await _obtenerDeviceIdPersistente();
       final identifier = identificadorUsuario?.trim() ?? '';
 
-      final response = await http
-          .post(
-            Uri.parse('$base/licenses/activate'),
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'license_key': key,
-              'device_id': deviceId,
-              'platform': _platformKey,
-              'app_version': package.version,
-              'build_number': package.buildNumber,
-              if (identifier.isNotEmpty && identifier.contains('@'))
-                'email': identifier,
-              if (identifier.isNotEmpty && !identifier.contains('@'))
-                'username': identifier,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
+      final response = await LicenseApiHttp.postJson(
+        baseUrl: base,
+        path: '/licenses/activate',
+        body: jsonEncode({
+          'license_key': key,
+          'device_id': deviceId,
+          'platform': _platformKey,
+          'app_version': package.version,
+          'build_number': package.buildNumber,
+          if (identifier.isNotEmpty && identifier.contains('@'))
+            'email': identifier,
+          if (identifier.isNotEmpty && !identifier.contains('@'))
+            'username': identifier,
+        }),
+        timeout: const Duration(seconds: 10),
+      );
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return LicenciaCheckResult(
@@ -479,7 +799,13 @@ class LicenseService {
       }
 
       final data = jsonDecode(response.body);
-      final payload = _normalizarPayloadLicencia(data, licenciaKey: key, deviceId: deviceId);
+      final local = await obtenerLicenciaLocal();
+      final payload = _normalizarPayloadLicencia(
+        data,
+        licenciaKey: key,
+        deviceId: deviceId,
+        mergeLocalMeta: local,
+      );
       final licencia = await _guardarPayloadLicencia(payload);
       return _evaluarLicenciaLocal(licencia, huboErrorRed: false);
     } catch (e) {
@@ -497,98 +823,43 @@ class LicenseService {
     required String identificadorUsuario,
     String? nombreApp,
   }) async {
-    final base = apiBaseUrl.trim();
-    if (base.isEmpty) {
-      return const LicenciaCheckResult(
-        esValida: false,
-        enGraciaOffline: false,
-        requiereActivacion: true,
-        mensaje: 'No se ha configurado LICENSE_API_URL.',
-        licencia: null,
-      );
-    }
-
-    final identifier = identificadorUsuario.trim();
-    if (identifier.isEmpty) {
-      return const LicenciaCheckResult(
-        esValida: false,
-        enGraciaOffline: false,
-        requiereActivacion: true,
-        mensaje: 'Introduce un email válido para solicitar licencia.',
-        licencia: null,
-      );
-    }
-
-    try {
-      final package = await PackageInfo.fromPlatform();
-      final deviceId = await _obtenerDeviceIdPersistente();
-      final response = await http
-          .post(
-            Uri.parse('$base/licenses/request'),
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'device_id': deviceId,
-              'platform': _platformKey,
-              'app_version': package.version,
-              'build_number': package.buildNumber,
-              if (nombreApp != null && nombreApp.trim().isNotEmpty)
-                'app_name': nombreApp.trim(),
-              if (identifier.contains('@')) 'email': identifier,
-              if (!identifier.contains('@')) 'username': identifier,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        return LicenciaCheckResult(
-          esValida: false,
-          enGraciaOffline: false,
-          requiereActivacion: true,
-          mensaje: _mensajeServidorAmigable(response.statusCode, contexto: 'request'),
-          licencia: null,
-        );
-      }
-
-      final data = jsonDecode(response.body);
-      final remoteLicense = data['license'];
-      final remoteKey = remoteLicense is Map<String, dynamic>
-          ? (remoteLicense['license_key']?.toString() ?? '').trim()
-          : '';
-      final payload = _normalizarPayloadLicencia(
-        data,
-        licenciaKey: remoteKey,
-        deviceId: deviceId,
-      );
-      final licencia = await _guardarPayloadLicencia(payload);
-      return _evaluarLicenciaLocal(licencia, huboErrorRed: false);
-    } catch (e) {
-      return LicenciaCheckResult(
-        esValida: false,
-        enGraciaOffline: false,
-        requiereActivacion: true,
-        mensaje: 'No se pudo solicitar licencia automática: $e',
-        licencia: null,
-      );
-    }
+    // Compat: ahora es identify + register.
+    final email = identificadorUsuario.trim();
+    final reg = await registrarInstalacion(
+      nombreApp: nombreApp ?? 'TiroAMG',
+    );
+    if (email.isEmpty) return reg;
+    return identificarEmail(email: email);
   }
 
   Future<LicenciaLocal> _validarEnServidor(LicenciaLocal local) async {
     final package = await PackageInfo.fromPlatform();
     final base = apiBaseUrl.trim();
+    final deviceId = local.deviceId ?? await _obtenerDeviceIdPersistente();
 
-    final response = await http
-        .post(
-          Uri.parse('$base/licenses/validate'),
-          headers: const {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'license_key': local.licenciaKey,
-            'device_id': local.deviceId,
-            'platform': _platformKey,
-            'app_version': package.version,
-            'build_number': package.buildNumber,
-          }),
-        )
-        .timeout(const Duration(seconds: 10));
+    final body = <String, dynamic>{
+      'device_id': deviceId,
+      'platform': _platformKey,
+      'app_version': package.version,
+      'build_number': package.buildNumber,
+    };
+    if (local.licenciaKey.trim().isNotEmpty) {
+      body['license_key'] = local.licenciaKey.trim();
+    }
+
+    Future<http.Response> post(String path) {
+      return LicenseApiHttp.postJson(
+        baseUrl: base,
+        path: path,
+        body: jsonEncode(body),
+        timeout: const Duration(seconds: 10),
+      );
+    }
+
+    var response = await post('/installations/validate');
+    if (response.statusCode == 404) {
+      response = await post('/licenses/validate');
+    }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw _LicenseServerException(response.statusCode);
@@ -598,7 +869,8 @@ class LicenseService {
     final payload = _normalizarPayloadLicencia(
       data,
       licenciaKey: local.licenciaKey,
-      deviceId: local.deviceId ?? await _obtenerDeviceIdPersistente(),
+      deviceId: deviceId,
+      mergeLocalMeta: local,
     );
     return _guardarPayloadLicencia(payload);
   }
@@ -612,7 +884,7 @@ class LicenseService {
     );
     final guardada = await obtenerLicenciaLocal();
     if (guardada == null) {
-      throw StateError('No se pudo persistir la licencia local.');
+      throw StateError('No se pudo persistir la instalación local.');
     }
     return guardada;
   }
@@ -621,24 +893,56 @@ class LicenseService {
     dynamic responseData, {
     required String licenciaKey,
     required String deviceId,
+    LicenciaLocal? mergeLocalMeta,
   }) {
     final root = responseData is Map<String, dynamic> ? responseData : const {};
     final lic = root['license'] is Map<String, dynamic>
         ? root['license'] as Map<String, dynamic>
         : root;
     final nowUtc = DateTime.now().toUtc();
-    final serverNow = DateTime.tryParse((root['server_time'] ?? lic['server_time'] ?? '').toString())?.toUtc() ?? nowUtc;
+    final serverNow = DateTime.tryParse(
+                (root['server_time'] ?? lic['server_time'] ?? '').toString())
+            ?.toUtc() ??
+        nowUtc;
     final nextValidation = serverNow.add(const Duration(hours: 12));
 
+    final features = <String, dynamic>{
+      ...LicenciaLocal.defaultModulesFeatures(),
+    };
+
     final rawFeatures = lic['features'];
-    final features = rawFeatures is Map<String, dynamic> ? rawFeatures : <String, dynamic>{};
+    if (rawFeatures is Map) {
+      features.addAll(Map<String, dynamic>.from(rawFeatures));
+    }
+    final rawModules = lic['modules'];
+    if (rawModules is Map) {
+      features.addAll(Map<String, dynamic>.from(rawModules));
+    }
+
+    // Conserva meta local (email / snooze).
+    if (mergeLocalMeta != null) {
+      final email = mergeLocalMeta.contactEmail;
+      if (email != null) features['contact_email'] = email;
+      if (mergeLocalMeta.identifyNeverAsk) {
+        features['identify_never'] = true;
+      }
+      final snooze = mergeLocalMeta.identifySnoozeUntil;
+      if (snooze != null) {
+        features['identify_snooze_until'] = snooze.toIso8601String();
+      }
+    }
+
+    final remoteEmail = lic['email']?.toString().trim();
+    if (remoteEmail != null && remoteEmail.isNotEmpty) {
+      features['contact_email'] = remoteEmail;
+    }
 
     return {
       'id': 1,
       'license_key': lic['license_key']?.toString().trim().isNotEmpty == true
           ? lic['license_key'].toString().trim()
           : licenciaKey.trim(),
-      'estado': (lic['status'] ?? lic['estado'] ?? 'inactive').toString(),
+      'estado': (lic['status'] ?? lic['estado'] ?? 'active').toString(),
       'fecha_inicio': _asDateIso(lic['fecha_inicio']),
       'fecha_fin': _asDateIso(lic['fecha_fin']),
       'plan': lic['plan']?.toString(),
@@ -664,19 +968,27 @@ class LicenseService {
         esValida: false,
         enGraciaOffline: false,
         requiereActivacion: false,
-        mensaje: 'Licencia deshabilitada ($estado).',
+        mensaje: 'Instalación deshabilitada ($estado).',
         licencia: local,
       );
     }
 
     final fechaFin = local.fechaFin;
-    if (estado == 'active' && (fechaFin == null || !fechaFin.isBefore(now))) {
+    if ((estado == 'active' || estado == 'inactive') &&
+        (fechaFin == null || !fechaFin.isBefore(now))) {
+      // inactive sin bloqueo duro: en B+C tratamos como usable si no está revoked.
       return LicenciaCheckResult(
         esValida: true,
         enGraciaOffline: false,
         requiereActivacion: false,
-        mensaje: 'Licencia activa.',
-        licencia: local,
+        mensaje: local.hasDeteccionAutomatica
+            ? 'Instalación activa (Inicio + Detección automática).'
+            : 'Instalación activa (módulo Inicio).',
+        licencia: local.copyWithFeatures({
+          ...local.features,
+          'inicio': local.hasInicioModule,
+          'target_shot_detection': local.hasDeteccionAutomatica,
+        }),
       );
     }
 
@@ -688,17 +1000,20 @@ class LicenseService {
           esValida: true,
           enGraciaOffline: true,
           requiereActivacion: false,
-          mensaje: 'Sin red. Operando en periodo de gracia offline.',
+          mensaje: 'Sin red. Operando con la última configuración de módulos.',
           licencia: local,
         );
       }
     }
 
+    // Caducada: en B+C seguimos dejando Inicio local.
     return LicenciaCheckResult(
-      esValida: false,
-      enGraciaOffline: false,
+      esValida: true,
+      enGraciaOffline: huboErrorRed,
       requiereActivacion: false,
-      mensaje: 'La licencia ha expirado o no está activa.',
+      mensaje: huboErrorRed
+          ? 'Sin red. Operando con Inicio en local.'
+          : 'Instalación usable (Inicio).',
       licencia: local,
     );
   }
@@ -710,18 +1025,27 @@ class LicenseService {
     if (existing != null && existing.isNotEmpty) return existing;
 
     final generated = _generarDeviceId();
-    await db.insert(
-      'Licencias',
-      {
-        'id': 1,
-        'license_key': '',
-        'estado': 'inactive',
-        'device_id': generated,
-        'ultima_validacion': null,
-        'proxima_validacion': null,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    if (rows.isNotEmpty) {
+      await db.update(
+        'Licencias',
+        {'device_id': generated},
+        where: 'id = ?',
+        whereArgs: const [1],
+      );
+    } else {
+      await db.insert(
+        'Licencias',
+        {
+          'id': 1,
+          'license_key': '',
+          'estado': 'active',
+          'device_id': generated,
+          'features_json': jsonEncode(LicenciaLocal.defaultModulesFeatures()),
+          'ultima_validacion': null,
+          'proxima_validacion': null,
+        },
+      );
+    }
     return generated;
   }
 

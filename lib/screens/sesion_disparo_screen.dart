@@ -82,8 +82,16 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   FaseSesion _faseActual = FaseSesion.stop;
   String _mensajeEstado = "LISTO";
   int _segundosRestantes = 0;
+  int _msRestantes = 0;
+  DateTime? _faseEndsAt;
   Color _colorEstado = Colors.grey;
   bool _haIniciado = false;
+  AvisoTiroPerfil _perfilAvisos = AvisoTiroPerfil.competicion;
+  bool _mute = false;
+  bool _flashBlanco = false;
+  bool _fuegoPitidoAnticipado = false;
+  int? _ultimoTickFinal; // segundo en el que ya sonó el tick
+  bool _pulsoFinal = false;
   
   // Control de Duelo
   int _contadorSeriesDuelo = 0;
@@ -93,13 +101,96 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   bool _mostrandoLupa = false;
 
   bool get _enCurso => _faseActual != FaseSesion.stop && _faseActual != FaseSesion.fin;
+  bool get _dianaCerrada =>
+      _faseActual == FaseSesion.espera || _faseActual == FaseSesion.preparacion;
+  bool get _cuentaAtrasFinal =>
+      _faseActual == FaseSesion.fuego &&
+      !widget.plantilla.esDuel &&
+      _segundosRestantes > 0 &&
+      _segundosRestantes <= 10;
+
+  String get _textoCrono {
+    if (_segundosRestantes >= 60) {
+      final m = _segundosRestantes ~/ 60;
+      final s = _segundosRestantes % 60;
+      return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
+    if (widget.plantilla.esDuel &&
+        (_faseActual == FaseSesion.fuego || _faseActual == FaseSesion.espera) &&
+        _msRestantes > 0 &&
+        _msRestantes < 10000) {
+      final whole = _msRestantes ~/ 1000;
+      final tenths = ((_msRestantes % 1000) / 100).floor();
+      return '$whole.$tenths';
+    }
+    return '$_segundosRestantes';
+  }
+
+  /// Etiqueta corta para la barra (sin tiempo).
+  String get _etiquetaFaseBarra {
+    switch (_faseActual) {
+      case FaseSesion.preparacion:
+        return 'PREPARACIÓN';
+      case FaseSesion.espera:
+        return 'ATENCIÓN';
+      case FaseSesion.fuego:
+        return 'FUEGO';
+      case FaseSesion.fin:
+        return 'ALTO';
+      case FaseSesion.stop:
+        return _mensajeEstado;
+    }
+  }
+
+  String? get _subtituloDueloFuego {
+    if (!widget.plantilla.esDuel || _faseActual != FaseSesion.fuego) return null;
+    final actual = (_contadorSeriesDuelo + 1).clamp(1, widget.plantilla.disparosPorSerie);
+    return 'Aparición $actual / ${widget.plantilla.disparosPorSerie}';
+  }
 
   @override
   void initState() {
     super.initState();
     _cargarConfiguracionDiana();
     _resetearValoresTiempo();
-    _audioService.init();
+    _initAudio();
+  }
+
+  Future<void> _initAudio() async {
+    await _audioService.init();
+    await _audioService.aplicarAutoPerfilSiProcede(widget.plantilla);
+    if (!mounted) return;
+    setState(() {
+      _perfilAvisos = _audioService.perfil;
+      _mute = _audioService.mute;
+    });
+  }
+
+  Future<void> _togglePerfilAvisos() async {
+    await _audioService.togglePerfil();
+    if (!mounted) return;
+    setState(() => _perfilAvisos = _audioService.perfil);
+    final label = _perfilAvisos == AvisoTiroPerfil.competicion
+        ? 'Modo Competición (árbitro)'
+        : 'Modo Entrenamiento (voz)';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(label), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  Future<void> _toggleMute() async {
+    await _audioService.toggleMute();
+    if (!mounted) return;
+    setState(() => _mute = _audioService.mute);
+  }
+
+  Future<void> _dispararFlash() async {
+    if (!widget.plantilla.esDuel) return;
+    if (!mounted) return;
+    setState(() => _flashBlanco = true);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    setState(() => _flashBlanco = false);
   }
 
   @override
@@ -136,7 +227,11 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     _mensajeEstado = "LISTO";
     _colorEstado = Colors.grey;
     _contadorSeriesDuelo = 0;
-    _segundosRestantes = widget.plantilla.tiempoPreparacion > 0 ? widget.plantilla.tiempoPreparacion : widget.plantilla.tiempoExposicion;
+    _faseEndsAt = null;
+    _msRestantes = 0;
+    _segundosRestantes = widget.plantilla.tiempoPreparacion > 0
+        ? widget.plantilla.tiempoPreparacion
+        : widget.plantilla.tiempoExposicion;
   }
 
   // --- LÓGICA DEL CRONÓMETRO AVANZADA ---
@@ -159,6 +254,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
   void _pausar() {
     _timer?.cancel();
+    _faseEndsAt = null;
     setState(() {
       _faseActual = FaseSesion.stop;
       _mensajeEstado = "PAUSADO";
@@ -167,41 +263,93 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   }
 
   void _cambiarFase(FaseSesion fase, int tiempo) {
+    final ms = (tiempo * 1000).clamp(0, 24 * 60 * 60 * 1000);
+    final omitirPitidoFuego = fase == FaseSesion.fuego && _fuegoPitidoAnticipado;
+    _fuegoPitidoAnticipado = false;
+    _ultimoTickFinal = null;
+
     setState(() {
       _faseActual = fase;
       _segundosRestantes = tiempo;
-      
+      _msRestantes = ms;
+      _faseEndsAt = ms > 0
+          ? DateTime.now().add(Duration(milliseconds: ms))
+          : null;
+      _pulsoFinal = false;
+
       if (fase == FaseSesion.preparacion) {
         _mensajeEstado = "PREPARACIÓN";
         _colorEstado = Colors.amber[800]!;
-        _audioService.decirPreparacion();
+        _audioService.senalPreparacion();
       } else if (fase == FaseSesion.espera) {
-        _mensajeEstado = "ATENCIÓN (ESPERA)";
+        _mensajeEstado = "ATENCIÓN";
         _colorEstado = Colors.red[700]!;
-        _audioService.decirAtencion();
+        _audioService.senalAtencion();
+        _dispararFlash();
       } else if (fase == FaseSesion.fuego) {
-        _mensajeEstado = "¡FUEGO!";
+        _mensajeEstado = "FUEGO";
         _colorEstado = Colors.green[600]!;
-        _audioService.decirFuego();
+        _audioService.senalFuego(omitirPitido: omitirPitidoFuego);
+        _dispararFlash();
       } else if (fase == FaseSesion.fin) {
-        _mensajeEstado = "FIN";
+        _mensajeEstado = "ALTO";
         _colorEstado = Colors.blueGrey;
-        _audioService.decirFin();
+        _audioService.senalAlto(serieTerminada: true);
       }
     });
   }
 
   void _iniciarTicker() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+    _timer = Timer.periodic(const Duration(milliseconds: 100), (t) {
       if (!mounted) return;
-      setState(() {
-        if (_segundosRestantes > 0) {
-          _segundosRestantes--;
-        } else {
-          _gestionarCambioFase();
+      final ends = _faseEndsAt;
+      if (ends == null) return;
+      final left = ends.difference(DateTime.now()).inMilliseconds;
+
+      // Anticipar pitido de fuego ~120 ms antes del verde (duelo espera→fuego).
+      if (_faseActual == FaseSesion.espera &&
+          widget.plantilla.esDuel &&
+          left <= 120 &&
+          left > 0 &&
+          !_fuegoPitidoAnticipado) {
+        _fuegoPitidoAnticipado = true;
+        _audioService.senalFuegoPitido();
+      }
+
+      if (left <= 0) {
+        _faseEndsAt = null;
+        setState(() {
+          _msRestantes = 0;
+          _segundosRestantes = 0;
+          _pulsoFinal = false;
+        });
+        _gestionarCambioFase();
+      } else {
+        final secs = (left / 1000).ceil();
+        final pulso = _faseActual == FaseSesion.fuego &&
+            !widget.plantilla.esDuel &&
+            secs <= 10 &&
+            ((left ~/ 100) % 10 < 5);
+
+        // Ticks en 10, 5, 3, 2, 1 s (precisión).
+        if (_faseActual == FaseSesion.fuego &&
+            !widget.plantilla.esDuel &&
+            (secs == 10 || secs == 5 || secs == 3 || secs == 2 || secs == 1) &&
+            _ultimoTickFinal != secs) {
+          _ultimoTickFinal = secs;
+          _audioService.senalTickFinal(urgente: secs <= 3);
+          if (_audioService.vozEntrenadorActiva && (secs == 10 || secs == 5)) {
+            _audioService.decirTiempo(secs);
+          }
         }
-      });
+
+        setState(() {
+          _msRestantes = left;
+          _segundosRestantes = secs;
+          _pulsoFinal = pulso;
+        });
+      }
     });
   }
 
@@ -378,138 +526,601 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cargando) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_cargando) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-    return Scaffold(
-      backgroundColor: Colors.grey[800],
-      appBar: AppBar(
-        title: Text(widget.tituloSerie ?? widget.plantilla.nombreDisciplina),
-        backgroundColor: Colors.black,
-        actions: [
-          TextButton(onPressed: _guardarYSalir, child: const Text('FIN', style: TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold)))
-        ],
+    return OrientationBuilder(
+      builder: (context, orientation) {
+        final landscape = orientation == Orientation.landscape;
+        return Scaffold(
+          backgroundColor: Colors.grey[800],
+          // En landscape no usamos AppBar a todo el ancho: controles van al panel.
+          appBar: landscape
+              ? null
+              : AppBar(
+                  title: Text(
+                    widget.tituloSerie ?? widget.plantilla.nombreDisciplina,
+                  ),
+                  backgroundColor: Colors.black,
+                  actions: _buildAppBarActions(),
+                ),
+          body: landscape ? _buildLandscapeBody() : _buildPortraitBody(),
+        );
+      },
+    );
+  }
+
+  List<Widget> _buildAppBarActions() {
+    return [
+      IconButton(
+        tooltip: _mute ? 'Activar sonido' : 'Silenciar',
+        onPressed: _toggleMute,
+        icon: Icon(
+          _mute ? Icons.volume_off : Icons.volume_up,
+          color: _mute ? Colors.orangeAccent : Colors.white70,
+        ),
       ),
-      body: Column(
-        children: [
-          // INFO
-          Container(
-            padding: const EdgeInsets.all(12), color: Colors.grey[900],
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(widget.equipo.nombre, style: const TextStyle(color: Colors.white)),
-                Text('$_puntosTotal pts', style: const TextStyle(color: Colors.amber, fontSize: 24, fontWeight: FontWeight.bold))
-            ])
+      IconButton(
+        tooltip: _perfilAvisos == AvisoTiroPerfil.competicion
+            ? 'Modo Competición (tocar para voz)'
+            : 'Modo Entrenamiento (tocar para árbitro)',
+        onPressed: _togglePerfilAvisos,
+        icon: Icon(
+          _perfilAvisos == AvisoTiroPerfil.competicion
+              ? Icons.sports_score
+              : Icons.record_voice_over,
+          color: _perfilAvisos == AvisoTiroPerfil.competicion
+              ? Colors.tealAccent
+              : Colors.amberAccent,
+        ),
+      ),
+      TextButton(
+        onPressed: _guardarYSalir,
+        child: const Text(
+          'FIN',
+          style: TextStyle(
+            color: Colors.tealAccent,
+            fontWeight: FontWeight.bold,
           ),
-          
-          // CRONO + BOTÓN DE SALTAR (SKIP)
-          Container(
-            color: _colorEstado, 
-            width: double.infinity, 
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                 const Expanded(child: SizedBox()), // Spacer
-                 Text("$_mensajeEstado: $_segundosRestantes s", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                 const Expanded(child: SizedBox()), // Spacer
-                 
-                 // BOTÓN SALTAR FASE (Solo visible si está corriendo)
-                 if (_enCurso)
-                   IconButton(
-                     icon: const Icon(Icons.skip_next, color: Colors.white, size: 30),
-                     onPressed: _avanzarFaseManual,
-                     tooltip: "Saltar tiempo de espera",
-                   )
-              ],
-            )
-          ),
-          
-          // DIANA
-          Expanded(
-            child: LayoutBuilder(builder: (context, constraints) {
-               double diametro = min(constraints.maxWidth, constraints.maxHeight);
-               double offX = (constraints.maxWidth - diametro) / 2;
-               double offY = (constraints.maxHeight - diametro) / 2;
-               Offset offsetCorrection = Offset(offX, offY);
-               Size size = Size(diametro, diametro);
+        ),
+      ),
+    ];
+  }
 
-               return GestureDetector(
-                 behavior: HitTestBehavior.opaque,
-                 onPanStart: (d) => _onPanStart(d, offsetCorrection, size),
-                 onPanUpdate: (d) => _onPanUpdate(d, offsetCorrection),
-                 onPanEnd: (d) => _onPanEnd(d, offsetCorrection, size),
-                 onTapUp: (d) => _onTapUp(d, offsetCorrection, size),
-                 child: Stack(
-                   children: [
-                     Center(
-                       child: CustomPaint(
-                         size: size,
-                         painter: DianaPainter(
-                           impactos: _puntosVisuales,
-                           valorMinimo: _valorMinimo,
-                           anilloNegroInicio: _anilloNegroInicio,
-                           esFondoNegro: _esFondoNegro,
-                           tieneMosca: _tieneMosca,
-                           tieneGuias: _tieneGuias,
-                           esEstiloDuelo: _esEstiloDuelo,
-                         ),
-                       ),
-                     ),
-                     
-                     // LUPA
-                     if (_mostrandoLupa && _posicionDedo != null)
-                        Positioned(
-                          left: _posicionDedo!.dx + offX - 50,
-                          top: _posicionDedo!.dy + offY - 120,
-                          child: Container(
-                            width: 100, height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle, color: Colors.black,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: ClipOval(
-                              child: Transform(
-                                transform: Matrix4.identity()
-                                  ..translate(-_posicionDedo!.dx * 2 + 50, -_posicionDedo!.dy * 2 + 50)
-                                  ..scale(2.0),
-                                child: CustomPaint(
-                                  size: size,
-                                  painter: DianaPainter(
-                                    impactos: _puntosVisuales,
-                                    valorMinimo: _valorMinimo,
-                                    anilloNegroInicio: _anilloNegroInicio,
-                                    esFondoNegro: _esFondoNegro,
-                                    tieneMosca: _tieneMosca,
-                                    tieneGuias: _tieneGuias,
-                                    esEstiloDuelo: _esEstiloDuelo,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        
-                      if (_mostrandoLupa && _posicionDedo != null)
-                        Positioned(
-                           left: _posicionDedo!.dx + offX - 50, top: _posicionDedo!.dy + offY - 120,
-                           child: Container(width: 100, height: 100, child: const Center(child: Icon(Icons.add, color: Colors.red, size: 20)))
-                        )
-                   ],
-                 ),
-               );
-            }),
+  Widget _buildPortraitBody() {
+    return Column(
+      children: [
+        _buildInfoBar(),
+        _buildStatusBar(),
+        Expanded(child: _buildDianaArea()),
+        _buildControlesBar(),
+      ],
+    );
+  }
+
+  Widget _buildLandscapeBody() {
+    return SafeArea(
+      child: Row(
+        children: [
+          Expanded(flex: 5, child: _buildDianaArea()),
+          SizedBox(
+            width: min(MediaQuery.sizeOf(context).width * 0.34, 300),
+            child: _buildPanelLateral(),
           ),
-          
-          // BOTONES INFERIORES
-          Container(
-            padding: const EdgeInsets.all(20), color: Colors.grey[900],
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                IconButton(icon: const Icon(Icons.refresh, color: Colors.red), onPressed: _reiniciarSerie),
-                ElevatedButton(onPressed: _iniciarSecuencia, child: Text(_enCurso ? "PAUSA" : "INICIAR")),
-                IconButton(icon: const Icon(Icons.undo, color: Colors.white), onPressed: _borrarUltimo),
-            ]),
-          )
         ],
       ),
     );
+  }
+
+  Widget _buildInfoBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      color: Colors.grey[900],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              widget.equipo.nombre,
+              style: const TextStyle(color: Colors.white),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            '$_puntosTotal pts',
+            style: const TextStyle(
+              color: Colors.amber,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBar({bool compact = false}) {
+    return Container(
+      color: _colorEstado,
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 8,
+        vertical: compact ? 6 : 8,
+      ),
+      child: Row(
+        children: [
+          Text(
+            _perfilAvisos == AvisoTiroPerfil.competicion ? 'ÁRBITRO' : 'VOZ',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: compact ? 10 : 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _etiquetaFaseBarra,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: compact ? 15 : 18,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                if (_subtituloDueloFuego != null)
+                  Text(
+                    _subtituloDueloFuego!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (_enCurso)
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              icon: const Icon(Icons.skip_next, color: Colors.white, size: 26),
+              onPressed: _avanzarFaseManual,
+              tooltip: 'Saltar fase',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlesBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: Colors.grey[900],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.red, size: 28),
+            onPressed: _reiniciarSerie,
+            tooltip: 'Reiniciar',
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(120, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            onPressed: _iniciarSecuencia,
+            child: Text(_enCurso ? 'PAUSA' : 'INICIAR'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.undo, color: Colors.white, size: 28),
+            onPressed: _borrarUltimo,
+            tooltip: 'Deshacer',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Panel derecho en landscape: título, FIN/mute/modo, puntos, estado, crono, controles.
+  Widget _buildPanelLateral() {
+    final titulo = widget.tituloSerie ?? widget.plantilla.nombreDisciplina;
+    return ColoredBox(
+      color: const Color(0xFF1A1A1A),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Cabecera del panel (sustituye AppBar)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: 'Volver',
+                  onPressed: () => Navigator.maybePop(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white70),
+                ),
+                Expanded(
+                  child: Text(
+                    titulo,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                IconButton(
+                  tooltip: _mute ? 'Activar sonido' : 'Silenciar',
+                  onPressed: _toggleMute,
+                  icon: Icon(
+                    _mute ? Icons.volume_off : Icons.volume_up,
+                    color: _mute ? Colors.orangeAccent : Colors.white70,
+                    size: 22,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Perfil de avisos',
+                  onPressed: _togglePerfilAvisos,
+                  icon: Icon(
+                    _perfilAvisos == AvisoTiroPerfil.competicion
+                        ? Icons.sports_score
+                        : Icons.record_voice_over,
+                    color: _perfilAvisos == AvisoTiroPerfil.competicion
+                        ? Colors.tealAccent
+                        : Colors.amberAccent,
+                    size: 22,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _guardarYSalir,
+                  child: const Text(
+                    'FIN',
+                    style: TextStyle(
+                      color: Colors.tealAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Colors.white12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+            child: Text(
+              widget.equipo.nombre,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          ),
+          Text(
+            '$_puntosTotal',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.amber,
+              fontSize: 36,
+              fontWeight: FontWeight.w800,
+              height: 1.05,
+            ),
+          ),
+          const Text(
+            'pts',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.amber, fontSize: 12),
+          ),
+          const SizedBox(height: 6),
+          _buildStatusBar(compact: true),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, c) {
+                final cronoSize = (c.maxHeight * 0.45).clamp(28.0, 44.0);
+                return Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: _faseActual == FaseSesion.fuego || _dianaCerrada
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_dianaCerrada)
+                                  Text(
+                                    _faseActual == FaseSesion.preparacion
+                                        ? 'PREPARACIÓN'
+                                        : 'DIANA CERRADA',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                Text(
+                                  _textoCrono,
+                                  style: TextStyle(
+                                    color: _cuentaAtrasFinal
+                                        ? Colors.orangeAccent
+                                        : Colors.white,
+                                    fontSize: cronoSize,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              _etiquetaFaseBarra,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.45),
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Controles compactos en una sola fila (evita overflow).
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.red),
+                  onPressed: _reiniciarSerie,
+                  tooltip: 'Reiniciar',
+                ),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(0, 42),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onPressed: _iniciarSecuencia,
+                    child: Text(_enCurso ? 'PAUSA' : 'INICIAR'),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.undo, color: Colors.white),
+                  onPressed: _borrarUltimo,
+                  tooltip: 'Deshacer',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDianaArea({bool showOverlaysOnDiana = true}) {
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    // En landscape el crono/estado van al panel; en vertical sobre la diana.
+    final overlayOnDiana = showOverlaysOnDiana && !landscape;
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final diametro = min(constraints.maxWidth, constraints.maxHeight);
+      final offX = (constraints.maxWidth - diametro) / 2;
+      final offY = (constraints.maxHeight - diametro) / 2;
+      final offsetCorrection = Offset(offX, offY);
+      final size = Size(diametro, diametro);
+
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onPanStart: (d) => _onPanStart(d, offsetCorrection, size),
+        onPanUpdate: (d) => _onPanUpdate(d, offsetCorrection),
+        onPanEnd: (d) => _onPanEnd(d, offsetCorrection, size),
+        onTapUp: (d) => _onTapUp(d, offsetCorrection, size),
+        child: Stack(
+          children: [
+            Center(
+              child: Container(
+                decoration: _faseActual == FaseSesion.fuego
+                    ? BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _cuentaAtrasFinal
+                              ? (_pulsoFinal
+                                  ? Colors.orangeAccent
+                                  : Colors.greenAccent)
+                              : Colors.greenAccent,
+                          width: _cuentaAtrasFinal ? (_pulsoFinal ? 8 : 5) : 5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (_cuentaAtrasFinal
+                                    ? Colors.orangeAccent
+                                    : Colors.greenAccent)
+                                .withValues(alpha: 0.35),
+                            blurRadius: _pulsoFinal ? 28 : 18,
+                            spreadRadius: _pulsoFinal ? 4 : 2,
+                          ),
+                        ],
+                      )
+                    : null,
+                child: CustomPaint(
+                  size: size,
+                  painter: DianaPainter(
+                    impactos: _puntosVisuales,
+                    valorMinimo: _valorMinimo,
+                    anilloNegroInicio: _anilloNegroInicio,
+                    esFondoNegro: _esFondoNegro,
+                    tieneMosca: _tieneMosca,
+                    tieneGuias: _tieneGuias,
+                    esEstiloDuelo: _esEstiloDuelo,
+                  ),
+                ),
+              ),
+            ),
+            if (overlayOnDiana && _faseActual == FaseSesion.fuego)
+              Positioned(
+                top: 16,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Text(
+                    _textoCrono,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _cuentaAtrasFinal
+                          ? Colors.orangeAccent
+                          : Colors.white,
+                      fontSize: _cuentaAtrasFinal ? 68 : 56,
+                      fontWeight: FontWeight.w800,
+                      height: 1.0,
+                      letterSpacing: 1.5,
+                      shadows: const [
+                        Shadow(
+                          color: Colors.black87,
+                          blurRadius: 12,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            if (overlayOnDiana && _dianaCerrada)
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: false,
+                  child: Container(
+                    color: _faseActual == FaseSesion.preparacion
+                        ? Colors.black.withValues(alpha: 0.55)
+                        : Colors.red.shade900.withValues(alpha: 0.62),
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _faseActual == FaseSesion.preparacion
+                              ? Icons.hourglass_top
+                              : Icons.block,
+                          color: Colors.white,
+                          size: 36,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          _faseActual == FaseSesion.preparacion
+                              ? 'PREPARACIÓN'
+                              : 'DIANA CERRADA',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _textoCrono,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 48,
+                            fontWeight: FontWeight.w800,
+                            height: 1.0,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            // En landscape: overlay de diana cerrada solo visual (sin texto).
+            if (!overlayOnDiana && _dianaCerrada)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    color: _faseActual == FaseSesion.preparacion
+                        ? Colors.black.withValues(alpha: 0.45)
+                        : Colors.red.shade900.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+            if (_flashBlanco)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ),
+            if (_mostrandoLupa && _posicionDedo != null && !_dianaCerrada)
+              Positioned(
+                left: _posicionDedo!.dx + offX - 50,
+                top: _posicionDedo!.dy + offY - 120,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: ClipOval(
+                    child: Transform(
+                      transform: Matrix4.identity()
+                        ..translate(
+                            -_posicionDedo!.dx * 2 + 50,
+                            -_posicionDedo!.dy * 2 + 50)
+                        ..scale(2.0),
+                      child: CustomPaint(
+                        size: size,
+                        painter: DianaPainter(
+                          impactos: _puntosVisuales,
+                          valorMinimo: _valorMinimo,
+                          anilloNegroInicio: _anilloNegroInicio,
+                          esFondoNegro: _esFondoNegro,
+                          tieneMosca: _tieneMosca,
+                          tieneGuias: _tieneGuias,
+                          esEstiloDuelo: _esEstiloDuelo,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (_mostrandoLupa && _posicionDedo != null && !_dianaCerrada)
+              Positioned(
+                left: _posicionDedo!.dx + offX - 50,
+                top: _posicionDedo!.dy + offY - 120,
+                child: const SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: Center(
+                    child: Icon(Icons.add, color: Colors.red, size: 20),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    });
   }
 }
 

@@ -234,7 +234,11 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
 
     if (_fases.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.modalidad.nombre), backgroundColor: Colors.blueGrey[900]),
+        appBar: AppBar(
+          title: Text(widget.modalidad.nombre),
+          backgroundColor: Colors.blueGrey[900],
+          foregroundColor: Colors.white,
+        ),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
@@ -251,7 +255,11 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     // Si terminamos, mostramos pantalla final estática
     if (_torneoFinalizado) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Resultados'), backgroundColor: Colors.blueGrey),
+        appBar: AppBar(
+          title: const Text('Resultados'),
+          backgroundColor: Colors.blueGrey,
+          foregroundColor: Colors.white,
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -276,6 +284,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
       appBar: AppBar(
         title: Text(widget.modalidad.nombre),
         backgroundColor: Colors.blueGrey[900],
+        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [

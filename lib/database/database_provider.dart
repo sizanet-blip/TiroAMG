@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseProvider {
-  static const int schemaVersion = 7;
+  static const int schemaVersion = 9;
   static Database? _database;
   static final DatabaseProvider instance = DatabaseProvider._constructor();
 
@@ -223,6 +223,12 @@ class DatabaseProvider {
     if (oldVersion < 7) {
       await _migrarV6aV7(db);
     }
+    if (oldVersion < 8) {
+      await _migrarV7aV8(db);
+    }
+    if (oldVersion < 9) {
+      await _migrarV8aV9(db);
+    }
   }
 
   Future<void> _migrarV1aV2(Database db) async {
@@ -304,6 +310,207 @@ class DatabaseProvider {
     ''');
   }
 
+  /// Amplía plantillas por defecto (4min, 150s Standard, entreno 2/3min).
+  Future<void> _migrarV7aV8(Database db) async {
+    final dianas = await db.query('CatalogoDianas', columns: ['id', 'nombre']);
+    int? idDianaPrec;
+    int? idDianaDuelo;
+    int? idDianaAire;
+    for (final d in dianas) {
+      final nombre = (d['nombre'] as String? ?? '').toLowerCase();
+      if (nombre.contains('precisi')) idDianaPrec = d['id'] as int?;
+      if (nombre.contains('duelo') || nombre.contains('rápido') || nombre.contains('rapido')) {
+        idDianaDuelo = d['id'] as int?;
+      }
+      if (nombre.contains('aire')) idDianaAire = d['id'] as int?;
+    }
+    idDianaPrec ??= dianas.isNotEmpty ? dianas.first['id'] as int : null;
+    idDianaDuelo ??= idDianaPrec;
+    idDianaAire ??= idDianaPrec;
+    if (idDianaPrec == null) return;
+
+    Future<int> ensure({
+      required String nombre,
+      required int disparos,
+      required int exposicion,
+      required int diana,
+      int prep = 60,
+      int ocultacion = 0,
+      bool duelo = false,
+      bool decimal = false,
+    }) async {
+      final rows = await db.query(
+        'PlantillasTiempos',
+        where: 'nombre_disciplina = ?',
+        whereArgs: [nombre],
+        limit: 1,
+      );
+      if (rows.isNotEmpty) return rows.first['id'] as int;
+      return db.insert('PlantillasTiempos', {
+        'nombre_disciplina': nombre,
+        'disparos_por_serie': disparos,
+        'series_por_sesion': 1,
+        'puntuacion_decimal': decimal ? 1 : 0,
+        'tiempo_preparacion': prep,
+        'es_duelo': duelo ? 1 : 0,
+        'tiempo_exposicion': exposicion,
+        'tiempo_ocultacion': ocultacion,
+        'id_tipo_diana': diana,
+      });
+    }
+
+    final idP4 = await ensure(
+      nombre: 'Serie Precisión 4min',
+      disparos: 5,
+      exposicion: 240,
+      diana: idDianaPrec,
+    );
+    // Renombrar si existía la versión con "(Aragón)".
+    await db.update(
+      'PlantillasTiempos',
+      {'nombre_disciplina': 'Serie Precisión 4min'},
+      where: 'nombre_disciplina = ?',
+      whereArgs: const ['Serie Precisión 4min (Aragón)'],
+    );
+    await ensure(
+      nombre: 'Serie Precisión 3min',
+      disparos: 5,
+      exposicion: 180,
+      diana: idDianaPrec,
+    );
+    await ensure(
+      nombre: 'Serie Precisión 2min',
+      disparos: 5,
+      exposicion: 120,
+      diana: idDianaPrec,
+    );
+    final id150 = await ensure(
+      nombre: 'Serie Standard 150s',
+      disparos: 5,
+      exposicion: 150,
+      diana: idDianaPrec,
+    );
+    await ensure(
+      nombre: 'Serie Precisión 5min',
+      disparos: 5,
+      exposicion: 300,
+      diana: idDianaPrec,
+    );
+    await ensure(
+      nombre: 'Serie Duelo 3s/7s',
+      disparos: 5,
+      exposicion: 3,
+      diana: idDianaDuelo!,
+      ocultacion: 7,
+      duelo: true,
+    );
+    await ensure(
+      nombre: 'Serie Rápida 20s',
+      disparos: 5,
+      exposicion: 20,
+      diana: idDianaPrec,
+    );
+    await ensure(
+      nombre: 'Serie Rápida 10s',
+      disparos: 5,
+      exposicion: 10,
+      diana: idDianaPrec,
+    );
+    await ensure(
+      nombre: 'Serie Velocidad 8s',
+      disparos: 5,
+      exposicion: 8,
+      diana: idDianaDuelo,
+    );
+    await ensure(
+      nombre: 'Serie Velocidad 6s',
+      disparos: 5,
+      exposicion: 6,
+      diana: idDianaDuelo,
+    );
+    await ensure(
+      nombre: 'Serie Velocidad 4s',
+      disparos: 5,
+      exposicion: 4,
+      diana: idDianaDuelo,
+    );
+    if (idDianaAire != null) {
+      await ensure(
+        nombre: 'Aire 10m (Serie 10)',
+        disparos: 10,
+        exposicion: 900,
+        diana: idDianaAire,
+      );
+      await ensure(
+        nombre: 'Carabina Decimal',
+        disparos: 10,
+        exposicion: 900,
+        diana: idDianaAire,
+        decimal: true,
+      );
+    }
+    await ensure(
+      nombre: 'Libre 50m (Serie 10)',
+      disparos: 10,
+      exposicion: 1200,
+      diana: idDianaPrec,
+    );
+    await ensure(
+      nombre: 'Avancarga (13 tiros)',
+      disparos: 13,
+      exposicion: 1800,
+      diana: idDianaPrec,
+      prep: 180,
+    );
+
+    // Standard: fases 150s deben usar la plantilla de 150s.
+    await db.rawUpdate(
+      '''
+      UPDATE FasesModalidad
+      SET id_plantilla_tiempos = ?
+      WHERE descripcion_fase LIKE '%150s%'
+      ''',
+      [id150],
+    );
+
+    // Club Fuego Central 15+15 → precisión 4min.
+    final fc15 = await db.query(
+      'Modalidades',
+      where: 'nombre = ?',
+      whereArgs: ['Pistola Fuego Central (15+15)'],
+      limit: 1,
+    );
+    if (fc15.isNotEmpty) {
+      await db.rawUpdate(
+        '''
+        UPDATE FasesModalidad
+        SET id_plantilla_tiempos = ?
+        WHERE id_modalidad = ?
+          AND descripcion_fase LIKE '%Precisión%'
+        ''',
+        [idP4, fc15.first['id']],
+      );
+    }
+  }
+
+  Future<void> _migrarV8aV9(Database db) async {
+    await db.update(
+      'PlantillasTiempos',
+      {'nombre_disciplina': 'Serie Precisión 4min'},
+      where: 'nombre_disciplina = ?',
+      whereArgs: const ['Serie Precisión 4min (Aragón)'],
+    );
+    await db.update(
+      'Modalidades',
+      {'descripcion': 'Popular: 15 Precisión + 15 Duelo (4min)'},
+      where: 'nombre = ? AND descripcion LIKE ?',
+      whereArgs: const [
+        'Pistola Fuego Central (15+15)',
+        '%Aragón%',
+      ],
+    );
+  }
+
   Future<void> _agregarColumnaSiNoExiste(
     Database db,
     String tabla,
@@ -340,21 +547,36 @@ class DatabaseProvider {
       'nombre': 'ISSF 10m Aire', 'valor_minimo': 1, 'anillo_negro_inicio': 7, 'es_fondo_negro': 0, 'tiene_mosca': 1, 'tiene_guias': 0, 'ancho_exterior_mm': 170.0, 'alto_exterior_mm': 170.0
     });
 
-    // D. PLANTILLAS DE TIEMPOS
-    
-    // Tiempos Precisión
+    // D. PLANTILLAS DE TIEMPOS (set completo: ~15)
+    // Precisión
     int idP_5min = await db.insert('PlantillasTiempos', {
       'nombre_disciplina': 'Serie Precisión 5min', 'disparos_por_serie': 5, 'series_por_sesion': 1,
       'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 300, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaPrec
     });
-    
-    // Tiempos Duelo
+    int idP_4min = await db.insert('PlantillasTiempos', {
+      'nombre_disciplina': 'Serie Precisión 4min', 'disparos_por_serie': 5, 'series_por_sesion': 1,
+      'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 240, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaPrec
+    });
+    await db.insert('PlantillasTiempos', {
+      'nombre_disciplina': 'Serie Precisión 3min', 'disparos_por_serie': 5, 'series_por_sesion': 1,
+      'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 180, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaPrec
+    });
+    await db.insert('PlantillasTiempos', {
+      'nombre_disciplina': 'Serie Precisión 2min', 'disparos_por_serie': 5, 'series_por_sesion': 1,
+      'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 120, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaPrec
+    });
+    int idP_150s = await db.insert('PlantillasTiempos', {
+      'nombre_disciplina': 'Serie Standard 150s', 'disparos_por_serie': 5, 'series_por_sesion': 1,
+      'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 150, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaPrec
+    });
+
+    // Duelo
     int idD_3_7 = await db.insert('PlantillasTiempos', {
       'nombre_disciplina': 'Serie Duelo 3s/7s', 'disparos_por_serie': 5, 'series_por_sesion': 1,
       'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 1, 'tiempo_exposicion': 3, 'tiempo_ocultacion': 7, 'id_tipo_diana': idDianaDuelo
     });
-    
-    // Tiempos Standard / Velocidad
+
+    // Rápida / Standard corto
     int idStd_20s = await db.insert('PlantillasTiempos', {
       'nombre_disciplina': 'Serie Rápida 20s', 'disparos_por_serie': 5, 'series_por_sesion': 1,
       'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 20, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaPrec
@@ -363,8 +585,8 @@ class DatabaseProvider {
       'nombre_disciplina': 'Serie Rápida 10s', 'disparos_por_serie': 5, 'series_por_sesion': 1,
       'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 10, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaPrec
     });
-    
-    // Tiempos Velocidad (8, 6, 4)
+
+    // Velocidad
     int idVel_8s = await db.insert('PlantillasTiempos', {
       'nombre_disciplina': 'Serie Velocidad 8s', 'disparos_por_serie': 5, 'series_por_sesion': 1,
       'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 8, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaDuelo
@@ -378,7 +600,7 @@ class DatabaseProvider {
       'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 4, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaDuelo
     });
 
-    // Tiempos Aire
+    // Aire
     int idAire60 = await db.insert('PlantillasTiempos', {
       'nombre_disciplina': 'Aire 10m (Serie 10)', 'disparos_por_serie': 10, 'series_por_sesion': 1,
       'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 900, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaAire
@@ -388,7 +610,7 @@ class DatabaseProvider {
       'puntuacion_decimal': 1, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 900, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaAire
     });
 
-    // Tiempos Largos (Libre / Avancarga)
+    // Largas
     int idLibre = await db.insert('PlantillasTiempos', {
       'nombre_disciplina': 'Libre 50m (Serie 10)', 'disparos_por_serie': 10, 'series_por_sesion': 1,
       'puntuacion_decimal': 0, 'tiempo_preparacion': 60, 'es_duelo': 0, 'tiempo_exposicion': 1200, 'tiempo_ocultacion': 0, 'id_tipo_diana': idDianaPrec
@@ -401,15 +623,15 @@ class DatabaseProvider {
 
     // E. COMPETICIONES OFICIALES (Los "Playlist")
 
-    // 1. PISTOLA FUEGO CENTRAL (15+15) - Versión Club
-    int idFC15 = await db.insert('Modalidades', {'nombre': 'Pistola Fuego Central (15+15)', 'descripcion': 'Popular: 15 Precisión + 15 Duelo', 'es_oficial': 1});
-    await _crearFase(db, idFC15, 1, idP_5min, 1, 1, "Ensayo Precisión");
-    await _crearFase(db, idFC15, 2, idP_5min, 3, 0, "Fase Precisión");
+    // 1. PISTOLA FUEGO CENTRAL (15+15) - Club (precisión 4min)
+    int idFC15 = await db.insert('Modalidades', {'nombre': 'Pistola Fuego Central (15+15)', 'descripcion': 'Popular: 15 Precisión + 15 Duelo (4min)', 'es_oficial': 1});
+    await _crearFase(db, idFC15, 1, idP_4min, 1, 1, "Ensayo Precisión");
+    await _crearFase(db, idFC15, 2, idP_4min, 3, 0, "Fase Precisión");
     await _crearFase(db, idFC15, 3, idD_3_7, 1, 1, "Ensayo Duelo");
     await _crearFase(db, idFC15, 4, idD_3_7, 3, 0, "Fase Duelo");
 
-    // 2. PISTOLA FUEGO CENTRAL (30+30) - Oficial
-    int idFC30 = await db.insert('Modalidades', {'nombre': 'Pistola Fuego Central (30+30)', 'descripcion': 'Oficial ISSF', 'es_oficial': 1});
+    // 2. PISTOLA FUEGO CENTRAL (30+30) - Oficial ISSF (precisión 5min)
+    int idFC30 = await db.insert('Modalidades', {'nombre': 'Pistola Fuego Central (30+30)', 'descripcion': 'Oficial ISSF (5min precisión)', 'es_oficial': 1});
     await _crearFase(db, idFC30, 1, idP_5min, 1, 1, "Ensayo Precisión");
     await _crearFase(db, idFC30, 2, idP_5min, 6, 0, "Fase Precisión");
     await _crearFase(db, idFC30, 3, idD_3_7, 1, 1, "Ensayo Duelo");
@@ -417,15 +639,15 @@ class DatabaseProvider {
 
     // 3. PISTOLA STANDARD (20+20+20)
     int idStd = await db.insert('Modalidades', {'nombre': 'Pistola Standard', 'descripcion': '20 tiros en 150s, 20s y 10s', 'es_oficial': 1});
-    await _crearFase(db, idStd, 1, idP_5min, 1, 1, "Ensayo 150s");
-    await _crearFase(db, idStd, 2, idP_5min, 4, 0, "Fase 150s");
+    await _crearFase(db, idStd, 1, idP_150s, 1, 1, "Ensayo 150s");
+    await _crearFase(db, idStd, 2, idP_150s, 4, 0, "Fase 150s");
     await _crearFase(db, idStd, 3, idStd_20s, 4, 0, "Fase 20s");
     await _crearFase(db, idStd, 4, idStd_10s, 4, 0, "Fase 10s");
 
-    // 4. PISTOLA 9mm (30+30)
+    // 4. PISTOLA 9mm (30+30) — precisión 4min
     int id9mm = await db.insert('Modalidades', {'nombre': 'Pistola 9mm', 'descripcion': 'Precisión + Velocidad 20s', 'es_oficial': 1});
-    await _crearFase(db, id9mm, 1, idP_5min, 1, 1, "Ensayo Precisión");
-    await _crearFase(db, id9mm, 2, idP_5min, 6, 0, "Fase Precisión");
+    await _crearFase(db, id9mm, 1, idP_4min, 1, 1, "Ensayo Precisión");
+    await _crearFase(db, id9mm, 2, idP_4min, 6, 0, "Fase Precisión");
     await _crearFase(db, id9mm, 3, idStd_20s, 1, 1, "Ensayo Velocidad");
     await _crearFase(db, id9mm, 4, idStd_20s, 6, 0, "Fase Velocidad");
 

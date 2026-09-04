@@ -23,7 +23,7 @@ class BackupService {
       // Desde ahí puedes guardarlo en Drive, Archivos, Email, etc.
       final result = await Share.shareXFiles(
         [XFile(path)], 
-        text: 'Copia de seguridad Tiro Deportivo AMG',
+        text: 'Copia de seguridad TiroAMG',
         subject: 'Copia de Seguridad ${DateTime.now().toString().split(' ')[0]}'
       );
 

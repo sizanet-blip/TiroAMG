@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 // Importamos todas las pantallas de gestión
 import 'gestion_equipos_screen.dart';
@@ -8,6 +8,7 @@ import 'catalogo_tipos_screen.dart';
 import 'catalogo_calibres_screen.dart';
 import 'catalogo_dianas_screen.dart'; // <--- 1. IMPORTANTE: Añade esta línea
 import 'perfil_form_screen.dart';
+import 'avisos_tiro_screen.dart';
 import '../database/database_provider.dart';
 import '../services/app_update_service.dart';
 import '../services/license_service.dart';
@@ -34,7 +35,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
   bool _cargandoInfo = true;
   bool _comprobandoActualizacion = false;
   LicenciaLocal? _licenciaActual;
-  LicenseUpgradeStatus? _ultimoUpgrade;
 
   @override
   void initState() {
@@ -66,22 +66,21 @@ class _ConfigScreenState extends State<ConfigScreen> {
   }
 
   Future<void> _cargarEstadoLicencia() async {
-    final result = await _licenseService.revisarLicencia();
-    final ultimoUpgrade = await _licenseService.obtenerUltimoUpgradeStatus();
+    final result = await _licenseService.revisarLicencia(forzarServidor: true);
     if (!mounted) return;
 
     final lic = result.licencia;
-    final fechaFin = lic?.fechaFin?.toLocal().toString().split(' ').first ?? '-';
-    final ultimaValidacion =
+    final device = lic?.deviceId ?? '-';
+    final email = lic?.contactEmail ?? 'Sin identificar';
+    final mods = _permissions.currentModulesLabel(lic);
+    final sync =
         lic?.ultimaValidacion?.toLocal().toString().split('.').first ?? '-';
-    final estado = lic?.estado.toUpperCase() ?? (result.esValida ? 'OK' : 'NO ACTIVA');
 
     setState(() {
-      _licenciaEstado = estado;
+      _licenciaEstado = result.esValida ? 'Activa' : 'Bloqueada';
       _licenciaDetalle =
-          '${result.mensaje}\nVence: $fechaFin\nÚltima validación: $ultimaValidacion';
+          '${result.mensaje}\nMódulos: $mods\nEmail: $email\nDevice: $device\nÚltima sync: $sync';
       _licenciaActual = lic;
-      _ultimoUpgrade = ultimoUpgrade;
     });
   }
 
@@ -92,66 +91,47 @@ class _ConfigScreenState extends State<ConfigScreen> {
     return () async {
       final permitidoLocal = _permissions.canAccess(_licenciaActual, capability);
       if (!permitidoLocal) {
-        await _mostrarDialogoUpgrade(capability: capability);
+        await _mostrarDialogoModuloBloqueado(capability: capability);
         return;
       }
 
-      final serverResult = await _licenseService.verificarCapacidadServidor(
-        licencia: _licenciaActual,
-        capability: _permissions.toServerCapability(capability),
-      );
-
-      if (serverResult.known && !serverResult.allowed) {
-        if (!mounted) return;
-        await _mostrarDialogoUpgrade(
-          capability: capability,
-          detalleServidor: serverResult.message,
+      if (capability == LicenseCapability.targetDetection) {
+        final serverResult = await _licenseService.verificarCapacidadServidor(
+          licencia: _licenciaActual,
+          capability: _permissions.toServerCapability(capability),
         );
-        return;
+        if (serverResult.known && !serverResult.allowed) {
+          if (!mounted) return;
+          await _mostrarDialogoModuloBloqueado(
+            capability: capability,
+            detalleServidor: serverResult.message,
+          );
+          return;
+        }
       }
 
       onAllowed();
     };
   }
 
-  Future<void> _mostrarDialogoUpgrade({
+  Future<void> _mostrarDialogoModuloBloqueado({
     required LicenseCapability capability,
     String? detalleServidor,
   }) async {
     if (!mounted) return;
-    final planNecesario = _permissions.requiredPlanLabel(capability);
-    final planActual = _permissions.currentPlanLabel(_licenciaActual?.plan);
+    final requerido = _permissions.requiredModuleLabel(capability);
+    final actual = _permissions.currentModulesLabel(_licenciaActual);
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Opción bloqueada por licencia'),
+        title: const Text('Módulo no disponible'),
         content: Text(
           detalleServidor?.trim().isNotEmpty == true
-              ? '$detalleServidor\n\nTu plan actual: $planActual.\nPlan requerido: $planNecesario o superior.'
-              : 'Tu plan actual es $planActual.\nEsta opción requiere plan $planNecesario o superior.',
+              ? '$detalleServidor\n\nMódulos actuales: $actual.\nNecesitas: $requerido.'
+              : 'Esta opción requiere «$requerido».\nMódulos actuales: $actual.',
         ),
         actions: [
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final result = await _licenseService.solicitarUpgrade(
-                licencia: _licenciaActual,
-                capability: _permissions.toServerCapability(capability),
-                requiredPlan: planNecesario,
-                currentPlan: planActual,
-              );
-              final ultimo = await _licenseService.obtenerUltimoUpgradeStatus();
-              if (mounted) {
-                setState(() => _ultimoUpgrade = ultimo);
-              }
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(result.message)),
-              );
-            },
-            child: const Text('Solicitar mejora de plan'),
-          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Entendido'),
@@ -159,6 +139,40 @@ class _ConfigScreenState extends State<ConfigScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _identificarEmailDialog() async {
+    final ctrl = TextEditingController(text: _licenciaActual?.contactEmail ?? '');
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Identificar instalación'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            labelText: 'Email',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    if (email == null || email.isEmpty || !mounted) return;
+    final res = await _licenseService.identificarEmail(email: email);
+    if (!mounted) return;
+    await _cargarEstadoLicencia();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.mensaje)));
   }
 
   Future<void> _buscarActualizacionesManual() async {
@@ -177,381 +191,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
     final message = result.message ?? 'Tu app ya está actualizada.';
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  String _normalizarPlan(String? rawPlan) {
-    final p = (rawPlan ?? '').trim().toLowerCase();
-    switch (p) {
-      case 'basic':
-      case 'basico':
-      case 'básico':
-      case 'trial':
-      case 'essential':
-        return 'basic';
-      case 'medio':
-      case 'medium':
-        return 'medio';
-      case 'pro':
-      case 'premium':
-        return 'pro';
-      case 'completo':
-      case 'complete':
-      case 'full':
-      case 'enterprise':
-        return 'completo';
-      default:
-        return 'basic';
-    }
-  }
-
-  String _planLabelPorClave(String clave) {
-    switch (clave) {
-      case 'medio':
-        return 'Medio';
-      case 'pro':
-        return 'Pro';
-      case 'completo':
-        return 'Completo';
-      default:
-        return 'Básico';
-    }
-  }
-
-  Future<void> _solicitarAmpliacionDesdeHistorial() async {
-    if (!mounted) return;
-    var planSolicitado = 'medio';
-    var enviando = false;
-    final planActualClave = _normalizarPlan(_licenciaActual?.plan);
-    final opcionesPlan = <String>['medio', 'pro', 'completo'];
-    if (planActualClave == 'medio') {
-      planSolicitado = 'pro';
-    } else if (planActualClave == 'pro') {
-      planSolicitado = 'completo';
-    } else if (planActualClave == 'completo') {
-      planSolicitado = 'completo';
-    }
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final screenSize = MediaQuery.sizeOf(ctx);
-          final dialogWidth = (screenSize.width - 32).clamp(280.0, 780.0).toDouble();
-          final dialogMaxHeight = (screenSize.height * 0.78).clamp(240.0, 560.0).toDouble();
-          final planActual = _permissions.currentPlanLabel(_licenciaActual?.plan);
-          final planObjetivo = _planLabelPorClave(planSolicitado);
-          final capability = 'solicitud_plan_$planSolicitado';
-
-          return AlertDialog(
-            title: const Text('Solicitar ampliación de licencia'),
-            content: SizedBox(
-              width: dialogWidth,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: dialogMaxHeight),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Selecciona el plan que quieres solicitar.',
-                      ),
-                      const SizedBox(height: 10),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minWidth: 640),
-                          child: DataTable(
-                            headingRowHeight: 36,
-                            dataRowMinHeight: 36,
-                            dataRowMaxHeight: 56,
-                            columns: const [
-                              DataColumn(label: Text('Plan')),
-                              DataColumn(label: Text('Uso recomendado')),
-                              DataColumn(label: Text('Funciones clave')),
-                            ],
-                            rows: const [
-                              DataRow(cells: [
-                                DataCell(Text('Básico')),
-                                DataCell(Text('Inicio y entreno manual')),
-                                DataCell(Text('Entrenamiento base, sin competición ni analítica avanzada.')),
-                              ]),
-                              DataRow(cells: [
-                                DataCell(Text('Medio')),
-                                DataCell(Text('Entrenamiento con más control')),
-                                DataCell(Text('Analítica avanzada y reglas de entrenamiento.')),
-                              ]),
-                              DataRow(cells: [
-                                DataCell(Text('Pro')),
-                                DataCell(Text('Tirador competitivo')),
-                                DataCell(Text('Competición, backup/export y gestión de catálogos.')),
-                              ]),
-                              DataRow(cells: [
-                                DataCell(Text('Completo')),
-                                DataCell(Text('Uso premium integral')),
-                                DataCell(Text('Todo lo de Pro + detección automática de tiros en diana.')),
-                              ]),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<String>(
-                        initialValue: planSolicitado,
-                        decoration: const InputDecoration(
-                          labelText: 'Plan que quieres solicitar',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: opcionesPlan
-                            .map((plan) => DropdownMenuItem(
-                                  value: plan,
-                                  child: Text(_planLabelPorClave(plan)),
-                                ))
-                            .toList(),
-                        onChanged: enviando
-                            ? null
-                            : (value) {
-                                if (value == null) return;
-                                setDialogState(() => planSolicitado = value);
-                              },
-                      ),
-                      const SizedBox(height: 10),
-                      Text('Plan actual: $planActual'),
-                      Text('Plan solicitado: $planObjetivo'),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Nota: la activación final depende de validación de licencia.',
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: enviando ? null : () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: enviando
-                    ? null
-                    : () async {
-                        setDialogState(() => enviando = true);
-                        final result = await _licenseService.solicitarUpgrade(
-                          licencia: _licenciaActual,
-                          capability: capability,
-                          requiredPlan: planObjetivo,
-                          currentPlan: planActual,
-                        );
-                        final ultimo = await _licenseService.obtenerUltimoUpgradeStatus();
-                        if (!mounted) return;
-                        setState(() => _ultimoUpgrade = ultimo);
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                        }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(result.message)),
-                        );
-                      },
-                child: const Text('Solicitar ampliación'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _mostrarHistorialUpgrade() async {
-    final historial = await _licenseService.obtenerHistorialUpgrade(limit: 30);
-    if (!mounted) return;
-    String filtro = 'todos';
-
-    List<LicenseUpgradeStatus> filtrar(List<LicenseUpgradeStatus> items) {
-      switch (filtro) {
-        case 'backend_ok':
-          return items.where((e) => e.backendRegistered).toList();
-        case 'backend_pendiente':
-          return items.where((e) => !e.backendRegistered).toList();
-        case 'email_ok':
-          return items.where((e) => e.emailOpened).toList();
-        case 'email_no':
-          return items.where((e) => !e.emailOpened).toList();
-        default:
-          return items;
-      }
-    }
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final screenSize = MediaQuery.sizeOf(ctx);
-          final dialogWidth = (screenSize.width - 32).clamp(280.0, 760.0).toDouble();
-          final listHeight = (screenSize.height * 0.45).clamp(170.0, 360.0).toDouble();
-          final filtrado = filtrar(historial);
-          return AlertDialog(
-            title: const Text('Historial de solicitudes'),
-            content: SizedBox(
-              width: dialogWidth,
-              child: historial.isEmpty
-                  ? const Text('No hay solicitudes registradas todavía.')
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        DropdownButtonFormField<String>(
-                          initialValue: filtro,
-                          decoration: const InputDecoration(
-                            labelText: 'Filtrar por estado',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'todos', child: Text('Todos')),
-                            DropdownMenuItem(value: 'backend_ok', child: Text('Backend registrado')),
-                            DropdownMenuItem(value: 'backend_pendiente', child: Text('Backend pendiente')),
-                            DropdownMenuItem(value: 'email_ok', child: Text('Email abierto')),
-                            DropdownMenuItem(value: 'email_no', child: Text('Email no abierto')),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setDialogState(() => filtro = value);
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Resultados: ${filtrado.length}',
-                            style: TextStyle(
-                              color: Colors.blueGrey.shade700,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: listHeight,
-                          child: filtrado.isEmpty
-                              ? const Center(
-                                  child: Text(
-                                    'No hay resultados para este filtro.',
-                                  ),
-                                )
-                              : ListView.separated(
-                                  itemCount: filtrado.length,
-                                  separatorBuilder: (_, __) => const Divider(height: 16),
-                                  itemBuilder: (_, i) {
-                                    final item = filtrado[i];
-                                    return ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      leading: Icon(
-                                        item.backendRegistered ? Icons.check_circle : Icons.mark_email_read,
-                                        color: item.backendRegistered ? Colors.green : Colors.orange,
-                                      ),
-                                      title: Text(
-                                        '${item.requiredPlan} · ${item.capability}',
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
-                                      ),
-                                      subtitle: Text(
-                                        '${item.at.toString().split('.').first}\n'
-                                        'Plan actual: ${item.currentPlan} · '
-                                        'Backend: ${item.backendRegistered ? 'registrado' : 'pendiente'} · '
-                                        'Email: ${item.emailOpened ? 'abierto' : 'no abierto'}\n'
-                                        '${item.message}',
-                                      ),
-                                      isThreeLine: true,
-                                    );
-                                  },
-                                ),
-                        ),
-                      ],
-                    ),
-            ),
-            actions: [
-              TextButton.icon(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  await _solicitarAmpliacionDesdeHistorial();
-                },
-                icon: const Icon(Icons.upgrade),
-                label: const Text('Solicitar ampliación'),
-              ),
-              if (historial.isNotEmpty)
-                TextButton.icon(
-                  onPressed: () async {
-                    final ok = await _licenseService.exportarHistorialUpgradePorEmail(
-                      items: filtrado,
-                    );
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          ok
-                              ? 'Cliente de email abierto con el historial filtrado.'
-                              : 'No se pudo abrir el cliente de email.',
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.send),
-                  label: const Text('Exportar'),
-                ),
-              if (historial.isNotEmpty)
-                TextButton.icon(
-                  onPressed: () async {
-                    final confirmar = await showDialog<bool>(
-                      context: ctx,
-                      builder: (dialogCtx) => AlertDialog(
-                        title: const Text('Limpiar historial'),
-                        content: const Text(
-                          'Se eliminarán todas las solicitudes guardadas. Esta acción no se puede deshacer.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(dialogCtx, false),
-                            child: const Text('Cancelar'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(dialogCtx, true),
-                            child: const Text('Eliminar'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmar != true) return;
-                    final borradas = await _licenseService.limpiarHistorialUpgrade(
-                      limpiarUltimoEstado: true,
-                    );
-                    final ultimo = await _licenseService.obtenerUltimoUpgradeStatus();
-                    if (!mounted) return;
-                    setState(() => _ultimoUpgrade = ultimo);
-                    if (!ctx.mounted) return;
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          borradas > 0
-                              ? 'Historial limpiado ($borradas registros).'
-                              : 'No había registros para limpiar.',
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Limpiar'),
-                ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cerrar'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
   }
 
   Future<void> _showUpdateDialog(AppUpdateInfo info,
@@ -708,7 +347,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
             ),
           ),
 
-          // 2. AQUÍ VA EL NUEVO BOTÓN (Justo al final de la sección C)
+          // 2. Aqui va el nuevo boton (justo al final de la seccion C)
           _buildConfigItem(
             context,
             'Catálogo de Dianas',
@@ -725,37 +364,50 @@ class _ConfigScreenState extends State<ConfigScreen> {
           ),
 
           const Divider(height: 30),
+
+          _buildSectionHeader('Avisos de tiro'),
+          _buildConfigItem(
+            context,
+            'Avisos de tiro',
+            'Competición, entrenamiento, volumen y vibración.',
+            Icons.campaign,
+            Colors.indigo,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AvisosTiroScreen()),
+            ),
+          ),
+
+          const Divider(height: 30),
           _buildSectionHeader('D. Estado de la Aplicación'),
-          _buildSubSectionHeader('Licencia'),
+          _buildSubSectionHeader('Esta instalación'),
           _buildInfoCard(
-            leading: const Icon(Icons.key, color: Colors.deepPurple, size: 30),
-            title: 'Licencia: $_licenciaEstado',
+            leading: const Icon(Icons.phone_android, color: Colors.deepPurple, size: 30),
+            title: 'Estado: $_licenciaEstado',
             subtitle: _licenciaDetalle,
           ),
-          if (_ultimoUpgrade != null) ...[
-            const SizedBox(height: 6),
-            _buildSubSectionHeader('Última solicitud de mejora de plan'),
-            _buildInfoCard(
-              leading: Icon(
-                _ultimoUpgrade!.backendRegistered ? Icons.check_circle : Icons.mark_email_read,
-                color: _ultimoUpgrade!.backendRegistered ? Colors.green : Colors.orange,
-                size: 30,
-              ),
-              title:
-                  '${_ultimoUpgrade!.requiredPlan} (${_ultimoUpgrade!.capability}) · ${_ultimoUpgrade!.at.toString().split('.').first}',
-              subtitle:
-                  'Plan actual: ${_ultimoUpgrade!.currentPlan}\n'
-                  'Backend: ${_ultimoUpgrade!.backendRegistered ? 'registrado' : 'pendiente'} · '
-                  'Email: ${_ultimoUpgrade!.emailOpened ? 'abierto' : 'no abierto'}\n'
-                  '${_ultimoUpgrade!.message}',
-            ),
-          ],
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: _mostrarHistorialUpgrade,
-              icon: const Icon(Icons.history),
-              label: const Text('Ver historial de solicitudes'),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                TextButton.icon(
+                  onPressed: () async {
+                    await _cargarEstadoLicencia();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Instalación actualizada.')),
+                    );
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refrescar'),
+                ),
+                TextButton.icon(
+                  onPressed: _identificarEmailDialog,
+                  icon: const Icon(Icons.email_outlined),
+                  label: const Text('Identificar (email)'),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 6),

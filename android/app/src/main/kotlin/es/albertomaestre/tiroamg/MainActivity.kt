@@ -1,4 +1,4 @@
-package com.example.tiro_amg
+package es.albertomaestre.tiroamg
 
 import io.flutter.embedding.android.FlutterActivity
 
