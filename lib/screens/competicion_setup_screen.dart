@@ -33,6 +33,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
   String? _posicionTiro;
   String? _iluminacion;
   bool _esInterior = true;
+  bool _usarEntradaManualPuntos = false;
   bool _cargando = true;
 
   @override
@@ -72,6 +73,7 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
           vientoMs: _parseDouble(_vientoController.text),
           vientoDireccion: _textOrNull(_vientoDirController.text),
           iluminacion: _iluminacion,
+          usarEntradaManualPuntos: _usarEntradaManualPuntos,
         ),
       ),
     );
@@ -155,6 +157,34 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
                 ),
               ],
               onChanged: (v) => setState(() => _municionSeleccionada = v),
+            ),
+            const SizedBox(height: 20),
+
+            Card(
+              elevation: 1,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: SwitchListTile(
+                  title: Text(
+                    _usarEntradaManualPuntos
+                        ? 'Puntuar por números'
+                        : 'Puntuar tocando diana',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    _usarEntradaManualPuntos
+                        ? 'Botones X (mosca) y 10…0. Sin marcar impactos en diana.'
+                        : 'Marcas el impacto tocando la diana.',
+                  ),
+                  secondary: Icon(
+                    _usarEntradaManualPuntos ? Icons.pin : Icons.adjust,
+                    color: Colors.amber[800],
+                  ),
+                  value: _usarEntradaManualPuntos,
+                  onChanged: (v) =>
+                      setState(() => _usarEntradaManualPuntos = v),
+                ),
+              ),
             ),
             const SizedBox(height: 20),
 

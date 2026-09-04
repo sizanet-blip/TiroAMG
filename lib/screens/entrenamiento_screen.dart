@@ -42,6 +42,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
   String? _posicionTiro;
   String? _iluminacion;
   bool _esInterior = true;
+  bool _usarEntradaManualPuntos = false;
 
   bool _cargando = true;
 
@@ -96,6 +97,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
           vientoMs: _parseDouble(_vientoController.text),
           vientoDireccion: _textOrNull(_vientoDirController.text),
           iluminacion: _iluminacion,
+          usarEntradaManualPuntos: _usarEntradaManualPuntos,
         ),
       ),
     );
@@ -213,9 +215,32 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
 
             const SizedBox(height: 20),
 
+            _buildSelectionCard(
+              title: '3. Modo de puntuación',
+              icon: Icons.pin,
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  _usarEntradaManualPuntos
+                      ? 'Puntuar por números'
+                      : 'Puntuar tocando diana',
+                ),
+                subtitle: Text(
+                  _usarEntradaManualPuntos
+                      ? 'Botones X (mosca) y 10…0. Sin marcar impactos en diana.'
+                      : 'Marcas el impacto tocando la diana.',
+                ),
+                value: _usarEntradaManualPuntos,
+                onChanged: (v) =>
+                    setState(() => _usarEntradaManualPuntos = v),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             // 3. TARJETA DE MUNICIÓN (OPCIONAL)
             _buildSelectionCard(
-              title: '3. Munición (Opcional)',
+              title: '4. Munición (Opcional)',
               icon: Icons.local_fire_department,
               child: DropdownButtonFormField<MunicionDetalle>(
                 decoration: const InputDecoration(
@@ -244,7 +269,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
             const SizedBox(height: 20),
 
             _buildSelectionCard(
-              title: '4. Condiciones de tiro',
+              title: '5. Condiciones de tiro',
               icon: Icons.thermostat,
               child: Column(
                 children: [

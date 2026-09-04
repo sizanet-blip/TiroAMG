@@ -31,6 +31,8 @@ class SesionDisparoScreen extends StatefulWidget {
   final int? numeroSerie;
   final int? totalSeries;
   final Function(List<Disparo> disparos, int puntos)? onCompletar;
+  /// Si true: panel X/10…0 en lugar de marcar impactos en la diana.
+  final bool usarEntradaManualPuntos;
 
   const SesionDisparoScreen({
     super.key,
@@ -51,6 +53,7 @@ class SesionDisparoScreen extends StatefulWidget {
     this.numeroSerie,
     this.totalSeries,
     this.onCompletar,
+    this.usarEntradaManualPuntos = false,
   });
 
   @override
@@ -577,15 +580,211 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   }
 
   void _borrarUltimo() {
-    if (_puntosVisuales.isNotEmpty) {
-      setState(() {
+    if (_listaDisparos.isEmpty && _puntosVisuales.isEmpty) return;
+    setState(() {
+      if (_puntosVisuales.isNotEmpty) {
         _puntosVisuales.removeLast();
-        if (_listaDisparos.isNotEmpty) {
-          _puntosTotal -= _listaDisparos.last.puntuacion.toInt();
-          _listaDisparos.removeLast();
-        }
-      });
+      }
+      if (_listaDisparos.isNotEmpty) {
+        _puntosTotal -= _listaDisparos.last.puntuacion.toInt();
+        // Si hay más puntos visuales que disparos (legado), no tocar lista dos veces
+        _listaDisparos.removeLast();
+      }
+    });
+  }
+
+  bool get _puedePuntuarManual {
+    if (!_haIniciado) return false;
+    // En fuego o en pausa (stop tras haber iniciado).
+    return _faseActual == FaseSesion.fuego ||
+        _faseActual == FaseSesion.stop;
+  }
+
+  void _registrarPuntoManual(int valor, {bool esMosca = false}) {
+    if (!_puedePuntuarManual) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solo puedes puntuar en FUEGO o en pausa.'),
+          duration: Duration(milliseconds: 900),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
     }
+    if (_serieCompleta) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Serie completa · $_disparosActuales/$_maxDisparosSerie',
+          ),
+          duration: const Duration(milliseconds: 1200),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+      // ignore: unawaited_futures
+      _audioService.avisarSerieCompleta(
+        actual: _disparosActuales,
+        maximo: _maxDisparosSerie,
+      );
+      return;
+    }
+
+    final puntos = esMosca ? 10 : valor.clamp(0, 10);
+    setState(() {
+      _puntosTotal += puntos;
+      if (esMosca) _contadorMoscas++;
+      _listaDisparos.add(
+        Disparo(
+          numero: _listaDisparos.length + 1,
+          x: 0,
+          y: 0,
+          puntuacion: puntos.toDouble(),
+          esMosca: esMosca,
+        ),
+      );
+    });
+  }
+
+  String _etiquetaMarca(Disparo d) {
+    if (d.esMosca) return 'X';
+    final v = d.puntuacion;
+    if (widget.plantilla.puntuacionDecimal && v != v.roundToDouble()) {
+      return v.toStringAsFixed(1);
+    }
+    return v.toInt().toString();
+  }
+
+  Widget _buildPanelPuntuacionManual() {
+    final botones = <Widget>[
+      _botonPuntoManual(
+        label: 'X',
+        color: Colors.amber.shade800,
+        onTap: () => _registrarPuntoManual(10, esMosca: true),
+      ),
+      for (int v = 10; v >= 0; v--)
+        _botonPuntoManual(
+          label: '$v',
+          color: v >= 9
+              ? Colors.green.shade700
+              : (v >= 7 ? Colors.blueGrey.shade700 : Colors.blueGrey.shade500),
+          onTap: () => _registrarPuntoManual(v),
+        ),
+    ];
+
+    return ColoredBox(
+      color: const Color(0xFF2A2A2A),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'PUNTUACIÓN MANUAL',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ),
+                _chipContadorTiros(compact: true),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _listaDisparos.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Pulsa X o 10…0 para registrar tiros',
+                      style: TextStyle(color: Colors.white38),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    reverse: true,
+                    itemCount: _listaDisparos.length,
+                    itemBuilder: (context, index) {
+                      final d = _listaDisparos[
+                          _listaDisparos.length - 1 - index];
+                      return Card(
+                        color: d.esMosca
+                            ? Colors.amber.withValues(alpha: 0.15)
+                            : Colors.white10,
+                        child: ListTile(
+                          dense: true,
+                          leading: Text(
+                            '#${d.numero}',
+                            style: const TextStyle(color: Colors.white54),
+                          ),
+                          title: Text(
+                            _etiquetaMarca(d),
+                            style: TextStyle(
+                              color: d.esMosca
+                                  ? Colors.amberAccent
+                                  : Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          trailing: d.esMosca
+                              ? const Text(
+                                  'MOSCA',
+                                  style: TextStyle(
+                                    color: Colors.amberAccent,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: botones,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _botonPuntoManual({
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: 52,
+      height: 48,
+      child: Material(
+        color: color,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Center(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _guardarYSalir() async {
@@ -596,14 +795,20 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       return;
     }
 
+    final partesNota = <String>[];
+    if (widget.municion != null) {
+      partesNota.add('${widget.municion!.marca} (${widget.municion!.lote})');
+    }
+    if (widget.usarEntradaManualPuntos) {
+      partesNota.add('Entrada: Manual');
+    }
+
     final sesion = Sesion(
       fecha: DateTime.now(),
       idEquipo: widget.equipo.id,
       idPlantilla: widget.plantilla.id!,
       idMunicion: widget.municion?.id,
-      nota: widget.municion != null
-          ? "${widget.municion!.marca} (${widget.municion!.lote})"
-          : null,
+      nota: partesNota.isEmpty ? null : partesNota.join(' · '),
       lugar: widget.lugar,
       distanciaMetros: widget.distanciaMetros,
       posicionTiro: widget.posicionTiro,
@@ -833,7 +1038,11 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       children: [
         _buildInfoBar(),
         _buildStatusBar(),
-        Expanded(child: _buildDianaArea()),
+        Expanded(
+          child: widget.usarEntradaManualPuntos
+              ? _buildPanelPuntuacionManual()
+              : _buildDianaArea(),
+        ),
         _buildControlesBar(),
       ],
     );
@@ -843,7 +1052,12 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     return SafeArea(
       child: Row(
         children: [
-          Expanded(flex: 5, child: _buildDianaArea()),
+          Expanded(
+            flex: 5,
+            child: widget.usarEntradaManualPuntos
+                ? _buildPanelPuntuacionManual()
+                : _buildDianaArea(),
+          ),
           SizedBox(
             width: min(MediaQuery.sizeOf(context).width * 0.34, 300),
             child: _buildPanelLateral(),
@@ -952,7 +1166,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
             onPressed: _reiniciarSerie,
             tooltip: 'Reiniciar',
           ),
-          _botonLupaInspeccion(),
+          if (!widget.usarEntradaManualPuntos) _botonLupaInspeccion(),
           _botonModoSerieLibre(),
           Expanded(
             child: Padding(
@@ -1144,7 +1358,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                   onPressed: _reiniciarSerie,
                   tooltip: 'Reiniciar',
                 ),
-                _botonLupaInspeccion(),
+                if (!widget.usarEntradaManualPuntos) _botonLupaInspeccion(),
                 _botonModoSerieLibre(compact: true),
                 Expanded(
                   child: ElevatedButton(

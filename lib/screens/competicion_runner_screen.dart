@@ -24,6 +24,7 @@ class CompeticionRunnerScreen extends StatefulWidget {
   final double? vientoMs;
   final String? vientoDireccion;
   final String? iluminacion;
+  final bool usarEntradaManualPuntos;
 
   const CompeticionRunnerScreen({
     super.key,
@@ -40,6 +41,7 @@ class CompeticionRunnerScreen extends StatefulWidget {
     this.vientoMs,
     this.vientoDireccion,
     this.iluminacion,
+    this.usarEntradaManualPuntos = false,
   });
 
   @override
@@ -130,6 +132,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
           vientoMs: widget.vientoMs,
           vientoDireccion: widget.vientoDireccion,
           iluminacion: widget.iluminacion,
+          usarEntradaManualPuntos: widget.usarEntradaManualPuntos,
           
           // PARÁMETROS NUEVOS PARA INFORMACIÓN VISUAL
           tituloSerie: "${faseActual.fase.descripcionFase} - Serie $numSerie/$totalSeries",
