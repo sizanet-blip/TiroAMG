@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/tipo_diana_model.dart';
 import '../services/catalogo_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 
 class TipoDianaFormScreen extends StatefulWidget {
   final TipoDiana? diana;
@@ -85,141 +87,139 @@ class _TipoDianaFormScreenState extends State<TipoDianaFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.diana == null ? 'Diseñar Diana' : 'Editar Diana'),
-        backgroundColor: Colors.blueGrey,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // NOMBRE
-              TextFormField(
+    return AppPageScaffold(
+      title: widget.diana == null ? 'Diseñar Diana' : 'Editar Diana',
+      body: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppSectionCard(
+              title: 'Identificación',
+              titleIcon: Icons.adjust,
+              child: TextFormField(
                 controller: _nombreController,
-                decoration: const InputDecoration(labelText: 'Nombre de la Diana', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Nombre de la Diana'),
                 validator: (v) => v!.isEmpty ? 'Requerido' : null,
               ),
-              const SizedBox(height: 20),
-              
-              const Text('Geometría y Puntuación', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal)),
-              const Divider(),
-              
-              // ** CAMPOS DE DIMENSIONES FÍSICAS (NUEVOS) **
-              Row(
+            ),
+
+            const SizedBox(height: 16),
+
+            AppSectionCard(
+              title: 'Geometría y puntuación',
+              titleIcon: Icons.straighten,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _anchoMmController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Ancho Exterior (mm)', 
-                        border: OutlineInputBorder(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _anchoMmController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Ancho Exterior (mm)',
+                          ),
+                          validator: (v) {
+                            if (v!.isEmpty) return 'Requerido';
+                            if (double.tryParse(v) == null) return 'Número inválido';
+                            return null;
+                          },
+                        ),
                       ),
-                      validator: (v) {
-                        if (v!.isEmpty) return 'Requerido';
-                        if (double.tryParse(v) == null) return 'Número inválido';
-                        return null;
-                      },
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _altoMmController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Alto Exterior (mm)',
+                          ),
+                          validator: (v) {
+                            if (v!.isEmpty) return 'Requerido';
+                            if (double.tryParse(v) == null) return 'Número inválido';
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6, bottom: 12),
+                    child: Text(
+                      'Dimensión física total del papel (ej: 170mm).',
+                      style: TextStyle(color: AppColors.subtitleSoft, fontSize: 12),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _altoMmController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Alto Exterior (mm)', 
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) {
-                        if (v!.isEmpty) return 'Requerido';
-                        if (double.tryParse(v) == null) return 'Número inválido';
-                        return null;
-                      },
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Anillo exterior (Borde de la diana)'),
+                    subtitle: Text('Valor actual: $_valorMinimo'),
+                    trailing: DropdownButton<int>(
+                      value: _valorMinimo,
+                      items: [1, 2, 3, 4, 5, 6, 7].map((v) => DropdownMenuItem(value: v, child: Text(v.toString()))).toList(),
+                      onChanged: (val) => setState(() => _valorMinimo = val!),
+                    ),
+                  ),
+                  Text(
+                    '• Usa 1 para dianas completas (Precisión).\n• Usa 5 para dianas con zoom (Duelo).',
+                    style: TextStyle(color: AppColors.subtitleSoft, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('¿Dónde empieza el color NEGRO?'),
+                    subtitle: Text('Desde el anillo: $_anilloNegro'),
+                    trailing: DropdownButton<int>(
+                      value: _anilloNegro,
+                      items: [4, 5, 6, 7, 8, 9, 10].map((v) => DropdownMenuItem(value: v, child: Text(v.toString()))).toList(),
+                      onChanged: (val) => setState(() => _anilloNegro = val!),
                     ),
                   ),
                 ],
               ),
-              const Padding(
-                padding: EdgeInsets.only(top: 4, bottom: 20, left: 2),
-                child: Text('   • Dimensión física total del papel (ej: 170mm).', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ),
-              // ** FIN CAMPOS DE DIMENSIONES FÍSICAS **
+            ),
 
-              // 1. VALOR MÍNIMO (Tamaño visible)
-              ListTile(
-                title: const Text('Anillo exterior (Borde de la diana)'),
-                subtitle: Text('Valor actual: $_valorMinimo'),
-                trailing: DropdownButton<int>(
-                  value: _valorMinimo,
-                  items: [1, 2, 3, 4, 5, 6, 7].map((v) => DropdownMenuItem(value: v, child: Text(v.toString()))).toList(),
-                  onChanged: (val) => setState(() => _valorMinimo = val!),
-                ),
-              ),
-              const Text('   • Usa 1 para dianas completas (Precisión).\n   • Usa 5 para dianas con zoom (Duelo).', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              
-              const SizedBox(height: 10),
+            const SizedBox(height: 16),
 
-              // 2. INICIO NEGRO
-              ListTile(
-                title: const Text('¿Dónde empieza el color NEGRO?'),
-                subtitle: Text('Desde el anillo: $_anilloNegro'),
-                trailing: DropdownButton<int>(
-                  value: _anilloNegro,
-                  items: [4, 5, 6, 7, 8, 9, 10].map((v) => DropdownMenuItem(value: v, child: Text(v.toString()))).toList(),
-                  onChanged: (val) => setState(() => _anilloNegro = val!),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-              const Text('Estilo Visual', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal)),
-              const Divider(),
-
-              // 3. COLOR DE FONDO
-              SwitchListTile(
-                title: const Text('Fondo Negro Total'),
-                subtitle: const Text('Activar para dianas de Duelo/Velocidad.'),
-                value: _esFondoNegro,
-                activeColor: Colors.black,
-                onChanged: (val) => setState(() => _esFondoNegro = val),
-              ),
-
-              // 4. GUIAS
-              SwitchListTile(
-                title: const Text('Guías Horizontales'),
-                subtitle: const Text('Líneas blancas a las 3 y a las 9.'),
-                value: _tieneGuias,
-                activeColor: Colors.blueGrey,
-                onChanged: (val) => setState(() => _tieneGuias = val),
-              ),
-
-              // 5. MOSCA
-              SwitchListTile(
-                title: const Text('Tiene Mosca (X-Ring)'),
-                value: _tieneMosca,
-                onChanged: (val) => setState(() => _tieneMosca = val),
-              ),
-
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.save),
-                  label: const Text('GUARDAR DISEÑO'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.all(15), 
-                    backgroundColor: Colors.teal, 
-                    foregroundColor: Colors.white
+            AppSectionCard(
+              title: 'Estilo visual',
+              titleIcon: Icons.palette_outlined,
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Fondo Negro Total'),
+                    subtitle: const Text('Activar para dianas de Duelo/Velocidad.'),
+                    value: _esFondoNegro,
+                    onChanged: (val) => setState(() => _esFondoNegro = val),
                   ),
-                  onPressed: _guardar,
-                ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Guías Horizontales'),
+                    subtitle: const Text('Líneas blancas a las 3 y a las 9.'),
+                    value: _tieneGuias,
+                    onChanged: (val) => setState(() => _tieneGuias = val),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Tiene Mosca (X-Ring)'),
+                    value: _tieneMosca,
+                    onChanged: (val) => setState(() => _tieneMosca = val),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+
+            const SizedBox(height: 28),
+
+            AppPrimaryButton(
+              label: 'Guardar diseño',
+              icon: Icons.save,
+              onPressed: _guardar,
+            ),
+          ],
         ),
       ),
     );

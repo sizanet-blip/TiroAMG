@@ -8,6 +8,7 @@ import '../models/disparo_model.dart';
 import '../services/competicion_service.dart';
 import '../services/entrenamiento_service.dart';
 import '../services/plantilla_tiempos_service.dart';
+import '../theme/app_theme.dart';
 import 'sesion_disparo_screen.dart'; // La pantalla de la diana
 
 class CompeticionRunnerScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class CompeticionRunnerScreen extends StatefulWidget {
   final double? vientoMs;
   final String? vientoDireccion;
   final String? iluminacion;
+  final bool usarEntradaManualPuntos;
 
   const CompeticionRunnerScreen({
     super.key,
@@ -40,6 +42,7 @@ class CompeticionRunnerScreen extends StatefulWidget {
     this.vientoMs,
     this.vientoDireccion,
     this.iluminacion,
+    this.usarEntradaManualPuntos = false,
   });
 
   @override
@@ -130,6 +133,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
           vientoMs: widget.vientoMs,
           vientoDireccion: widget.vientoDireccion,
           iluminacion: widget.iluminacion,
+          usarEntradaManualPuntos: widget.usarEntradaManualPuntos,
           
           // PARÁMETROS NUEVOS PARA INFORMACIÓN VISUAL
           tituloSerie: "${faseActual.fase.descripcionFase} - Serie $numSerie/$totalSeries",
@@ -234,7 +238,10 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
 
     if (_fases.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.modalidad.nombre), backgroundColor: Colors.blueGrey[900]),
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text(widget.modalidad.nombre),
+        ),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
@@ -251,16 +258,19 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     // Si terminamos, mostramos pantalla final estática
     if (_torneoFinalizado) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Resultados'), backgroundColor: Colors.blueGrey),
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Resultados'),
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('TORNEO COMPLETADO', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              Text('TORNEO COMPLETADO', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.title)),
               const SizedBox(height: 20),
-              Text('$_puntosTotales Puntos', style: const TextStyle(fontSize: 48, color: Colors.amber)),
+              Text('$_puntosTotales Puntos', style: TextStyle(fontSize: 48, color: AppColors.accentCompetition)),
               const SizedBox(height: 40),
-              ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('VOLVER AL MENÚ'))
+              FilledButton(onPressed: () => Navigator.pop(context), child: const Text('VOLVER AL MENÚ'))
             ],
           ),
         ),
@@ -272,10 +282,9 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     final esEnsayo = faseActual.fase.esEnsayo;
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(widget.modalidad.nombre),
-        backgroundColor: Colors.blueGrey[900],
       ),
       body: Column(
         children: [

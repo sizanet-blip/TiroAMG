@@ -3,6 +3,7 @@ import '../models/municion_model.dart';
 import '../models/catalogo_model.dart'; // Para cargar los calibres
 import '../services/municion_service.dart';
 import '../services/catalogo_service.dart'; // Necesitamos el servicio de catálogos
+import '../widgets/app_ui.dart';
 
 class MunicionFormScreen extends StatefulWidget {
   final int? municionId;
@@ -75,73 +76,62 @@ class _MunicionFormScreenState extends State<MunicionFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.municionId == null ? 'Nueva Munición' : 'Editar Munición'),
-        backgroundColor: Colors.teal,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              // Marca
-              TextFormField(
-                controller: _marcaController,
-                decoration: const InputDecoration(labelText: 'Marca (Ej: Eley, SK)', border: OutlineInputBorder()),
-                validator: (v) => v!.isEmpty ? 'Requerido' : null,
-              ),
-              const SizedBox(height: 20),
-
-              // Lote
-              TextFormField(
-                controller: _loteController,
-                decoration: const InputDecoration(labelText: 'Número de Lote', border: OutlineInputBorder()),
-                validator: (v) => v!.isEmpty ? 'Requerido' : null,
-              ),
-              const SizedBox(height: 20),
-
-              TextFormField(
-                controller: _cantidadController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Cantidad de cartuchos (stock actual)',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) {
-                  final n = int.tryParse(v ?? '');
-                  if (n == null || n < 0) return 'Introduce un numero valido';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Desplegable de Calibres
-              DropdownButtonFormField<int>(
-                decoration: const InputDecoration(labelText: 'Calibre', border: OutlineInputBorder()),
-                value: _selectedCalibre,
-                items: _calibres.map((e) => DropdownMenuItem(value: e.id, child: Text(e.nombre))).toList(),
-                onChanged: (val) => setState(() => _selectedCalibre = val),
-                validator: (v) => v == null ? 'Selecciona un calibre' : null,
-              ),
-
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.save),
-                  label: const Text('GUARDAR', style: TextStyle(fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.all(15),
+    return AppPageScaffold(
+      title: widget.municionId == null ? 'Nueva Munición' : 'Editar Munición',
+      body: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppSectionCard(
+              title: 'Lote',
+              titleIcon: Icons.local_fire_department_outlined,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _marcaController,
+                    decoration: const InputDecoration(labelText: 'Marca (Ej: Eley, SK)'),
+                    validator: (v) => v!.isEmpty ? 'Requerido' : null,
                   ),
-                  onPressed: _guardar,
-                ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _loteController,
+                    decoration: const InputDecoration(labelText: 'Número de Lote'),
+                    validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _cantidadController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Cantidad de cartuchos (stock actual)',
+                    ),
+                    validator: (v) {
+                      final n = int.tryParse(v ?? '');
+                      if (n == null || n < 0) return 'Introduce un numero valido';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<int>(
+                    decoration: const InputDecoration(labelText: 'Calibre'),
+                    value: _selectedCalibre,
+                    items: _calibres.map((e) => DropdownMenuItem(value: e.id, child: Text(e.nombre))).toList(),
+                    onChanged: (val) => setState(() => _selectedCalibre = val),
+                    validator: (v) => v == null ? 'Selecciona un calibre' : null,
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+
+            const SizedBox(height: 28),
+
+            AppPrimaryButton(
+              label: 'Guardar',
+              icon: Icons.save,
+              onPressed: _guardar,
+            ),
+          ],
         ),
       ),
     );

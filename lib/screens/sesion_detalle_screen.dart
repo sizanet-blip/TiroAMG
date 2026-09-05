@@ -12,6 +12,7 @@ import '../services/equipo_service.dart';
 import '../services/pdf_service.dart';
 import '../services/perfil_service.dart';
 import '../services/municion_service.dart';
+import '../theme/app_theme.dart';
 import 'estadisticas_screen.dart'; // <--- IMPORTANTE: Para navegar a estadísticas
 
 class SesionDetalleScreen extends StatefulWidget {
@@ -258,10 +259,9 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-              ElevatedButton.icon(
+              FilledButton.icon(
                 icon: const Icon(Icons.save),
                 label: const Text('GUARDAR'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                 onPressed: () async {
                   Navigator.pop(ctx);
                   await _guardarCambiosEnBD(
@@ -349,17 +349,15 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cargando) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_cargando) return const Scaffold(backgroundColor: AppColors.background, body: Center(child: CircularProgressIndicator()));
 
     int puntos = _disparos.fold(0, (sum, item) => sum + item.puntuacion.floor());
     int moscas = _disparos.where((d) => d.esMosca).length;
 
     return Scaffold(
-      backgroundColor: Colors.grey[200],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Detalle de Tirada'),
-        backgroundColor: Colors.indigo,
-        elevation: 0,
         actions: [
           // --- 1. BOTÓN ESTADÍSTICAS (NUEVO) ---
           IconButton(
@@ -388,11 +386,19 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 5))]
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,40 +407,40 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_plantilla?.nombreDisciplina ?? 'Desconocido', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.indigo)),
+                      Text(_plantilla?.nombreDisciplina ?? 'Desconocido', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.title)),
                       const SizedBox(height: 5),
                       if (_equipoDetalle != null)
-                        Row(children: [const Icon(Icons.hardware, size: 14, color: Colors.grey), const SizedBox(width: 5), Text(_equipoDetalle!.nombre, style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w500))]),
+                        Row(children: [Icon(Icons.hardware, size: 14, color: AppColors.subtitle), const SizedBox(width: 5), Text(_equipoDetalle!.nombre, style: TextStyle(color: AppColors.title, fontSize: 13, fontWeight: FontWeight.w500))]),
                       if (_municionDetalle != null)
-                        Row(children: [const Icon(Icons.local_fire_department, size: 14, color: Colors.grey), const SizedBox(width: 5), Text('${_municionDetalle!.marca} (${_municionDetalle!.lote})', style: const TextStyle(color: Colors.black87, fontSize: 13))]),
+                        Row(children: [Icon(Icons.local_fire_department, size: 14, color: AppColors.subtitle), const SizedBox(width: 5), Text('${_municionDetalle!.marca} (${_municionDetalle!.lote})', style: TextStyle(color: AppColors.title, fontSize: 13))]),
                       if (_sesion?.lugar != null && _sesion!.lugar!.isNotEmpty)
-                        Row(children: [const Icon(Icons.place, size: 14, color: Colors.grey), const SizedBox(width: 5), Text(_sesion!.lugar!, style: const TextStyle(color: Colors.black87, fontSize: 13))]),
+                        Row(children: [Icon(Icons.place, size: 14, color: AppColors.subtitle), const SizedBox(width: 5), Text(_sesion!.lugar!, style: TextStyle(color: AppColors.title, fontSize: 13))]),
                       if (_sesion?.distanciaMetros != null)
-                        Row(children: [const Icon(Icons.straighten, size: 14, color: Colors.grey), const SizedBox(width: 5), Text('${_sesion!.distanciaMetros} m', style: const TextStyle(color: Colors.black87, fontSize: 13))]),
+                        Row(children: [Icon(Icons.straighten, size: 14, color: AppColors.subtitle), const SizedBox(width: 5), Text('${_sesion!.distanciaMetros} m', style: TextStyle(color: AppColors.title, fontSize: 13))]),
                       if (_sesion?.temperaturaC != null || _sesion?.humedadPct != null || _sesion?.vientoMs != null) ...[
                         const SizedBox(height: 4),
                         Text(
                           'Met: ${_sesion?.temperaturaC?.toStringAsFixed(1) ?? '-'}°C | '
                           'Hum: ${_sesion?.humedadPct?.toStringAsFixed(0) ?? '-'}% | '
                           'Viento: ${_sesion?.vientoMs?.toStringAsFixed(1) ?? '-'} m/s ${_sesion?.vientoDireccion ?? ''}',
-                          style: const TextStyle(color: Colors.black54, fontSize: 12),
+                          style: TextStyle(color: AppColors.subtitle, fontSize: 12),
                         ),
                       ],
                       if (_sesion?.nota != null && _sesion!.nota!.isNotEmpty) ...[
                         const SizedBox(height: 5),
-                        Text(_sesion!.nota!, style: const TextStyle(color: Colors.blueGrey, fontSize: 12, fontStyle: FontStyle.italic), maxLines: 3, overflow: TextOverflow.ellipsis),
+                        Text(_sesion!.nota!, style: TextStyle(color: AppColors.subtitle, fontSize: 12, fontStyle: FontStyle.italic), maxLines: 3, overflow: TextOverflow.ellipsis),
                       ],
                       const SizedBox(height: 8),
-                      Text("${_sesion!.fecha.day}/${_sesion!.fecha.month}/${_sesion!.fecha.year} ${_sesion!.fecha.hour}:${_sesion!.fecha.minute.toString().padLeft(2,'0')}", style: TextStyle(color: Colors.grey[400], fontSize: 11)),
+                      Text("${_sesion!.fecha.day}/${_sesion!.fecha.month}/${_sesion!.fecha.year} ${_sesion!.fecha.hour}:${_sesion!.fecha.minute.toString().padLeft(2,'0')}", style: TextStyle(color: AppColors.subtitleSoft, fontSize: 11)),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('$puntos', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 28, color: Colors.indigo)),
-                    const Text("PUNTOS", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.indigoAccent)),
-                    if (moscas > 0) Text('$moscas moscas (x)', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 12)),
+                    Text('$puntos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28, color: AppColors.accentTraining)),
+                    Text("PUNTOS", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.accentTraining)),
+                    if (moscas > 0) Text('$moscas moscas (x)', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accentCompetition, fontSize: 12)),
                   ],
                 ),
               ],
@@ -477,14 +483,17 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
           
           Container(
             height: 120, 
-            color: Colors.white,
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
             child: SafeArea(
               top: false,
               child: Column(
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Text("Secuencia", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text("Secuencia", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.subtitle)),
                   ),
                   const Divider(height: 1),
                   Expanded(
@@ -503,18 +512,17 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                             margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             decoration: BoxDecoration(
-                              color: tiro.esMosca ? Colors.amber.withOpacity(0.1) : Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 3, offset: const Offset(0, 1))]
+                              color: tiro.esMosca ? AppColors.accentCompetition.withValues(alpha: 0.1) : AppColors.surface,
+                              borderRadius: BorderRadius.circular(AppRadii.iconBox),
+                              border: Border.all(color: AppColors.border),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                FittedBox(child: Text('#${tiro.numero}', style: TextStyle(fontSize: 10, color: Colors.grey[600]))),
+                                FittedBox(child: Text('#${tiro.numero}', style: TextStyle(fontSize: 10, color: AppColors.subtitle))),
                                 const SizedBox(height: 2),
-                                Expanded(child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text('${tiro.puntuacion.toInt()}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87))))),
-                                if(tiro.esMosca) const FittedBox(child: Text('X', style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold))) else const SizedBox(height: 12), 
+                                Expanded(child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text('${tiro.puntuacion.toInt()}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.title))))),
+                                if(tiro.esMosca) FittedBox(child: Text('X', style: TextStyle(fontSize: 12, color: AppColors.accentCompetition, fontWeight: FontWeight.bold))) else const SizedBox(height: 12), 
                               ],
                             ),
                           );

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/data_seeder_service.dart';
-import '../services/backup_service.dart'; // Importar el nuevo servicio
-import 'package:flutter/foundation.dart'; // <--- Agrega esto para usar kDebugMode
+import '../services/backup_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -12,7 +14,7 @@ class BackupScreen extends StatefulWidget {
 
 class _BackupScreenState extends State<BackupScreen> {
   final _seederService = DataSeederService();
-  final _backupService = BackupService(); // Instancia del servicio
+  final _backupService = BackupService();
   
   bool _procesando = false;
 
@@ -40,25 +42,22 @@ class _BackupScreenState extends State<BackupScreen> {
 
   // --- FUNCIONES DE BACKUP REAL ---
   void _exportarBD() async {
-    // No ponemos _procesando = true aquí porque el diálogo de compartir es nativo y externo
     await _backupService.exportarBaseDatos();
-    // No mostramos snackbar porque el propio sistema operativo da feedback visual
   }
 
   void _importarBD() async {
-    // Advertencia de seguridad
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Restaurar copia?'),
-        content: const Text(
+        content: Text(
           '⚠️ CUIDADO: Esta acción BORRARÁ todos los datos actuales y los reemplazará por los de la copia de seguridad.\n\nEsta acción es irreversible.',
-          style: TextStyle(color: Colors.red)
+          style: TextStyle(color: AppColors.accentDanger),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.accentDanger),
             onPressed: () async {
               Navigator.pop(ctx);
               setState(() => _procesando = true);
@@ -69,7 +68,6 @@ class _BackupScreenState extends State<BackupScreen> {
               
               if (mounted) {
                 if (exito) {
-                  // Sugerimos reiniciar para asegurar que todo cargue bien
                   showDialog(
                     context: context,
                     builder: (_) => AlertDialog(
@@ -83,7 +81,7 @@ class _BackupScreenState extends State<BackupScreen> {
                 }
               }
             }, 
-            child: const Text('Sí, Restaurar', style: TextStyle(color: Colors.white))
+            child: const Text('Sí, Restaurar'),
           ),
         ],
       )
@@ -92,113 +90,95 @@ class _BackupScreenState extends State<BackupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Herramientas y Backup'),
-        backgroundColor: Colors.blueGrey,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Copia de Seguridad', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            const Text('Guarda tus datos en un lugar seguro (Google Drive, Email, etc.) para no perderlos.', style: TextStyle(color: Colors.grey)),
-            
-            const SizedBox(height: 20),
-
-            // --- SECCIÓN BACKUP REAL ---
-            ListTile(
-              leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.upload, color: Colors.white)),
-              title: const Text('Exportar Base de Datos'),
-              subtitle: const Text('Crear copia de seguridad'),
-              onTap: _exportarBD,
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey[300]!)),
+    return AppPageScaffold(
+      title: 'Herramientas y Backup',
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Copia de Seguridad',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.title,
             ),
-            const SizedBox(height: 10),
-            ListTile(
-              leading: const CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.download, color: Colors.white)),
-              title: const Text('Importar Base de Datos'),
-              subtitle: const Text('Restaurar desde un archivo'),
-              onTap: _importarBD,
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey[300]!)),
-            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Guarda tus datos en un lugar seguro (Google Drive, Email, etc.) para no perderlos.',
+            style: TextStyle(color: AppColors.subtitle),
+          ),
+          const SizedBox(height: 20),
 
-            const SizedBox(height: 40),
-            
-            // --- SECCIÓN DESARROLLADOR ---
-            if (kDebugMode) ...[ 
-              const SizedBox(height: 40),
-              
-              // --- SECCIÓN DESARROLLADOR ---
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.withOpacity(0.5)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
+          AppNavGroup(
+            children: [
+              AppNavTile(
+                title: 'Exportar Base de Datos',
+                subtitle: 'Crear copia de seguridad',
+                icon: Icons.upload,
+                color: AppColors.accentAnalytics,
+                onTap: _exportarBD,
+              ),
+              AppNavTile(
+                title: 'Importar Base de Datos',
+                subtitle: 'Restaurar desde un archivo',
+                icon: Icons.download,
+                color: AppColors.accentCompetition,
+                onTap: _importarBD,
+              ),
+            ],
+          ),
+
+          if (kDebugMode) ...[
+            const SizedBox(height: 28),
+            AppSectionCard(
+              title: 'Zona de Pruebas (Developer)',
+              titleIcon: Icons.build,
+              titleIconColor: AppColors.subtitle,
+              child: _procesando
+                  ? const Center(child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(),
+                    ))
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Icon(Icons.build, color: Colors.grey),
-                        SizedBox(width: 10),
-                        Text('Zona de Pruebas (Developer)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                        FilledButton(
+                          onPressed: _generarDatos,
+                          child: const Text('GENERAR DATOS DE PRUEBA'),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton(
+                          onPressed: _borrarSoloPruebas,
+                          child: const Text('BORRAR SOLO DATOS DE PRUEBA'),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('⚠️ ¿BORRAR TODO?'),
+                                content: const Text('Se eliminarán tus entrenamientos REALES. No se puede deshacer.'),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                                  FilledButton(
+                                    style: FilledButton.styleFrom(backgroundColor: AppColors.accentDanger),
+                                    onPressed: () { Navigator.pop(ctx); _borrarTodo(); }, 
+                                    child: const Text('Borrar Todo'),
+                                  ),
+                                ],
+                              )
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(foregroundColor: AppColors.accentDanger),
+                          child: const Text('BORRAR ABSOLUTAMENTE TODO'),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 15),
-                    
-                    if (_procesando)
-                      const Center(child: CircularProgressIndicator())
-                    else
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ElevatedButton(
-                            onPressed: _generarDatos,
-                            child: const Text('GENERAR DATOS DE PRUEBA'),
-                          ),
-                          const SizedBox(height: 10),
-                          OutlinedButton(
-                            onPressed: _borrarSoloPruebas,
-                            child: const Text('BORRAR SOLO DATOS DE PRUEBA'),
-                          ),
-                          const SizedBox(height: 10),
-                          OutlinedButton(
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('⚠️ ¿BORRAR TODO?'),
-                                  content: const Text('Se eliminarán tus entrenamientos REALES. No se puede deshacer.'),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                      onPressed: () { Navigator.pop(ctx); _borrarTodo(); }, 
-                                      child: const Text('Borrar Todo')
-                                    ),
-                                  ],
-                                )
-                              );
-                            },
-                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text('BORRAR ABSOLUTAMENTE TODO'),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ], // Fin del bloque if (kDebugMode)
-
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

@@ -1,11 +1,11 @@
 {
-    "name": "tiro_amg",
-    "short_name": "tiro_amg",
+    "name": "TiroAMG",
+    "short_name": "TiroAMG",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Tiro deportivo · entrenamientos y competiciones",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

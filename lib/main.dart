@@ -1,9 +1,10 @@
-import 'dart:io'; 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'screens/home_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   // 1. Inicializar bindings de Flutter
@@ -58,11 +59,8 @@ class _TiroTrackerAppState extends State<TiroTrackerApp>
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Tiro Deportivo AMG', 
-      theme: ThemeData(
-        primarySwatch: Colors.blueGrey,
-        useMaterial3: true,
-      ),
+      title: 'TiroAMG', 
+      theme: buildTiroAmgTheme(),
       // --- CONFIGURACIÓN DE IDIOMA (¡NUEVO!) ---
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

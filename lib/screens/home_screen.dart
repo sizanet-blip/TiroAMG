@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 // Importamos las pantallas de destino
 import 'competicion_screen.dart';
@@ -7,13 +5,17 @@ import 'entrenamiento_screen.dart';
 import 'historial_screen.dart';
 import 'backup_screen.dart';
 import 'config_screen.dart';
+import 'ayuda_screen.dart';
 import 'recorte_diana_screen.dart';
-import 'package:flutter/foundation.dart'; // <--- Agrega esto para usar kDebugMode
 import 'package:package_info_plus/package_info_plus.dart';
 import '../services/app_update_service.dart';
 import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
+import '../theme/app_theme.dart';
+import '../utils/app_exit.dart';
+import '../widgets/app_ui.dart';
+import '../widgets/identificar_instalacion_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,8 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final LicensePermissionsService _permissions = const LicensePermissionsService();
   final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
   bool _updateDialogShown = false;
-  bool _licenseDialogShown = false;
+  bool _identificacionLista = false;
   LicenciaLocal? _licenciaActual;
+
+  bool get _puedeUsarApp => _licenciaActual?.puedeUsarApp == true;
 
   @override
   void initState() {
@@ -38,45 +42,61 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _runStartupChecks() async {
-    final ok = await _checkLicenseOnStart();
-    if (!ok || !mounted) return;
-    await _checkUpdatesOnStart();
+    // Ficha local primero (rápido). La red va en segundo plano.
+    try {
+      final quick = await _licenseService
+          .revisarLicencia(forzarServidor: false)
+          .timeout(const Duration(seconds: 4));
+      if (!mounted) return;
+      _actualizarLicencia(quick.licencia);
+      if (_puedeUsarApp) {
+        setState(() => _identificacionLista = true);
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+    // ignore: unawaited_futures
+    _syncInstallationInBackground();
+
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+    try {
+      await _maybeShowIdentifyPrompt();
+    } catch (_) {}
+
+    if (!mounted) return;
+    try {
+      await _checkUpdatesOnStart();
+    } catch (_) {}
   }
 
-  Future<bool> _checkLicenseOnStart() async {
-    if (!mounted) return false;
-
-    final initialResult = await _licenseService.revisarLicencia();
-    if (!mounted) return false;
-
-    if (initialResult.esValida) {
-      _actualizarLicencia(initialResult.licencia);
-      if (initialResult.enGraciaOffline) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(initialResult.mensaje)),
-        );
+  Future<void> _syncInstallationInBackground() async {
+    try {
+      final result = await _licenseService
+          .revisarLicencia(forzarServidor: true)
+          .timeout(const Duration(seconds: 12));
+      if (!mounted) return;
+      if (result.licencia != null) {
+        _actualizarLicencia(result.licencia);
       }
-      return true;
-    }
+    } catch (_) {}
+  }
 
-    if (_licenseDialogShown) return false;
-    _licenseDialogShown = true;
-    await _showLicenseDialog(initialResult.mensaje);
-    _licenseDialogShown = false;
-
-    final retryResult = await _licenseService.revisarLicencia(forzarServidor: true);
-    if (!mounted) return false;
-    if (retryResult.esValida) {
-      _actualizarLicencia(retryResult.licencia);
-      return true;
+  Future<void> _maybeShowIdentifyPrompt() async {
+    final show = await _licenseService.shouldShowIdentifyPrompt();
+    if (!mounted) return;
+    if (!show) {
+      setState(() => _identificacionLista = true);
+      return;
     }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(retryResult.mensaje)),
-      );
+    final ok = await _showIdentifyDialog();
+    if (!mounted) return;
+    if (ok) {
+      setState(() => _identificacionLista = true);
+      return;
     }
-    return false;
+    // Sin aceptar privacidad y condiciones no se usa la app.
+    exitApp();
   }
 
   void _actualizarLicencia(LicenciaLocal? licencia) {
@@ -93,62 +113,49 @@ class _HomeScreenState extends State<HomeScreen> {
   }) async {
     final permitidoLocal = _permissions.canAccess(_licenciaActual, capability);
     if (!permitidoLocal) {
-      await _mostrarDialogoUpgrade(capability: capability);
+      await _mostrarDialogoModuloBloqueado(capability: capability);
       return;
     }
 
-    final serverResult = await _licenseService.verificarCapacidadServidor(
-      licencia: _licenciaActual,
-      capability: _permissions.toServerCapability(capability),
-    );
-
-    // known=true: respuesta autoritativa del servidor.
-    if (serverResult.known && !serverResult.allowed) {
-      if (!mounted) return;
-      await _mostrarDialogoUpgrade(
-        capability: capability,
-        detalleServidor: serverResult.message,
+    // Solo revalidamos en servidor la detección automática.
+    if (capability == LicenseCapability.targetDetection) {
+      final serverResult = await _licenseService.verificarCapacidadServidor(
+        licencia: _licenciaActual,
+        capability: _permissions.toServerCapability(capability),
       );
-      return;
+      if (serverResult.known && !serverResult.allowed) {
+        if (!mounted) return;
+        await _mostrarDialogoModuloBloqueado(
+          capability: capability,
+          detalleServidor: serverResult.message,
+        );
+        return;
+      }
     }
 
     onAllowed();
   }
 
-  Future<void> _mostrarDialogoUpgrade({
+  Future<void> _mostrarDialogoModuloBloqueado({
     required LicenseCapability capability,
     String? detalleServidor,
   }) async {
     if (!mounted) return;
-    final planNecesario = _permissions.requiredPlanLabel(capability);
-    final planActual = _permissions.currentPlanLabel(_licenciaActual?.plan);
+    final requerido = _permissions.requiredModuleLabel(capability);
+    final actual = _permissions.currentModulesLabel(_licenciaActual);
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Función bloqueada por licencia'),
+        title: const Text('Módulo no disponible'),
         content: Text(
           detalleServidor?.trim().isNotEmpty == true
-              ? '$detalleServidor\n\nTu plan actual: $planActual.\nPlan requerido: $planNecesario o superior.'
-              : 'Tu plan actual es $planActual.\nEsta opción requiere plan $planNecesario o superior.',
+              ? '$detalleServidor\n\nMódulos actuales: $actual.\nNecesitas: $requerido.'
+              : 'Esta opción requiere el módulo «$requerido».\n'
+                  'Módulos actuales: $actual.\n\n'
+                  'Se activa desde el panel web de instalaciones.',
         ),
         actions: [
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final result = await _licenseService.solicitarUpgrade(
-                licencia: _licenciaActual,
-                capability: _permissions.toServerCapability(capability),
-                requiredPlan: planNecesario,
-                currentPlan: planActual,
-              );
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(result.message)),
-              );
-            },
-            child: const Text('Solicitar mejora de plan'),
-          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Entendido'),
@@ -225,251 +232,237 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showLicenseDialog(String initialMessage) async {
-    final userController = TextEditingController();
-    String mensaje = initialMessage;
-    bool cargando = false;
-
-    if (!mounted) {
-      return;
-    }
-
-    await showDialog<void>(
+  Future<bool> _showIdentifyDialog() async {
+    if (!mounted) return false;
+    final ok = await showIdentificarInstalacionDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setStateDialog) {
-            return AlertDialog(
-              title: const Text('Activar cuenta'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(mensaje),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: userController,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                FilledButton(
-                  onPressed: cargando
-                      ? null
-                      : () async {
-                          final email = userController.text.trim();
-                          if (!_emailRegex.hasMatch(email)) {
-                            setStateDialog(() {
-                              mensaje =
-                                  'Introduce un email válido para activar tu cuenta.';
-                            });
-                            return;
-                          }
-                          setStateDialog(() => cargando = true);
-                          final res = await _licenseService.solicitarLicenciaAutomatica(
-                            identificadorUsuario: email,
-                            nombreApp: 'Tiro Deportivo AMG',
-                          );
-                          if (!ctx.mounted) return;
-                          setStateDialog(() {
-                            cargando = false;
-                            mensaje = res.mensaje;
-                          });
-                          if (res.esValida) {
-                            Navigator.of(ctx).pop();
-                          }
-                        },
-                  child: const Text('Activar'),
-                ),
-                if (!kIsWeb)
-                  TextButton(
-                    onPressed: cargando
-                        ? null
-                        : () {
-                            exit(0);
-                          },
-                    child: const Text('Salir'),
-                  ),
-              ],
-            );
-          },
-        );
-      },
+      licenseService: _licenseService,
+      emailInicial: _licenciaActual?.contactEmail,
+      permitirOmitir: false,
+      salirAlCancelar: true,
+      emailOpcional: true,
+      privacidadYaAceptada: _licenciaActual?.privacyAccepted == true,
+      condicionesYaAceptadas: _licenciaActual?.termsAccepted == true,
+      emailRegex: _emailRegex,
     );
-
+    if (!ok || !mounted) return false;
+    final quick = await _licenseService.revisarLicencia(forzarServidor: false);
+    if (!mounted) return false;
+    _actualizarLicencia(quick.licencia);
+    return _licenciaActual?.puedeUsarApp == true;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Tiro Deportivo AMG'),
-        backgroundColor: Colors.blueGrey,
-        centerTitle: true,
-        elevation: 0,
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              // --- LOGO ---
-              const Padding(
-                padding: EdgeInsets.only(bottom: 40.0),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.adjust,
-                      size: 100,
-                      color: Colors.blueGrey,
-                    ),
-                    SizedBox(height: 15),
-                    Text(
-                      'Registro de Tiro',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueGrey),
-                    ),
-                  ],
-                ),
-              ),
-              if (_licenciaActual != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Center(
-                    child: Chip(
-                      avatar: const Icon(Icons.verified, size: 18),
-                      label: Text(
-                        'Plan: ${_permissions.currentPlanLabel(_licenciaActual?.plan)}',
-                      ),
+    if (!_identificacionLista || !_puedeUsarApp) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildBrandHeader(),
+                  const SizedBox(height: 28),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Esperando aceptación de privacidad y condiciones…',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.subtitle,
                     ),
                   ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final items = <_HomeMenuItem>[
+      if (_permissions.canAccess(
+          _licenciaActual, LicenseCapability.targetDetection))
+        _HomeMenuItem(
+          title: 'Recorte Diana',
+          subtitle: 'Análisis fotográfico de impactos',
+          icon: Icons.camera_alt_outlined,
+          color: Colors.deepOrange,
+          onTap: () => _abrirSiPermitido(
+            context: context,
+            capability: LicenseCapability.targetDetection,
+            onAllowed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RecorteDianaScreen()),
+            ),
+          ),
+        ),
+      _HomeMenuItem(
+        title: 'Competición',
+        subtitle: 'Modalidades y fases oficiales',
+        icon: Icons.emoji_events_outlined,
+        color: const Color(0xFFC79100),
+        onTap: () => _abrirSiPermitido(
+          context: context,
+          capability: LicenseCapability.competition,
+          onAllowed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CompeticionScreen()),
+          ),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Entrenamiento',
+        subtitle: 'Series, tiempos y avisos de tiro',
+        icon: Icons.gps_fixed,
+        color: Colors.teal.shade700,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const EntrenamientoScreen()),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Historial y Análisis',
+        subtitle: 'Sesiones, estadísticas e informes',
+        icon: Icons.insights_outlined,
+        color: Colors.indigo.shade600,
+        onTap: () => _abrirSiPermitido(
+          context: context,
+          capability: LicenseCapability.analytics,
+          onAllowed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const HistorialScreen()),
+          ),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Copia de Seguridad',
+        subtitle: 'Exportar e importar datos',
+        icon: Icons.cloud_sync_outlined,
+        color: Colors.blueGrey.shade600,
+        onTap: () => _abrirSiPermitido(
+          context: context,
+          capability: LicenseCapability.backup,
+          onAllowed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const BackupScreen()),
+          ),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Configuración',
+        subtitle: 'Equipos, plantillas y preferencias',
+        icon: Icons.settings_outlined,
+        color: Colors.blueGrey.shade800,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ConfigScreen()),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Ayuda',
+        subtitle: 'Guía, manual y preguntas frecuentes',
+        icon: Icons.help_outline,
+        color: Colors.blueGrey.shade500,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AyudaScreen()),
+        ),
+      ),
+    ];
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+              children: [
+                _buildBrandHeader(),
+                const SizedBox(height: 28),
+                AppNavGroup(
+                  children: [
+                    for (final item in items)
+                      AppNavTile(
+                        title: item.title,
+                        subtitle: item.subtitle,
+                        icon: item.icon,
+                        color: item.color,
+                        onTap: item.onTap,
+                      ),
+                  ],
                 ),
-
-              // --- BOTONES DEL MENÚ ---
-              if (kDebugMode) ...[
-                // ** NUEVA OPCIÓN DE PRUEBAS (PRIMERA) **
-                _buildMenuItem(
-                    context,
-                    'Recorte Diana (Pruebas)',
-                    Icons.camera_alt,
-                    Colors.deepOrange,
-                    () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const RecorteDianaScreen()))),
               ],
-              _buildMenuItem(
-                  context,
-                  'Competición',
-                  Icons.emoji_events,
-                  Colors.amber[700]!,
-                  () => _abrirSiPermitido(
-                        context: context,
-                        capability: LicenseCapability.competition,
-                        onAllowed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const CompeticionScreen()),
-                        ),
-                      )),
-
-              _buildMenuItem(
-                  context,
-                  'Entrenamiento',
-                  Icons.sports_baseball,
-                  Colors.teal,
-                  () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const EntrenamientoScreen()))),
-
-              _buildMenuItem(
-                  context,
-                  'Historial y Análisis',
-                  Icons.analytics,
-                  Colors.indigo,
-                  () => _abrirSiPermitido(
-                        context: context,
-                        capability: LicenseCapability.analytics,
-                        onAllowed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const HistorialScreen()),
-                        ),
-                      )),
-
-              _buildMenuItem(
-                  context,
-                  'Copia de Seguridad',
-                  Icons.cloud_sync,
-                  Colors.blueGrey,
-                  () => _abrirSiPermitido(
-                        context: context,
-                        capability: LicenseCapability.backup,
-                        onAllowed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const BackupScreen()),
-                        ),
-                      )),
-
-              _buildMenuItem(
-                  context,
-                  'Configuración',
-                  Icons.settings,
-                  Colors.grey[700]!,
-                  () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ConfigScreen()))),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildMenuItem(BuildContext context, String title, IconData icon,
-      Color color, VoidCallback onTap) {
-    return Card(
-      elevation: 4,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        splashColor: color.withValues(alpha: 0.1),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: <Widget>[
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    shape: BoxShape.circle),
-                child: Icon(icon, size: 28, color: color),
+  Widget _buildBrandHeader() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                'assets/logo.png',
+                width: 64,
+                height: 64,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.high,
               ),
-              const SizedBox(width: 20),
-              Expanded(
-                // Aquí quitamos la necesidad de que el título contenga la numeración
-                child: Text(title,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(width: 14),
+            Text(
+              'TiroAMG',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+                height: 1,
+                color: Colors.blueGrey.shade800,
               ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Tiro deportivo · entrenamientos y competiciones',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.35,
+            fontWeight: FontWeight.w500,
+            color: AppColors.subtitle,
           ),
         ),
-      ),
+      ],
     );
   }
+}
+
+class _HomeMenuItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _HomeMenuItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 }

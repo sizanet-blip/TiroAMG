@@ -8,6 +8,7 @@ import '../services/pdf_service.dart';
 import '../services/perfil_service.dart'; 
 import '../services/equipo_service.dart';
 import '../services/municion_service.dart';
+import '../theme/app_theme.dart';
 import 'sesion_detalle_screen.dart';
 import 'estadisticas_screen.dart'; // <--- NUEVO IMPORT
 
@@ -279,10 +280,9 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-              ElevatedButton.icon(
+              FilledButton.icon(
                 icon: const Icon(Icons.save),
                 label: const Text('GUARDAR CAMBIOS'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                 onPressed: () async {
                   Navigator.pop(ctx);
                   await _guardarCambiosEnBD(
@@ -402,10 +402,9 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Detalle Competición'),
-        backgroundColor: Colors.amber[800],
         actions: [
           // BOTÓN ESTADÍSTICAS (¡NUEVO!)
           IconButton(
@@ -420,57 +419,72 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
       body: Column(
         children: [
           Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             padding: const EdgeInsets.all(16),
-            color: Colors.white,
             width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                     Expanded(child: Text(widget.nombreTorneo, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueGrey))),
+                     Expanded(child: Text(widget.nombreTorneo, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.title))),
                      Container(
                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                       decoration: BoxDecoration(color: Colors.amber[100], borderRadius: BorderRadius.circular(20)),
-                       child: Text('${widget.totalPuntos} pts', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[900])),
+                       decoration: BoxDecoration(
+                         color: AppColors.accentCompetition.withValues(alpha: 0.15),
+                         borderRadius: BorderRadius.circular(20),
+                       ),
+                       child: Text('${widget.totalPuntos} pts', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accentCompetition)),
                      )
                   ]
                 ),
                 const SizedBox(height: 10),
                 Row(children: [
-                    const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                    Icon(Icons.calendar_today, size: 14, color: AppColors.subtitle),
                     const SizedBox(width: 5),
-                    Text("${widget.fecha.day}/${widget.fecha.month}/${widget.fecha.year}", style: const TextStyle(color: Colors.black87)),
+                    Text("${widget.fecha.day}/${widget.fecha.month}/${widget.fecha.year}", style: TextStyle(color: AppColors.title)),
                 ]),
                 const SizedBox(height: 5),
                 Row(children: [
-                    const Icon(Icons.hardware, size: 14, color: Colors.grey),
+                    Icon(Icons.hardware, size: 14, color: AppColors.subtitle),
                     const SizedBox(width: 5),
-                    Text(_equipoUsado?.nombre ?? "Arma no especificada", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500)),
+                    Text(_equipoUsado?.nombre ?? "Arma no especificada", style: TextStyle(color: AppColors.title, fontWeight: FontWeight.w500)),
                 ]),
                 if (_municionUsada != null) ...[
                     const SizedBox(height: 5),
                     Row(children: [
-                        const Icon(Icons.local_fire_department, size: 14, color: Colors.grey),
+                        Icon(Icons.local_fire_department, size: 14, color: AppColors.subtitle),
                         const SizedBox(width: 5),
-                        Text('${_municionUsada!.marca} (${_municionUsada!.lote})', style: const TextStyle(color: Colors.black87)),
+                        Text('${_municionUsada!.marca} (${_municionUsada!.lote})', style: TextStyle(color: AppColors.title)),
                     ]),
                 ],
                 if (_lugarGuardado.isNotEmpty) ...[
                     const SizedBox(height: 5),
                     Row(children: [
-                        const Icon(Icons.place, size: 14, color: Colors.grey),
+                        Icon(Icons.place, size: 14, color: AppColors.subtitle),
                         const SizedBox(width: 5),
-                        Text(_lugarGuardado, style: const TextStyle(color: Colors.black87)),
+                        Text(_lugarGuardado, style: TextStyle(color: AppColors.title)),
                     ]),
                 ],
                 if (_distanciaMetros != null) ...[
                     const SizedBox(height: 5),
                     Row(children: [
-                        const Icon(Icons.straighten, size: 14, color: Colors.grey),
+                        Icon(Icons.straighten, size: 14, color: AppColors.subtitle),
                         const SizedBox(width: 5),
-                        Text('$_distanciaMetros m', style: const TextStyle(color: Colors.black87)),
+                        Text('$_distanciaMetros m', style: TextStyle(color: AppColors.title)),
                     ]),
                 ],
                 if (_temperaturaC != null || _humedadPct != null || _vientoMs != null) ...[
@@ -479,52 +493,57 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                       'Met: ${_temperaturaC?.toStringAsFixed(1) ?? '-'}°C | '
                       'Hum: ${_humedadPct?.toStringAsFixed(0) ?? '-'}% | '
                       'Viento: ${_vientoMs?.toStringAsFixed(1) ?? '-'} m/s ${_vientoDireccion ?? ''}',
-                      style: const TextStyle(color: Colors.black54),
+                      style: TextStyle(color: AppColors.subtitle),
                     ),
                 ],
                 if (_notasGuardadas.isNotEmpty) ...[
                     const SizedBox(height: 5),
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Icon(Icons.comment, size: 14, color: Colors.grey),
+                        Icon(Icons.comment, size: 14, color: AppColors.subtitle),
                         const SizedBox(width: 5),
-                        Expanded(child: Text(_notasGuardadas, style: const TextStyle(color: Colors.black87, fontStyle: FontStyle.italic))),
+                        Expanded(child: Text(_notasGuardadas, style: TextStyle(color: AppColors.title, fontStyle: FontStyle.italic))),
                     ]),
                 ]
               ],
             ),
           ),
           
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Align(alignment: Alignment.centerLeft, child: Text("Fases del Torneo", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text("Fases del Torneo", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.subtitle)),
+            ),
           ),
 
           Expanded(
             child: _cargando 
             ? const Center(child: CircularProgressIndicator())
-            : ListView.builder(
+            : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               itemCount: _fases.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final fase = _fases[index];
                 String descripcion = fase.nota?.split('|').last.trim() ?? "Serie ${index + 1}";
                 bool esEnsayo = fase.nota != null && fase.nota!.toLowerCase().contains('ensayo');
+                final accent = esEnsayo ? AppColors.accentCompetition : AppColors.accentTraining;
 
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                  color: esEnsayo ? Colors.orange[50] : Colors.white,
+                  color: esEnsayo ? AppColors.accentCompetition.withValues(alpha: 0.06) : AppColors.surface,
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: esEnsayo ? Colors.orange[200] : Colors.amber.withOpacity(0.2),
-                      child: Text('${index + 1}', style: TextStyle(color: Colors.amber[900], fontWeight: FontWeight.bold)),
+                      backgroundColor: accent.withValues(alpha: 0.15),
+                      child: Text('${index + 1}', style: TextStyle(color: accent, fontWeight: FontWeight.bold)),
                     ),
-                    title: Text(fase.nombreTitulo),
-                    subtitle: Text(descripcion + (esEnsayo ? " (No suma)" : "")),
+                    title: Text(fase.nombreTitulo, style: TextStyle(color: AppColors.title)),
+                    subtitle: Text(descripcion + (esEnsayo ? " (No suma)" : ""), style: TextStyle(color: AppColors.subtitle)),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('${fase.totalPuntos} pts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: esEnsayo ? Colors.grey : Colors.black)),
+                        Text('${fase.totalPuntos} pts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: esEnsayo ? AppColors.subtitle : AppColors.title)),
                         const SizedBox(width: 10),
-                        const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                        Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.chevron),
                       ],
                     ),
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SesionDetalleScreen(sesionId: fase.id))),

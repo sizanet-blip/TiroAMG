@@ -1,7 +1,7 @@
 name: tiro_deportivo_amg
-description: Aplicación integral para el registro, análisis y gestión de entrenamientos y competiciones de tiro deportivo (ISSF). Incluye simulador, estadísticas avanzadas y generación de informes.
+description: TiroAMG — Tiro deportivo · entrenamientos y competiciones (ISSF). Registro, análisis, simulador, estadísticas e informes.
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+5
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -46,6 +46,8 @@ dependencies:
   image_picker: ^1.2.1
   image: ^4.1.7
   flutter_tts: ^3.2.2
+  shared_preferences: ^2.5.5
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:
@@ -60,6 +62,9 @@ flutter:
   
   assets:
      - assets/logo.png
+     - assets/logo_wordmark.png
+     - assets/sounds/
+     - assets/help/
 
 # --- CONFIGURACIÓN DEL ICONO DE LA APP ---
 flutter_launcher_icons:

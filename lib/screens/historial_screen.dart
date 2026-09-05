@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/sesion_model.dart';
 import '../services/entrenamiento_service.dart';
+import '../theme/app_theme.dart';
 import 'sesion_detalle_screen.dart';
 import 'competicion_historial_detalle_screen.dart';
-// Asegúrate de que el nombre del archivo de estadísticas coincida con el que tienes
-import 'estadisticas_screen.dart'; 
+import 'estadisticas_screen.dart';
 
 class HistorialScreen extends StatefulWidget {
   const HistorialScreen({super.key});
@@ -111,10 +111,10 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
       initialDateRange: _rangoSeleccionado,
       builder: (context, child) {
         return Theme(
-          data: ThemeData.light().copyWith(
-            primaryColor: Colors.indigo,
-            colorScheme: const ColorScheme.light(primary: Colors.indigo),
-            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: AppColors.primary,
+            ),
           ),
           child: child!,
         );
@@ -145,8 +145,8 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
         content: const Text('¿Estás seguro? Se borrarán todos los datos asociados.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.accentDanger),
             onPressed: () async {
               Navigator.pop(ctx);
               if (esCompe) {
@@ -156,15 +156,13 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
               }
               _cargarDatos();
             },
-            child: const Text('Borrar', style: TextStyle(color: Colors.white)),
+            child: const Text('Borrar'),
           ),
         ],
       ),
     );
   }
 
-  String _formatoFecha(DateTime fecha) => "${fecha.day}/${fecha.month}/${fecha.year}";
-  
   String _formatoCorto(DateTime fecha) => "${fecha.day}/${fecha.month}";
   
   String _obtenerMes(int mes) {
@@ -175,10 +173,9 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Historial'),
-        backgroundColor: Colors.indigo,
         actions: [
           // Botón de Estadísticas contextual
           IconButton(
@@ -197,7 +194,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
           controller: _tabController,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
-          indicatorColor: Colors.amber,
+          indicatorColor: Colors.white,
           tabs: const [
             Tab(text: 'ENTRENAMIENTOS', icon: Icon(Icons.sports_baseball)),
             Tab(text: 'COMPETICIONES', icon: Icon(Icons.emoji_events)),
@@ -208,13 +205,13 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
         children: [
           // --- BARRA DE FILTROS ---
           Container(
-            color: Colors.white,
+            color: AppColors.surface,
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             child: Row(
               children: [
                 Icon(
                   _filtroSeleccionado == 5 ? Icons.date_range : Icons.filter_list, 
-                  color: Colors.indigo, 
+                  color: AppColors.primary, 
                   size: 24
                 ),
                 const SizedBox(width: 16),
@@ -222,9 +219,9 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                   child: DropdownButton<int>(
                     value: _filtroSeleccionado,
                     isExpanded: true,
-                    underline: Container(height: 2, color: Colors.indigo.withOpacity(0.2)),
-                    icon: const Icon(Icons.arrow_drop_down, color: Colors.indigo),
-                    style: const TextStyle(color: Colors.black87, fontSize: 16),
+                    underline: Container(height: 2, color: AppColors.border),
+                    icon: Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                    style: TextStyle(color: AppColors.title, fontSize: 16),
                     
                     onChanged: (int? newValue) {
                       if (newValue == 5) {
@@ -239,7 +236,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                     },
                     items: [
                       const DropdownMenuItem(value: 0, child: Text('Mostrar Todo')),
-                      const DropdownMenuItem(value: 1, child: Text('Hoy')), // ¡NUEVO!
+                      const DropdownMenuItem(value: 1, child: Text('Hoy')),
                       const DropdownMenuItem(value: 2, child: Text('Este Mes')),
                       const DropdownMenuItem(value: 3, child: Text('Últimos 3 Meses')),
                       const DropdownMenuItem(value: 4, child: Text('Este Año')),
@@ -277,6 +274,8 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
   }
 
   Widget _construirLista(List<SesionResumen> lista, bool esCompe) {
+    final accent = esCompe ? AppColors.accentCompetition : AppColors.accentTraining;
+
     if (lista.isEmpty) {
       return Center(
         child: Column(
@@ -285,29 +284,27 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
             Icon(
               esCompe ? Icons.emoji_events_outlined : Icons.sports_baseball_outlined, 
               size: 60, 
-              color: Colors.grey[300]
+              color: AppColors.subtitleSoft,
             ),
             const SizedBox(height: 10),
             Text(
               'No hay registros para este filtro', 
-              style: TextStyle(color: Colors.grey[400])
+              style: TextStyle(color: AppColors.subtitle),
             ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
       itemCount: lista.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final item = lista[index];
         return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadii.card),
             onTap: () {
                if (esCompe) {
                  Navigator.push(
@@ -335,14 +332,14 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: esCompe ? Colors.amber[50] : Colors.teal[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: esCompe ? Colors.amber.withOpacity(0.3) : Colors.teal.withOpacity(0.3))
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(AppRadii.iconBox),
+                      border: Border.all(color: accent.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       children: [
-                        Text("${item.fecha.day}", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: esCompe ? Colors.amber[900] : Colors.teal[900])),
-                        Text(_obtenerMes(item.fecha.month), style: TextStyle(fontSize: 12, color: esCompe ? Colors.amber[900] : Colors.teal[900])),
+                        Text("${item.fecha.day}", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: accent)),
+                        Text(_obtenerMes(item.fecha.month), style: TextStyle(fontSize: 12, color: accent)),
                       ],
                     ),
                   ),
@@ -353,20 +350,20 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item.nombreTitulo, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(item.nombreTitulo, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.title)),
                         const SizedBox(height: 4),
-                        Text(item.nombreEquipo, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                        Text(item.nombreEquipo, style: TextStyle(color: AppColors.subtitle, fontSize: 13)),
                         if (item.marcaMunicion != null && item.marcaMunicion!.isNotEmpty)
                           Text(
                             'Munición: ${item.marcaMunicion}${(item.loteMunicion != null && item.loteMunicion!.isNotEmpty) ? ' (${item.loteMunicion})' : ''}',
-                            style: const TextStyle(fontSize: 11, color: Colors.deepOrange),
+                            style: TextStyle(fontSize: 11, color: AppColors.subtitleSoft),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         if (!esCompe && item.nota != null) 
                            Text(
                              item.nota!.replaceAll('Torneo: ', ''), 
-                             style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.blueGrey),
+                             style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.subtitle),
                              maxLines: 1, overflow: TextOverflow.ellipsis
                            ),
                       ],
@@ -382,10 +379,10 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                         style: TextStyle(
                           fontSize: 24, 
                           fontWeight: FontWeight.bold, 
-                          color: esCompe ? Colors.amber[800] : Colors.teal[800]
+                          color: accent,
                         )
                       ),
-                      if (item.totalMoscas > 0) Text('${item.totalMoscas}x', style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.bold)),
+                      if (item.totalMoscas > 0) Text('${item.totalMoscas}x', style: TextStyle(fontSize: 12, color: AppColors.subtitle, fontWeight: FontWeight.bold)),
                     ],
                   )
                 ],

@@ -10,6 +10,7 @@ import '../models/equipo_model.dart';
 import '../models/tipo_diana_model.dart';
 import '../models/disparo_model.dart';
 import '../models/municion_model.dart';
+import '../theme/app_theme.dart';
 
 class EstadisticasScreen extends StatefulWidget {
   final int modo; 
@@ -32,10 +33,9 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   final _municionService = MunicionService();
   final _pdfService = PdfService(); 
 
-  // COLOR TEMÁTICO: AZUL
-  final Color _colorTema = Colors.blue;
-  final Color _colorTemaClaro = Colors.blue.shade100;
-  final Color _colorTemaOscuro = Colors.blue.shade900;
+  final Color _colorTema = AppColors.accentAnalytics;
+  final Color _colorTemaClaro = AppColors.accentAnalytics.withValues(alpha: 0.12);
+  final Color _colorTemaOscuro = AppColors.primary;
 
   List<EquipoDetalle> _equipos = [];
   List<TipoDiana> _dianas = [];
@@ -265,7 +265,23 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   }
 
   void _seleccionarFechasManuales() async {
-    final picked = await showDateRangePicker(context: context, locale: const Locale('es', 'ES'), firstDate: DateTime(2020), lastDate: DateTime.now(), initialDateRange: _rangoFechasManual, saveText: 'ACEPTAR', helpText: 'RANGO', cancelText: 'CANCELAR', confirmText: 'ACEPTAR', builder: (context, child) => Theme(data: ThemeData.light().copyWith(primaryColor: _colorTema, colorScheme: ColorScheme.light(primary: _colorTema)), child: child!));
+    final picked = await showDateRangePicker(
+      context: context,
+      locale: const Locale('es', 'ES'),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: _rangoFechasManual,
+      saveText: 'ACEPTAR',
+      helpText: 'RANGO',
+      cancelText: 'CANCELAR',
+      confirmText: 'ACEPTAR',
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(primary: AppColors.primary),
+        ),
+        child: child!,
+      ),
+    );
     if(picked!=null){ setState(() { _rangoFechasManual = picked; _filtroFechaSeleccionado = 5; }); _refrescarDatos(); } else { if (_filtroFechaSeleccionado==5 && _rangoFechasManual==null) { setState(()=>_filtroFechaSeleccionado=0); _refrescarDatos(); } }
   }
   String _formatoCorto(DateTime fecha) => "${fecha.day}/${fecha.month}";
@@ -275,9 +291,9 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     String titulo = _esModoDetalle ? 'Análisis de Sesión' : (widget.modo == 2 ? 'Análisis Competiciones' : 'Análisis Entrenamientos');
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(titulo), 
-        backgroundColor: _colorTema,
+        title: Text(titulo),
         actions: [
           IconButton(icon: const Icon(Icons.print), tooltip: "Imprimir PDF", onPressed: !_cargando ? _imprimirInforme : null)
         ],
@@ -287,14 +303,16 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
           if (!_esModoDetalle)
           Card(
             margin: EdgeInsets.zero,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(bottom: Radius.circular(15))),
-            elevation: 4,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(AppRadii.card)),
+              side: BorderSide(color: AppColors.border),
+            ),
             child: Column(
               children: [
                 ListTile(
                   leading: Icon(Icons.filter_alt, color: _colorTema),
-                  title: const Text("Filtros de Análisis", style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(_filtroFechaSeleccionado == 0 ? "Todo el historial" : "Filtros activos...", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  title: Text("Filtros de Análisis", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.title)),
+                  subtitle: Text(_filtroFechaSeleccionado == 0 ? "Todo el historial" : "Filtros activos...", style: TextStyle(fontSize: 12, color: AppColors.subtitle)),
                   trailing: Icon(_filtrosAbiertos ? Icons.expand_less : Icons.expand_more, color: _colorTema),
                   onTap: () => setState(() => _filtrosAbiertos = !_filtrosAbiertos),
                 ),
@@ -305,7 +323,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                       children: [
                         DropdownButtonFormField<int>(
                           isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Periodo', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
+                          decoration: const InputDecoration(labelText: 'Periodo', contentPadding: EdgeInsets.symmetric(horizontal: 10)),
                           value: _filtroFechaSeleccionado,
                           items: [const DropdownMenuItem(value: 0, child: Text('Todo')), const DropdownMenuItem(value: 1, child: Text('Hoy')), const DropdownMenuItem(value: 2, child: Text('Este Mes')), const DropdownMenuItem(value: 3, child: Text('Últimos 3 Meses')), const DropdownMenuItem(value: 4, child: Text('Este Año')), DropdownMenuItem(value: 5, child: Text(_filtroFechaSeleccionado == 5 && _rangoFechasManual != null ? '${_formatoCorto(_rangoFechasManual!.start)} - ${_formatoCorto(_rangoFechasManual!.end)}' : 'Personalizado...', overflow: TextOverflow.ellipsis))],
                           onChanged: (v) { if (v == 5) { _seleccionarFechasManuales(); } else { setState(() { _filtroFechaSeleccionado = v!; _refrescarDatos(); }); } },
@@ -313,7 +331,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                         const SizedBox(height: 10),
                         DropdownButtonFormField<EquipoDetalle>(
                           isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Arma', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
+                          decoration: const InputDecoration(labelText: 'Arma', contentPadding: EdgeInsets.symmetric(horizontal: 10)),
                           value: _equipoSel,
                           items: [const DropdownMenuItem(value: null, child: Text('Todas las armas')), ..._equipos.map((e) => DropdownMenuItem(value: e, child: Text(e.nombre, overflow: TextOverflow.ellipsis))).toList()],
                           onChanged: (v) => setState(() { _equipoSel = v; _refrescarDatos(); }),
@@ -321,7 +339,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                         const SizedBox(height: 10),
                         DropdownButtonFormField<MunicionDetalle>(
                           isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Munición', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
+                          decoration: const InputDecoration(labelText: 'Munición', contentPadding: EdgeInsets.symmetric(horizontal: 10)),
                           value: _municionSel,
                           items: [
                             const DropdownMenuItem(value: null, child: Text('Toda la munición')),
@@ -335,7 +353,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                         const SizedBox(height: 10),
                         DropdownButtonFormField<TipoDiana>(
                           isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Tipo de Diana', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
+                          decoration: const InputDecoration(labelText: 'Tipo de Diana', contentPadding: EdgeInsets.symmetric(horizontal: 10)),
                           value: _dianaSel,
                           items: _dianas.map((d) => DropdownMenuItem(value: d, child: Text(d.nombre, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) => setState(() { _dianaSel = v; _refrescarDatos(); }),
@@ -354,6 +372,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                 children: [
                   TabBar(
                     labelColor: _colorTema,
+                    unselectedLabelColor: AppColors.subtitle,
                     indicatorColor: _colorTema,
                     tabs: const [
                       Tab(text: 'AGRUPACIÓN', icon: Icon(Icons.gps_fixed)),
@@ -386,19 +405,19 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   }
 
   Widget _buildDiagnosticoTecnico() {
-    if (_diagnostico.isEmpty) return const Center(child: Text("No hay errores suficientes.", style: TextStyle(color: Colors.grey)));
+    if (_diagnostico.isEmpty) return Center(child: Text("No hay errores suficientes.", style: TextStyle(color: AppColors.subtitle)));
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Text("Diestro"), Switch(value: _soyZurdo, onChanged: (v) { setState(() => _soyZurdo = v); _refrescarDatos(); }, activeColor: _colorTema), const Text("Zurdo")]),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text("Diestro", style: TextStyle(color: AppColors.title)), Switch(value: _soyZurdo, onChanged: (v) { setState(() => _soyZurdo = v); _refrescarDatos(); }, activeColor: _colorTema), Text("Zurdo", style: TextStyle(color: AppColors.title))]),
           const SizedBox(height: 10),
           SizedBox(height: 200, child: PieChart(PieChartData(sections: _generarSeccionesPastel(), centerSpaceRadius: 40, sectionsSpace: 2))),
           const SizedBox(height: 20),
-          const Text("Errores más frecuentes", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text("Errores más frecuentes", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.title)),
           const SizedBox(height: 10),
-          ..._diagnostico.map((diag) => Card(margin: const EdgeInsets.only(bottom: 8), child: Padding(padding: const EdgeInsets.all(12.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [CircleAvatar(backgroundColor: _colorTemaClaro, radius: 18, child: Text("${diag.porcentaje.round()}%", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _colorTemaOscuro))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(diag.nombreError, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), Text("${diag.cantidad} disparos detectados", style: const TextStyle(color: Colors.grey, fontSize: 12))]))]),
+          ..._diagnostico.map((diag) => Card(margin: const EdgeInsets.only(bottom: 10), child: Padding(padding: const EdgeInsets.all(12.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [CircleAvatar(backgroundColor: _colorTemaClaro, radius: 18, child: Text("${diag.porcentaje.round()}%", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _colorTemaOscuro))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(diag.nombreError, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.title)), Text("${diag.cantidad} disparos detectados", style: TextStyle(color: AppColors.subtitle, fontSize: 12))]))]),
                   if (diag.detalles.isNotEmpty) ...[
                     const SizedBox(height: 10), 
                     const Divider(height: 1), 
@@ -411,11 +430,11 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                         Color colorTxt;
                         if (detalle.puntuacion < 7) { colorBg = Colors.red[50]!; colorTxt = Colors.red[900]!; } 
                         else if (detalle.puntuacion < 9) { colorBg = Colors.orange[50]!; colorTxt = Colors.orange[900]!; } 
-                        else { colorBg = Colors.blueGrey[50]!; colorTxt = Colors.blueGrey[900]!; } 
+                        else { colorBg = AppColors.primary.withValues(alpha: 0.08); colorTxt = AppColors.title; } 
 
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
-                          decoration: BoxDecoration(color: colorBg, borderRadius: BorderRadius.circular(10), border: Border.all(color: colorTxt.withOpacity(0.3))), 
+                          decoration: BoxDecoration(color: colorBg, borderRadius: BorderRadius.circular(10), border: Border.all(color: colorTxt.withValues(alpha: 0.3))), 
                           child: Text(detalle.etiqueta, style: TextStyle(fontSize: 11, color: colorTxt, fontWeight: FontWeight.bold))
                         );
                       }).toList()
@@ -475,7 +494,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     int numDescartes = _analisis!.disparosDescartados.length;
 
     return SingleChildScrollView(child: Column(children: [
-          Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: colorConsejo.withOpacity(0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: colorConsejo)), child: Column(children: [
+          Container(margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: colorConsejo.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(AppRadii.card), border: Border.all(color: colorConsejo)), child: Column(children: [
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(iconoConsejo, color: colorConsejo), const SizedBox(width: 10), Expanded(child: Text(consejo, style: TextStyle(fontWeight: FontWeight.bold, color: colorConsejo, fontSize: 16)))]), 
             
             // --- AQUI ESTA EL CAMBIO DE "TENDENCIA" EN PANTALLA ---
@@ -551,7 +570,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _resumenMunicion.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final r = _resumenMunicion[index];
         final titulo = (r.idMunicion == null) ? 'Sin munición asociada' : '${r.marca} (${r.lote})';
@@ -559,15 +578,15 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: _colorTemaClaro,
-              child: const Icon(Icons.local_fire_department, color: Colors.deepOrange),
+              child: Icon(Icons.local_fire_department, color: AppColors.accentCompetition),
             ),
-            title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('Sesiones: ${r.sesiones} | Disparos: ${r.disparos} | Puntos: ${r.totalPuntos.toStringAsFixed(0)}'),
+            title: Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.title)),
+            subtitle: Text('Sesiones: ${r.sesiones} | Disparos: ${r.disparos} | Puntos: ${r.totalPuntos.toStringAsFixed(0)}', style: TextStyle(color: AppColors.subtitle)),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text('Media', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                Text('Media', style: TextStyle(fontSize: 11, color: AppColors.subtitle)),
                 Text(r.media.toStringAsFixed(2), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _colorTemaOscuro)),
               ],
             ),
@@ -594,15 +613,14 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       itemBuilder: (context, index) {
         final c = _comparativoLotes[index];
         return Card(
-          elevation: 2,
           child: Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(c.modalidad, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(c.modalidad, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.title)),
                 const SizedBox(height: 4),
-                Text('Temp: ${c.rangoTemperatura} | Viento: ${c.rangoViento}', style: const TextStyle(color: Colors.grey)),
+                Text('Temp: ${c.rangoTemperatura} | Viento: ${c.rangoViento}', style: TextStyle(color: AppColors.subtitle)),
                 const Divider(),
                 Row(
                   children: [
@@ -610,14 +628,14 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green.withOpacity(0.3)),
+                          color: AppColors.accentTraining.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(AppRadii.iconBox),
+                          border: Border.all(color: AppColors.accentTraining.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('MEJOR LOTE', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                            Text('MEJOR LOTE', style: TextStyle(color: AppColors.accentTraining, fontWeight: FontWeight.bold)),
                             Text('${c.mejor.marca} (${c.mejor.lote})'),
                             Text('Media: ${c.mejor.media.toStringAsFixed(2)} | Disparos: ${c.mejor.disparos}', style: const TextStyle(fontSize: 12)),
                           ],
@@ -629,14 +647,14 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                          color: AppColors.accentDanger.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(AppRadii.iconBox),
+                          border: Border.all(color: AppColors.accentDanger.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('PEOR LOTE', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                            Text('PEOR LOTE', style: TextStyle(color: AppColors.accentDanger, fontWeight: FontWeight.bold)),
                             Text('${c.peor.marca} (${c.peor.lote})'),
                             Text('Media: ${c.peor.media.toStringAsFixed(2)} | Disparos: ${c.peor.disparos}', style: const TextStyle(fontSize: 12)),
                           ],
@@ -649,7 +667,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                 Text(
                   'Diferencia: ${c.diferencia.toStringAsFixed(2)} pts/disparo',
                   style: TextStyle(
-                    color: c.diferencia >= 0 ? Colors.blueGrey : Colors.red,
+                    color: c.diferencia >= 0 ? AppColors.primary : AppColors.accentDanger,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

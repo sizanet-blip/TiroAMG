@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/plantilla_tiempos_model.dart';
 import '../services/plantilla_tiempos_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 import 'plantilla_tiempos_form_screen.dart'; // Importaremos el formulario aquí
 
 class GestionTiemposScreen extends StatefulWidget {
@@ -39,21 +41,23 @@ class _GestionTiemposScreenState extends State<GestionTiemposScreen> {
   void _confirmarBorrado(PlantillaTiempos item) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar borrado'),
-        content: Text('¿Eliminar la plantilla "${item.nombreDisciplina}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _service.borrar(item.id!);
-              _cargarDatos();
-            },
-            child: const Text('Borrar', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+      builder: (ctx) => AppDialog(
+        title: 'Eliminar plantilla',
+        icon: Icons.delete_outline,
+        iconColor: AppColors.accentDanger,
+        content: Text(
+          '¿Borrar «${item.nombreDisciplina}»? Esta acción no se puede deshacer.',
+        ),
+        actions: appDialogActions(
+          context: ctx,
+          confirmLabel: 'Borrar',
+          danger: true,
+          onConfirm: () async {
+            Navigator.pop(ctx);
+            await _service.borrar(item.id!);
+            _cargarDatos();
+          },
+        ),
       ),
     );
   }
@@ -61,48 +65,84 @@ class _GestionTiemposScreenState extends State<GestionTiemposScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Plantillas de Tiempos'), backgroundColor: Colors.indigo),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('Plantillas de Tiempos')),
       body: _lista.isEmpty
-          ? const Center(child: Text('No hay plantillas creadas', style: TextStyle(color: Colors.grey)))
-          : ListView.builder(
-              itemCount: _lista.length,
-              itemBuilder: (context, index) {
-                final item = _lista[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: ListTile(
-                    // Icono diferente según el modo (Duelo o Fijo)
-                    leading: CircleAvatar(
-                      backgroundColor: item.esDuel ? Colors.orange.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
-                      child: Icon(
-                        item.esDuel ? Icons.timer : Icons.ads_click, // Icono visual
-                        color: item.esDuel ? Colors.deepOrange : Colors.blue,
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  'No hay plantillas creadas',
+                  style: TextStyle(color: AppColors.subtitle),
+                ),
+              ),
+            )
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                  itemCount: _lista.length,
+                  itemBuilder: (context, index) {
+                    final item = _lista[index];
+                    final accent = item.esDuel
+                        ? AppColors.accentCompetition
+                        : AppColors.accentAnalytics;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        // Icono diferente según el modo (Duelo o Fijo)
+                        leading: CircleAvatar(
+                          backgroundColor: accent.withValues(alpha: 0.12),
+                          child: Icon(
+                            item.esDuel ? Icons.timer : Icons.ads_click,
+                            color: accent,
+                          ),
+                        ),
+                        title: Text(
+                          item.nombreDisciplina,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.title,
+                          ),
+                        ),
+                        onLongPress: () => _confirmarBorrado(item),
+                        subtitle: Text(
+                          item.esDuel
+                              ? '${item.seriesPorSesion} series de ${item.disparosPorSerie} tiros (3s/7s)'
+                              : '${item.seriesPorSesion} series en ${item.tiempoExposicion} seg',
+                          style: TextStyle(color: AppColors.subtitleSoft),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.edit,
+                                color: AppColors.accentAnalytics,
+                              ),
+                              onPressed: () => _abrirFormulario(item.id),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: AppColors.accentDanger,
+                              ),
+                              onPressed: () => _confirmarBorrado(item),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    title: Text(item.nombreDisciplina, style: const TextStyle(fontWeight: FontWeight.bold)),
-
-                    onLongPress: () => _confirmarBorrado(item),
-
-                    subtitle: Text(
-                      item.esDuel
-                          ? '${item.seriesPorSesion} series de ${item.disparosPorSerie} tiros (3s/7s)'
-                          : '${item.seriesPorSesion} series en ${item.tiempoExposicion} seg',
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(icon: const Icon(Icons.edit, color: Colors.indigo), onPressed: () => _abrirFormulario(item.id)),
-                        IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _confirmarBorrado(item)),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.indigo,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         onPressed: () => _abrirFormulario(),
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add),
       ),
     );
   }

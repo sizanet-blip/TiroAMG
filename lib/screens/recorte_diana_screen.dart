@@ -1837,6 +1837,18 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
         builder: (context, constraints) {
           return Column(
             children: [
+              Material(
+                color: Colors.orange.shade50,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(
+                    'Aviso: la detección automática puede fallar. Revisa siempre el resultado. '
+                    'La app se ofrece sin garantía; uso bajo tu responsabilidad.',
+                    style: TextStyle(fontSize: 12.5, height: 1.3),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
               // Botones de selección
               Padding(
                 padding: const EdgeInsets.all(16.0),

@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "tiro_amg" "\0"
+            VALUE "CompanyName", "es.albertomaestre" "\0"
+            VALUE "FileDescription", "TiroAMG" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "tiro_amg" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
+            VALUE "InternalName", "TiroAMG" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 es.albertomaestre. All rights reserved." "\0"
             VALUE "OriginalFilename", "tiro_amg.exe" "\0"
-            VALUE "ProductName", "tiro_amg" "\0"
+            VALUE "ProductName", "TiroAMG" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

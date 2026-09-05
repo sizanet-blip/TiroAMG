@@ -33,6 +33,49 @@ class LicenciaLocal {
 
   bool get estaActiva => estado.toLowerCase() == 'active';
 
+  /// Módulos del servidor/local (inicio, target_shot_detection, …).
+  Map<String, dynamic> get modules {
+    final raw = features['modules'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    // Compat: los flags van planos en features_json.
+    return features;
+  }
+
+  String? get contactEmail {
+    final v = features['contact_email']?.toString().trim();
+    if (v == null || v.isEmpty) return null;
+    return v;
+  }
+
+  bool get identifyNeverAsk => features['identify_never'] == true;
+
+  DateTime? get identifySnoozeUntil {
+    return DateTime.tryParse(features['identify_snooze_until']?.toString() ?? '')
+        ?.toUtc();
+  }
+
+  bool get hasInicioModule {
+    final v = _boolOf(modules, 'inicio');
+    // Sin dato = Inicio activo (default B+C).
+    return v ?? true;
+  }
+
+  bool get hasDeteccionAutomatica {
+    return _boolOf(modules, 'target_shot_detection') ?? false;
+  }
+
+  bool get isIdentified =>
+      contactEmail != null && contactEmail!.isNotEmpty;
+
+  bool get privacyAccepted => features['privacy_accepted'] == true;
+
+  bool get termsAccepted => features['terms_accepted'] == true;
+
+  /// Acceso a la app: privacidad + condiciones de uso.
+  /// El email de identificación es opcional.
+  bool get puedeUsarApp => privacyAccepted && termsAccepted;
+
   factory LicenciaLocal.fromMap(Map<String, dynamic> map) {
     final rawFeatures = map['features_json']?.toString();
     Map<String, dynamic> parsedFeatures = const {};
@@ -78,6 +121,44 @@ class LicenciaLocal {
       'max_dispositivos': maxDispositivos,
       'firma': firma,
     };
+  }
+
+  LicenciaLocal copyWithFeatures(Map<String, dynamic> nextFeatures) {
+    return LicenciaLocal(
+      id: id,
+      licenciaKey: licenciaKey,
+      estado: estado,
+      fechaInicio: fechaInicio,
+      fechaFin: fechaFin,
+      plan: plan,
+      features: nextFeatures,
+      deviceId: deviceId,
+      ultimaValidacion: ultimaValidacion,
+      proximaValidacion: proximaValidacion,
+      diasGraciaOffline: diasGraciaOffline,
+      maxDispositivos: maxDispositivos,
+      firma: firma,
+    );
+  }
+
+  static Map<String, dynamic> defaultModulesFeatures() => {
+        'inicio': true,
+        'target_shot_detection': false,
+      };
+
+  static bool? _boolOf(Map<String, dynamic> map, String key) {
+    if (!map.containsKey(key)) return null;
+    final value = map[key];
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final v = value.trim().toLowerCase();
+      if (v == 'true' || v == '1' || v == 'yes' || v == 'si' || v == 'sí') {
+        return true;
+      }
+      if (v == 'false' || v == '0' || v == 'no') return false;
+    }
+    return null;
   }
 
   static DateTime? _parseDate(dynamic raw) {

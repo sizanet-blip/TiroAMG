@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# NuGet CLI local (Windows / audioplayers)
+/tools/nuget.exe
