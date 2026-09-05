@@ -1,12 +1,14 @@
 import 'help_content.dart';
 
 /// Política de privacidad de TiroAMG (texto en la app).
-/// Borrador orientativo — no sustituye asesoramiento legal.
+/// Alineada con la política web en albertomaestre.es.
 abstract final class PrivacyContent {
-  static const String version = '1.0';
+  static const String version = '1.1';
   static const String responsable = 'Alberto Maestre Gutiérrez';
   static const String emailContacto = 'info@albertomaestre.es';
   static const String web = 'https://www.albertomaestre.es/';
+  static const String webPrivacidad =
+      'https://www.albertomaestre.es/pagina/politica-de-privacidad';
   static const String appName = 'TiroAMG';
 
   static const HelpDoc documento = HelpDoc(
@@ -20,99 +22,111 @@ abstract final class PrivacyContent {
           'El responsable del tratamiento de los datos personales es $responsable, persona física, en relación con la aplicación $appName.',
           'Contacto para ejercer derechos o consultas sobre privacidad: $emailContacto',
           'Sitio web: $web',
+          'Versión ampliada en la web: $webPrivacidad',
         ],
       ),
       HelpDocSection(
         title: '2. Ámbito y destinatarios',
         paragraphs: [
-          '$appName es una aplicación de apoyo al tiro deportivo (entrenamientos, competiciones, historial y gestión asociada).',
-          'El servicio se ofrece sin contraprestación económica por parte del responsable en el sentido de cobro al usuario final por el uso básico descrito.',
+          '$appName es una aplicación de apoyo al tiro deportivo (entrenamientos, competiciones, historial, catálogos y, si está habilitado, detección automática de impactos).',
+          'El uso básico se ofrece sin cobro al usuario final. Algunas funciones avanzadas se gestionan como módulos activables por el responsable (por ejemplo, detección automática), no mediante compra dentro de la app.',
           'La aplicación está dirigida exclusivamente a personas adultas (mayores de 18 años). No está pensada para menores de edad.',
         ],
       ),
       HelpDocSection(
-        title: '3. Datos que se tratan',
+        title: '3. Qué se envía al servidor',
         paragraphs: [
-          'Según el uso que hagas de la app y del registro de la instalación, pueden tratarse:',
+          'Al arrancar, la app puede registrar la instalación de forma silenciosa (sin email) para obtener licencia y módulos. Según el uso, el servidor puede tratar:',
         ],
         bullets: [
-          'Email de contacto asociado a la instalación.',
-          'Identificador técnico del dispositivo (device ID) y datos de plataforma (Android, Windows, etc.).',
-          'Versión de la aplicación y número de build.',
-          'Datos de perfil que introduzcas (nombre, licencia federativa, club, categoría, etc.).',
-          'Datos de uso deportivo guardados en el dispositivo (sesiones, puntuaciones, impactos, material, munición, condiciones, etc.).',
-          'Copias de seguridad que generes o restaures (archivo local que tú controlas al exportar/importar).',
-          'Registros técnicos necesarios para licencia, validación y soporte (p. ej. estado de módulos, fechas de sincronización).',
+          'Identificador técnico de instalación (device ID generado por la app; no es IMEI ni identificador publicitario).',
+          'Plataforma (Android, Windows, etc.), versión de la app y número de build.',
+          'Clave de licencia, estado y módulos habilitados (p. ej. Inicio, detección automática).',
+          'Email de contacto, solo si tú lo aportas después (opcional) para identificar la instalación o soporte.',
+          'Comprobaciones puntuales de capacidad/módulo y, si las solicitas, peticiones de mejora de módulos.',
         ],
       ),
       HelpDocSection(
-        title: '4. Finalidades',
+        title: '4. Qué se queda en tu dispositivo',
+        paragraphs: [
+          'Estos datos se guardan en local y no se envían al servidor de licencias para el control de instalaciones:',
+        ],
         bullets: [
-          'Identificar y registrar la instalación para licencia, módulos y soporte.',
-          'Prestar las funciones de la app (entrenamiento, competición, historial, avisos, etc.).',
-          'Generar informes o exportaciones que tú solicites.',
-          'Mantener la seguridad, integridad y actualización del servicio.',
-          'Atender solicitudes y comunicaciones relacionadas con el uso de $appName.',
+          'Perfil deportivo (nombre, licencia federativa, club, categoría, etc.).',
+          'Sesiones, disparos, puntuaciones, material, munición, fotos de diana y preferencias (p. ej. avisos de tiro).',
+          'Aceptación de esta política (versión y fecha), necesaria para usar la app.',
+          'Copias de seguridad que exportes o importes (tú eliges el destino del archivo).',
         ],
       ),
       HelpDocSection(
-        title: '5. Base jurídica',
+        title: '5. Finalidades',
+        bullets: [
+          'Registrar y validar la instalación (licencia y módulos).',
+          'Estimar el número de instalaciones/usuarios activos y prevenir abusos.',
+          'Prestar las funciones de la app en el dispositivo.',
+          'Atender soporte y solicitudes relacionadas con $appName.',
+          'Comprobar actualizaciones de la app (metadata de versión), sin enviar el historial deportivo.',
+        ],
+      ),
+      HelpDocSection(
+        title: '6. Base jurídica',
         paragraphs: [
           'El tratamiento se basa, según el caso, en:',
         ],
         bullets: [
-          'Ejecución de la relación de uso / medidas precontractuales o contractuales asociadas al registro y prestación del servicio (art. 6.1.b RGPD), cuando aportas email y datos necesarios para identificar la instalación.',
-          'Interés legítimo (art. 6.1.f RGPD) en la seguridad técnica, prevención de abusos y mejora del servicio, ponderado frente a tus derechos.',
-          'Consentimiento (art. 6.1.a RGPD) cuando marcas expresamente la aceptación de esta política al registrar la instalación.',
-          'Cumplimiento de obligaciones legales cuando proceda.',
+          'Ejecución del servicio / medidas asociadas al registro de instalación y prestación de la app (art. 6.1.b RGPD).',
+          'Interés legítimo (art. 6.1.f RGPD) en seguridad técnica, control de licencias/módulos y prevención de abusos.',
+          'Consentimiento (art. 6.1.a RGPD) cuando marcas la aceptación de esta política para poder usar la app.',
+          'Cuando aportas email, también la identificación voluntaria de la instalación para soporte o vinculación.',
         ],
       ),
       HelpDocSection(
-        title: '6. Conservación',
+        title: '7. Conservación',
         paragraphs: [
           'Los datos en el dispositivo permanecen mientras uses la app o hasta que los borres (desinstalación, borrado de datos o restauración).',
-          'Los datos asociados al registro en servidor se conservan mientras la instalación esté activa o sea necesario para licencia, soporte y seguridad, y después durante los plazos legales aplicables.',
+          'Los datos de instalación/licencia en servidor se conservan mientras la instalación esté activa o sea necesario para licencia, soporte y seguridad (orientativo: hasta 24 meses desde la última actividad), y después según plazos legales aplicables.',
           'Si solicitas la eliminación, se atenderá salvo obligaciones de conservación o motivos legítimos de bloqueo.',
         ],
       ),
       HelpDocSection(
-        title: '7. Destinatarios y encargados',
+        title: '8. Destinatarios y encargados',
         paragraphs: [
           'No se venden datos personales a terceros con fines comerciales.',
-          'Pueden acceder a los datos proveedores que prestan alojamiento o infraestructura del panel/servidor de licencias, actuando como encargados del tratamiento cuando corresponda, con servidores situados en la Unión Europea.',
+          'Pueden acceder a los datos de instalación/licencia proveedores de alojamiento del panel/API (habitualmente Hostinger, en la Unión Europea), actuando como encargados cuando corresponda.',
+          '$appName no utiliza Firebase, analítica publicitaria ni redes de anuncios.',
           'También pueden conocerse datos las autoridades competentes cuando exista obligación legal.',
         ],
       ),
       HelpDocSection(
-        title: '8. Transferencias internacionales',
+        title: '9. Transferencias internacionales',
         paragraphs: [
-          'El tratamiento previsto se realiza con infraestructura en la Unión Europea. No está previsto transferir tus datos fuera del EEE de forma habitual. Si en el futuro fuera necesario, se informarían las garantías adecuadas.',
+          'El tratamiento previsto del panel de licencias se realiza con infraestructura habitual en la Unión Europea. No está previsto transferir tus datos fuera del EEE de forma habitual. Si en el futuro fuera necesario, se informarían las garantías adecuadas.',
         ],
       ),
       HelpDocSection(
-        title: '9. Derechos',
+        title: '10. Derechos',
         paragraphs: [
           'Puedes ejercer acceso, rectificación, supresión, oposición, limitación y, cuando proceda, portabilidad, así como retirar el consentimiento sin afectar a la licitud del tratamiento previo.',
-          'Para ejercerlos, escribe a $emailContacto indicando el derecho solicitado y datos que permitan identificar la instalación (email registrado / device si lo conoces).',
+          'Para ejercerlos, escribe a $emailContacto indicando el derecho solicitado y datos que permitan identificar la instalación (email registrado y/o device ID si lo conoces).',
           'También puedes reclamar ante la Agencia Española de Protección de Datos (AEPD): www.aepd.es',
         ],
       ),
       HelpDocSection(
-        title: '10. Seguridad',
+        title: '11. Seguridad',
         paragraphs: [
           'Se aplican medidas técnicas y organizativas razonables (comunicaciones cifradas hacia el servidor cuando se usa HTTPS, control de acceso al panel, minimización de datos). Ningún sistema es 100 % seguro; te recomendamos proteger el dispositivo y las copias de seguridad exportadas.',
         ],
       ),
       HelpDocSection(
-        title: '11. Menores',
+        title: '12. Menores',
         paragraphs: [
           '$appName está dirigida solo a adultos. No se solicita ni se autoriza el registro de menores de 18 años.',
         ],
       ),
       HelpDocSection(
-        title: '12. Cambios',
+        title: '13. Cambios',
         paragraphs: [
-          'Esta política puede actualizarse. La versión actual en la app es $version. Si hay cambios relevantes, se procurará informarte en la propia aplicación o en $web.',
+          'Esta política puede actualizarse. La versión actual en la app es $version. Si hay cambios relevantes, se procurará informarte en la propia aplicación o en $webPrivacidad.',
         ],
       ),
     ],

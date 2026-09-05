@@ -70,9 +70,11 @@ class LicenciaLocal {
 
   bool get privacyAccepted => features['privacy_accepted'] == true;
 
-  /// Acceso a la app: basta con aceptar la política de privacidad.
+  bool get termsAccepted => features['terms_accepted'] == true;
+
+  /// Acceso a la app: privacidad + condiciones de uso.
   /// El email de identificación es opcional.
-  bool get puedeUsarApp => privacyAccepted;
+  bool get puedeUsarApp => privacyAccepted && termsAccepted;
 
   factory LicenciaLocal.fromMap(Map<String, dynamic> map) {
     final rawFeatures = map['features_json']?.toString();

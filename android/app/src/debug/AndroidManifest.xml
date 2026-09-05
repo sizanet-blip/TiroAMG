@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- HTTP a webamg.desarrollo vía 10.0.2.2 en el emulador. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

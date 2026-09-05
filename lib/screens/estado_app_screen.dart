@@ -105,6 +105,7 @@ class _EstadoAppScreenState extends State<EstadoAppScreen> {
       permitirOmitir: false,
       emailOpcional: false,
       privacidadYaAceptada: _licenciaActual?.privacyAccepted == true,
+      condicionesYaAceptadas: _licenciaActual?.termsAccepted == true,
     );
     if (!mounted) return;
     await _cargarEstadoLicencia();

@@ -325,7 +325,12 @@ abstract final class HelpContent {
     HelpFaqItem(
       question: '¿Cómo identifico mi instalación?',
       answer:
-          'Al abrir la app debes aceptar la política de privacidad (obligatorio). El email es opcional; puedes añadirlo luego en Configuración → Estado de la aplicación → Identificar (email).',
+          'Al abrir la app debes aceptar la política de privacidad y las condiciones de uso (obligatorio). El email es opcional; puedes añadirlo luego en Configuración → Estado de la aplicación → Identificar (email).',
+    ),
+    HelpFaqItem(
+      question: '¿El desarrollador responde si la app falla?',
+      answer:
+          'TiroAMG se ofrece “tal cual”, sin garantía de ausencia de errores. Úsala bajo tu responsabilidad. Revisa Condiciones de uso en Ayuda. La detección automática puede fallar: verifica siempre los resultados.',
     ),
     HelpFaqItem(
       question: '¿Qué es una plantilla de tiempos?',

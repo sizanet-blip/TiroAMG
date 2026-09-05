@@ -4,9 +4,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// HTTP para el panel de licencias.
-/// En Android + `*.desarrollo`, conecta a [androidDevHost] (10.0.2.2) con SNI/Host
-/// del dominio real, porque el emulador no usa el hosts de Windows.
+/// HTTP hacia panel / metadata de desarrollo.
+/// En Android + host `*.desarrollo`, conecta a [androidDevHost] (10.0.2.2) con
+/// Host/SNI del dominio real, porque el emulador no usa el hosts de Windows.
 class LicenseApiHttp {
   LicenseApiHttp._();
 
@@ -18,10 +18,22 @@ class LicenseApiHttp {
   static String get androidDevHost =>
       _devHostFromEnv.trim().isNotEmpty ? _devHostFromEnv.trim() : '10.0.2.2';
 
-  static bool get _needsAndroidDevBridge {
-    if (!Platform.isAndroid) return false;
-    const api = String.fromEnvironment('LICENSE_API_URL', defaultValue: '');
-    return api.contains('.desarrollo');
+  /// GET genérico. En Android + host `*.desarrollo` usa el puente a [androidDevHost].
+  static Future<http.Response> get(
+    Uri uri, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    if (_needsAndroidDevBridgeFor(uri)) {
+      return _requestViaDevBridge(
+        logical: uri,
+        method: 'GET',
+        body: null,
+        contentType: null,
+        timeout: timeout,
+        logTag: 'DevHttp',
+      );
+    }
+    return http.get(uri).timeout(timeout);
   }
 
   static Future<http.Response> postJson({
@@ -33,8 +45,15 @@ class LicenseApiHttp {
     final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
     final logical = Uri.parse('$base$path');
 
-    if (_needsAndroidDevBridge && logical.host.endsWith('.desarrollo')) {
-      return _postViaDevBridge(logical, body, timeout);
+    if (_needsAndroidDevBridgeFor(logical)) {
+      return _requestViaDevBridge(
+        logical: logical,
+        method: 'POST',
+        body: body,
+        contentType: 'application/json',
+        timeout: timeout,
+        logTag: 'License',
+      );
     }
 
     return http
@@ -46,32 +65,45 @@ class LicenseApiHttp {
         .timeout(timeout);
   }
 
-  /// TCP → 10.0.2.2, TLS con SNI = panel.amg.desarrollo, Host header correcto.
-  static Future<http.Response> _postViaDevBridge(
-    Uri logical,
-    String body,
-    Duration timeout,
-  ) async {
+  static bool _needsAndroidDevBridgeFor(Uri uri) {
+    if (!Platform.isAndroid) return false;
+    return uri.host.endsWith('.desarrollo');
+  }
+
+  /// TCP → 10.0.2.2 (HTTP o HTTPS). Host/SNI = dominio lógico del vhost.
+  static Future<http.Response> _requestViaDevBridge({
+    required Uri logical,
+    required String method,
+    required String? body,
+    required String? contentType,
+    required Duration timeout,
+    required String logTag,
+  }) async {
     final port = logical.hasPort
         ? logical.port
         : (logical.scheme == 'https' ? 443 : 80);
     final path = logical.hasQuery
         ? '${logical.path}?${logical.query}'
         : (logical.path.isEmpty ? '/' : logical.path);
-    final payload = utf8.encode(body);
+    final payload = body == null ? <int>[] : utf8.encode(body);
+    final useTls = logical.scheme == 'https';
 
     debugPrint(
-      '[License] bridge ${logical.host} → $androidDevHost:$port$path',
+      '[$logTag] bridge ${logical.host} → $androidDevHost:$port$path',
     );
 
     final raw = await Socket.connect(androidDevHost, port).timeout(timeout);
-    final SecureSocket secure;
+    late final Socket socket;
     try {
-      secure = await SecureSocket.secure(
-        raw,
-        host: logical.host,
-        onBadCertificate: (_) => true,
-      ).timeout(timeout);
+      if (useTls) {
+        socket = await SecureSocket.secure(
+          raw,
+          host: logical.host,
+          onBadCertificate: (_) => true,
+        ).timeout(timeout);
+      } else {
+        socket = raw;
+      }
     } catch (e) {
       await raw.close();
       rethrow;
@@ -79,26 +111,33 @@ class LicenseApiHttp {
 
     try {
       final headers = StringBuffer()
-        ..write('POST $path HTTP/1.1\r\n')
-        ..write('Host: ${logical.host}\r\n')
-        ..write('Content-Type: application/json\r\n')
-        ..write('Content-Length: ${payload.length}\r\n')
-        ..write('Accept: application/json\r\n')
+        ..write('$method $path HTTP/1.1\r\n')
+        ..write('Host: ${logical.host}\r\n');
+      if (contentType != null) {
+        headers.write('Content-Type: $contentType\r\n');
+      }
+      if (payload.isNotEmpty) {
+        headers.write('Content-Length: ${payload.length}\r\n');
+      }
+      headers
+        ..write('Accept: application/json,*/*\r\n')
         ..write('Connection: close\r\n')
         ..write('\r\n');
 
-      secure.add(utf8.encode(headers.toString()));
-      secure.add(payload);
-      await secure.flush().timeout(timeout);
+      socket.add(utf8.encode(headers.toString()));
+      if (payload.isNotEmpty) {
+        socket.add(payload);
+      }
+      await socket.flush().timeout(timeout);
 
       final chunks = <int>[];
-      await for (final chunk in secure.timeout(timeout)) {
+      await for (final chunk in socket.timeout(timeout)) {
         chunks.addAll(chunk);
       }
 
       return _parseHttpResponse(chunks, logical);
     } finally {
-      await secure.close();
+      await socket.close();
     }
   }
 

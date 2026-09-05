@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import 'license_api_http.dart';
 
 class AppUpdateInfo {
   final String latestVersion;
@@ -60,9 +61,10 @@ class AppUpdateService {
       final currentVersion = packageInfo.version;
       final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
 
-      final response = await http
-          .get(Uri.parse(metadataUrl))
-          .timeout(const Duration(seconds: 8));
+      final response = await LicenseApiHttp.get(
+        Uri.parse(metadataUrl),
+        timeout: const Duration(seconds: 8),
+      );
       if (response.statusCode != 200) {
         return AppUpdateCheckResult(
           hasUpdate: false,

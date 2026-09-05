@@ -700,6 +700,41 @@ class LicenseService {
     });
   }
 
+  /// Guarda la aceptación de las condiciones de uso (versión + fecha UTC).
+  Future<void> registrarAceptacionCondiciones({
+    required String version,
+  }) async {
+    final local = await _ensureLocalDefaultInstallation();
+    final meta = Map<String, dynamic>.from(local.features);
+    meta['terms_accepted'] = true;
+    meta['terms_version'] = version;
+    meta['terms_accepted_at'] = DateTime.now().toUtc().toIso8601String();
+    await _guardarPayloadLicencia({
+      ...local.toMap(),
+      'features_json': jsonEncode(meta),
+    });
+  }
+
+  /// Aceptación conjunta de privacidad y condiciones (arranque / gate de uso).
+  Future<void> registrarAceptacionLegal({
+    required String privacyVersion,
+    required String termsVersion,
+  }) async {
+    final local = await _ensureLocalDefaultInstallation();
+    final meta = Map<String, dynamic>.from(local.features);
+    final now = DateTime.now().toUtc().toIso8601String();
+    meta['privacy_accepted'] = true;
+    meta['privacy_version'] = privacyVersion;
+    meta['privacy_accepted_at'] = now;
+    meta['terms_accepted'] = true;
+    meta['terms_version'] = termsVersion;
+    meta['terms_accepted_at'] = now;
+    await _guardarPayloadLicencia({
+      ...local.toMap(),
+      'features_json': jsonEncode(meta),
+    });
+  }
+
   Future<LicenciaLocal> _ensureLocalDefaultInstallation() async {
     final existing = await obtenerLicenciaLocal();
     if (existing != null) {
@@ -929,7 +964,7 @@ class LicenseService {
       features.addAll(Map<String, dynamic>.from(rawModules));
     }
 
-    // Conserva meta local (email / snooze).
+    // Conserva meta local (email / snooze / aceptaciones legales).
     if (mergeLocalMeta != null) {
       final email = mergeLocalMeta.contactEmail;
       if (email != null) features['contact_email'] = email;
@@ -939,6 +974,19 @@ class LicenseService {
       final snooze = mergeLocalMeta.identifySnoozeUntil;
       if (snooze != null) {
         features['identify_snooze_until'] = snooze.toIso8601String();
+      }
+      final localFeatures = mergeLocalMeta.features;
+      for (final key in const [
+        'privacy_accepted',
+        'privacy_version',
+        'privacy_accepted_at',
+        'terms_accepted',
+        'terms_version',
+        'terms_accepted_at',
+      ]) {
+        if (localFeatures.containsKey(key)) {
+          features[key] = localFeatures[key];
+        }
       }
     }
 

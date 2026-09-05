@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../help/privacy_content.dart';
+import '../help/terms_content.dart';
 import '../services/license_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_exit.dart';
 import '../widgets/app_ui.dart';
 import '../screens/ayuda_documento_screen.dart';
 
-/// Diálogo de registro: privacidad obligatoria; email opcional u obligatorio según flags.
+/// Diálogo de registro: privacidad + condiciones obligatorias; email opcional u obligatorio.
 ///
 /// Con [salirAlCancelar] (arranque), Salir cierra la aplicación.
-/// Con [emailOpcional] se puede continuar solo aceptando la política.
+/// Con [emailOpcional] se puede continuar solo aceptando lo legal.
 Future<bool> showIdentificarInstalacionDialog({
   required BuildContext context,
   required LicenseService licenseService,
@@ -19,6 +20,7 @@ Future<bool> showIdentificarInstalacionDialog({
   bool salirAlCancelar = false,
   bool emailOpcional = false,
   bool privacidadYaAceptada = false,
+  bool condicionesYaAceptadas = false,
   RegExp? emailRegex,
 }) async {
   final result = await showDialog<bool>(
@@ -31,6 +33,7 @@ Future<bool> showIdentificarInstalacionDialog({
       salirAlCancelar: salirAlCancelar,
       emailOpcional: emailOpcional,
       privacidadYaAceptada: privacidadYaAceptada,
+      condicionesYaAceptadas: condicionesYaAceptadas,
       emailRegex: emailRegex ?? RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$'),
     ),
   );
@@ -44,6 +47,7 @@ class _IdentificarInstalacionDialog extends StatefulWidget {
   final bool salirAlCancelar;
   final bool emailOpcional;
   final bool privacidadYaAceptada;
+  final bool condicionesYaAceptadas;
   final RegExp emailRegex;
 
   const _IdentificarInstalacionDialog({
@@ -53,6 +57,7 @@ class _IdentificarInstalacionDialog extends StatefulWidget {
     required this.salirAlCancelar,
     required this.emailOpcional,
     required this.privacidadYaAceptada,
+    required this.condicionesYaAceptadas,
     required this.emailRegex,
   });
 
@@ -66,19 +71,21 @@ class _IdentificarInstalacionDialogState
   late final TextEditingController _controller;
   late String _mensaje;
   var _cargando = false;
-  late bool _aceptaPrivacidad;
+  late bool _aceptaLegal;
+
+  bool get _legalYaAceptado =>
+      widget.privacidadYaAceptada && widget.condicionesYaAceptadas;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.emailInicial ?? '');
-    _aceptaPrivacidad = widget.privacidadYaAceptada;
+    _aceptaLegal = _legalYaAceptado;
     _mensaje = widget.emailOpcional
-        ? 'Para usar TiroAMG debes aceptar la política de privacidad. El email es opcional (recomendado para soporte y licencia).'
-        : 'Asocia un email para registrar esta instalación. Debes aceptar la política de privacidad.';
+        ? 'Para usar TiroAMG debes aceptar la política de privacidad y las condiciones de uso. El email es opcional (recomendado para soporte).'
+        : 'Asocia un email para registrar esta instalación. Debes aceptar la política de privacidad y las condiciones de uso.';
     if (widget.salirAlCancelar) {
-      _mensaje =
-          '$_mensaje Si sales sin aceptar, la aplicación se cerrará.';
+      _mensaje = '$_mensaje Si sales sin aceptar, la aplicación se cerrará.';
     }
   }
 
@@ -90,7 +97,7 @@ class _IdentificarInstalacionDialogState
 
   void _salirOCerrar() {
     if (widget.salirAlCancelar) {
-      SystemNavigator.pop();
+      exitApp();
       return;
     }
     Navigator.of(context).pop(false);
@@ -98,10 +105,10 @@ class _IdentificarInstalacionDialogState
 
   Future<void> _continuar() async {
     final email = _controller.text.trim();
-    if (!_aceptaPrivacidad) {
+    if (!_aceptaLegal) {
       setState(() {
         _mensaje =
-            'Debes aceptar la Política de privacidad para continuar.';
+            'Debes aceptar la Política de privacidad y las Condiciones de uso para continuar.';
       });
       return;
     }
@@ -120,8 +127,9 @@ class _IdentificarInstalacionDialogState
 
     setState(() => _cargando = true);
     try {
-      await widget.licenseService.registrarAceptacionPrivacidad(
-        version: PrivacyContent.version,
+      await widget.licenseService.registrarAceptacionLegal(
+        privacyVersion: PrivacyContent.version,
+        termsVersion: TermsContent.version,
       );
 
       if (email.isNotEmpty) {
@@ -154,7 +162,7 @@ class _IdentificarInstalacionDialogState
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (widget.salirAlCancelar && !_cargando) {
-          SystemNavigator.pop();
+          exitApp();
         }
       },
       child: AppDialog(
@@ -173,6 +181,15 @@ class _IdentificarInstalacionDialogState
                 _mensaje,
                 style: TextStyle(
                   fontSize: 13.5,
+                  height: 1.35,
+                  color: AppColors.subtitle,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                TermsContent.resumenCorto,
+                style: TextStyle(
+                  fontSize: 12.5,
                   height: 1.35,
                   color: AppColors.subtitle,
                 ),
@@ -196,12 +213,10 @@ class _IdentificarInstalacionDialogState
                     width: 24,
                     height: 24,
                     child: Checkbox(
-                      value: _aceptaPrivacidad,
-                      onChanged: _cargando || widget.privacidadYaAceptada
+                      value: _aceptaLegal,
+                      onChanged: _cargando || _legalYaAceptado
                           ? null
-                          : (v) => setState(
-                                () => _aceptaPrivacidad = v ?? false,
-                              ),
+                          : (v) => setState(() => _aceptaLegal = v ?? false),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -210,9 +225,9 @@ class _IdentificarInstalacionDialogState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.privacidadYaAceptada
-                              ? 'Política de privacidad ya aceptada.'
-                              : 'He leído y acepto la Política de privacidad (obligatorio).',
+                          _legalYaAceptado
+                              ? 'Privacidad y condiciones ya aceptadas.'
+                              : 'He leído y acepto la Política de privacidad y las Condiciones de uso (obligatorio). Entiendo que la app se ofrece sin garantía y bajo mi responsabilidad.',
                           style: TextStyle(
                             fontSize: 13,
                             height: 1.35,
@@ -236,6 +251,24 @@ class _IdentificarInstalacionDialogState
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           child: const Text('Ver política de privacidad'),
+                        ),
+                        TextButton(
+                          onPressed: _cargando
+                              ? null
+                              : () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const CondicionesUsoScreen(),
+                                    ),
+                                  );
+                                },
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Ver condiciones de uso'),
                         ),
                       ],
                     ),
@@ -305,5 +338,14 @@ class PoliticaPrivacidadScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AyudaDocumentoScreen(doc: PrivacyContent.documento);
+  }
+}
+
+class CondicionesUsoScreen extends StatelessWidget {
+  const CondicionesUsoScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AyudaDocumentoScreen(doc: TermsContent.documento);
   }
 }

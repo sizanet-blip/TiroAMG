@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 // Importamos las pantallas de destino
 import 'competicion_screen.dart';
 import 'entrenamiento_screen.dart';
@@ -14,6 +13,7 @@ import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_exit.dart';
 import '../widgets/app_ui.dart';
 import '../widgets/identificar_instalacion_dialog.dart';
 
@@ -95,8 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _identificacionLista = true);
       return;
     }
-    // Sin aceptar privacidad no se usa la app.
-    SystemNavigator.pop();
+    // Sin aceptar privacidad y condiciones no se usa la app.
+    exitApp();
   }
 
   void _actualizarLicencia(LicenciaLocal? licencia) {
@@ -242,6 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
       salirAlCancelar: true,
       emailOpcional: true,
       privacidadYaAceptada: _licenciaActual?.privacyAccepted == true,
+      condicionesYaAceptadas: _licenciaActual?.termsAccepted == true,
       emailRegex: _emailRegex,
     );
     if (!ok || !mounted) return false;
@@ -268,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const CircularProgressIndicator(),
                   const SizedBox(height: 16),
                   Text(
-                    'Esperando aceptación de privacidad…',
+                    'Esperando aceptación de privacidad y condiciones…',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,

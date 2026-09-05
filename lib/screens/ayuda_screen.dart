@@ -111,6 +111,18 @@ class AyudaScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                  AppNavTile(
+                    title: 'Condiciones de uso',
+                    subtitle: 'Sin garantía; uso bajo tu responsabilidad',
+                    icon: Icons.gavel_outlined,
+                    color: AppColors.accentCompetition,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CondicionesUsoScreen(),
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
