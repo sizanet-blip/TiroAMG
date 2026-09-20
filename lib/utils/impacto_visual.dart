@@ -6,6 +6,13 @@ class ImpactoVisual {
 
   static const Color colorImpacto = Color(0xFFE53935);
   static const Color colorDescartado = Color(0xFF9E9E9E);
+  /// Impactos de series anteriores (solo referencia visual).
+  static const Color colorFantasma = Color(0xFF1E88E5);
+
+  /// Mismo estilo que un impacto normal, en azul para diferenciarlo del rojo.
+  static void dibujarFantasma(Canvas canvas, Offset punto, double radio) {
+    dibujar(canvas, punto, radio, color: colorFantasma);
+  }
 
   /// Fracción del ancho de un anillo de puntuación.
   /// Referencia: diana 25 m (~25 mm/anillo) y .22 LR (~5,6 mm) ≈ 0,11.

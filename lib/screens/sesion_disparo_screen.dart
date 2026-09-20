@@ -37,6 +37,8 @@ class SesionDisparoScreen extends StatefulWidget {
   final bool usarEntradaManualPuntos;
   /// Sesión orientada a regular miras (análisis de clics).
   final bool esCorreccionMira;
+  /// Impactos normalizados (−1…1) de series anteriores; solo referencia visual.
+  final List<Offset> impactosFantasmaInicial;
 
   const SesionDisparoScreen({
     super.key,
@@ -59,6 +61,7 @@ class SesionDisparoScreen extends StatefulWidget {
     this.onCompletar,
     this.usarEntradaManualPuntos = false,
     this.esCorreccionMira = false,
+    this.impactosFantasmaInicial = const [],
   });
 
   @override
@@ -72,6 +75,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
   final List<Disparo> _listaDisparos = [];
   final List<Offset> _puntosVisuales = [];
+  /// Coordenadas normalizadas (mismo sistema que [Disparo.x]/[Disparo.y]).
+  late List<Offset> _fantasmasNorm;
   final GlobalKey _dianaPaintKey = GlobalKey();
   final GlobalKey _dianaStackKey = GlobalKey();
   
@@ -179,6 +184,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   @override
   void initState() {
     super.initState();
+    _fantasmasNorm = List<Offset>.from(widget.impactosFantasmaInicial);
     _cargarConfiguracionDiana();
     _resetearValoresTiempo();
     _initAudio();
@@ -832,36 +838,66 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
     final puntosGuardados = _puntosTotal;
     final disparosGuardados = _listaDisparos.length;
+    final hayReferenciaPosible = _listaDisparos.any((d) => d.x != 0 || d.y != 0) ||
+        _fantasmasNorm.isNotEmpty;
 
     final accion = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text('Entrenamiento guardado'),
-        content: Text(
-          'Puntuación: $puntosGuardados pts · $disparosGuardados disparos.\n\n'
-          '¿Qué quieres hacer ahora?',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Puntuación: $puntosGuardados pts · $disparosGuardados disparos.',
+            ),
+            const SizedBox(height: 16),
+            if (hayReferenciaPosible)
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(ctx, 'nuevo_fantasma'),
+                icon: const Icon(Icons.visibility_outlined),
+                label: const Text('Seguir con referencia'),
+              ),
+            if (hayReferenciaPosible) const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.pop(ctx, 'nuevo_limpio'),
+              icon: const Icon(Icons.crop_free),
+              label: const Text('Diana limpia'),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'menu'),
+              child: const Text('Volver al menú'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'menu'),
-            child: const Text('Volver al menú'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, 'nuevo'),
-            child: const Text('Nuevo entrenamiento'),
-          ),
-        ],
       ),
     );
 
     if (!mounted) return;
 
-    if (accion == 'nuevo') {
-      _prepararNuevaSerie();
+    if (accion == 'nuevo_fantasma') {
+      final acumulados = <Offset>[
+        ..._fantasmasNorm,
+        for (final d in _listaDisparos)
+          if (d.x != 0 || d.y != 0) Offset(d.x, d.y),
+      ];
+      _prepararNuevaSerie(fijarFantasmas: acumulados);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Referencia: ${acumulados.length} impactos anteriores (no puntúan).',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else if (accion == 'nuevo_limpio') {
+      _prepararNuevaSerie(resetFantasmas: true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Sesión guardada. Lista para un nuevo entrenamiento.'),
+          content: Text('Sesión guardada. Diana limpia lista.'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -874,7 +910,10 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     }
   }
 
-  void _prepararNuevaSerie() {
+  void _prepararNuevaSerie({
+    bool resetFantasmas = false,
+    List<Offset>? fijarFantasmas,
+  }) {
     _pausar();
     _inspeccionController.value = Matrix4.identity();
     setState(() {
@@ -887,6 +926,11 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       _mostrandoLupa = false;
       _posicionDedo = null;
       _posicionGlobalPuntero = null;
+      if (fijarFantasmas != null) {
+        _fantasmasNorm = List<Offset>.from(fijarFantasmas);
+      } else if (resetFantasmas) {
+        _fantasmasNorm.clear();
+      }
       _resetearValoresTiempo();
     });
   }
@@ -906,6 +950,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
               Navigator.pop(ctx);
+              // Reiniciar solo la serie actual; conservar fantasmas de referencia.
               _prepararNuevaSerie();
             },
             child: const Text('Reiniciar',
@@ -1411,6 +1456,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                 size: size,
                 painter: DianaPainter(
                   impactos: _puntosVisuales,
+                  impactosFantasmaNorm: _fantasmasNorm,
                   valorMinimo: _valorMinimo,
                   anilloNegroInicio: _anilloNegroInicio,
                   esFondoNegro: _esFondoNegro,
@@ -1567,6 +1613,34 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                           fontWeight: FontWeight.w700,
                           fontSize: 12,
                           letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_fantasmasNorm.isNotEmpty && !_modoInspeccion)
+            Positioned(
+              bottom: 10,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 5),
+                      child: Text(
+                        'Referencia: ${_fantasmasNorm.length} anteriores',
+                        style: const TextStyle(
+                          color: ImpactoVisual.colorFantasma,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
                         ),
                       ),
                     ),
@@ -1743,6 +1817,8 @@ class _CruzLupaPainter extends CustomPainter {
 
 class DianaPainter extends CustomPainter {
   final List<Offset> impactos;
+  /// Normalizados (−1…1) respecto al radio; se convierten a píxeles al pintar.
+  final List<Offset> impactosFantasmaNorm;
   final int valorMinimo;
   final int anilloNegroInicio;
   final bool esFondoNegro;
@@ -1753,6 +1829,7 @@ class DianaPainter extends CustomPainter {
 
   DianaPainter({
     required this.impactos,
+    this.impactosFantasmaNorm = const [],
     required this.valorMinimo,
     required this.anilloNegroInicio,
     required this.esFondoNegro,
@@ -1826,6 +1903,11 @@ class DianaPainter extends CustomPainter {
       anchoZona: anchoZona,
       nombreCalibre: nombreCalibre,
     );
+    // Fantasmas debajo de los impactos actuales.
+    for (final n in impactosFantasmaNorm) {
+      final p = Offset(center.dx + n.dx * radius, center.dy + n.dy * radius);
+      ImpactoVisual.dibujarFantasma(canvas, p, radioImpacto);
+    }
     for (final p in impactos) {
       ImpactoVisual.dibujar(canvas, p, radioImpacto);
     }

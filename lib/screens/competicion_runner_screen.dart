@@ -72,6 +72,10 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
   // Historial visual para mostrar en la lista de abajo
   final List<String> _logEventos = [];
 
+  /// Impactos normalizados acumulados de series previas (referencia visual).
+  final List<Offset> _fantasmasAcumulados = [];
+  bool _mantenerReferencia = true;
+
   @override
   void initState() {
     super.initState();
@@ -135,6 +139,9 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
           vientoDireccion: widget.vientoDireccion,
           iluminacion: widget.iluminacion,
           usarEntradaManualPuntos: widget.usarEntradaManualPuntos,
+          impactosFantasmaInicial: _mantenerReferencia
+              ? List<Offset>.from(_fantasmasAcumulados)
+              : const [],
           
           // PARÁMETROS NUEVOS PARA INFORMACIÓN VISUAL
           tituloSerie: "${faseActual.fase.descripcionFase} - Serie $numSerie/$totalSeries",
@@ -173,6 +180,13 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
           : 'Torneo: ${widget.modalidad.nombre} | ${fase.fase.descripcionFase} | Serie ${_indiceRepeticion + 1}',
     );
     await _entrenamientoService.guardarSesionCompleta(nuevaSesion, disparos);
+
+    // Acumular impactos con posición real para referencia en la siguiente serie.
+    for (final d in disparos) {
+      if (d.x != 0 || d.y != 0) {
+        _fantasmasAcumulados.add(Offset(d.x, d.y));
+      }
+    }
 
     // 2. Actualizar Marcador del Torneo
     setState(() {
@@ -368,6 +382,36 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                         onPressed: _lanzarSiguienteSerie,
                       ),
                     ),
+
+                    if (_fantasmasAcumulados.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: const Text(
+                          'Mantener impactos de referencia',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          _mantenerReferencia
+                              ? '${_fantasmasAcumulados.length} impactos grises (no puntúan)'
+                              : 'Próxima serie con diana limpia',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        value: _mantenerReferencia,
+                        onChanged: (v) => setState(() => _mantenerReferencia = v),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => setState(() {
+                            _fantasmasAcumulados.clear();
+                            _mantenerReferencia = true;
+                          }),
+                          child: const Text('Limpiar referencia'),
+                        ),
+                      ),
+                    ],
                     
                     if (esEnsayo)
                       const Padding(
