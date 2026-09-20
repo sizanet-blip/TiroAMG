@@ -156,6 +156,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
       fecha: DateTime.now(),
       idEquipo: widget.equipo.id,
       idPlantilla: plantilla.id!,
+      idModalidad: widget.modalidad.id,
       idMunicion: widget.municion?.id,
       lugar: widget.lugar,
       distanciaMetros: widget.distanciaMetros,
@@ -167,8 +168,9 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
       vientoMs: widget.vientoMs,
       vientoDireccion: widget.vientoDireccion,
       iluminacion: widget.iluminacion,
-      // Añadimos metadatos del torneo en la nota para identificarlo luego
-      nota: 'Torneo: ${widget.modalidad.nombre} | ${fase.fase.descripcionFase} | Serie ${_indiceRepeticion + 1}',
+      nota: fase.fase.esEnsayo
+          ? 'Torneo: ${widget.modalidad.nombre} | Ensayo | ${fase.fase.descripcionFase} | Serie ${_indiceRepeticion + 1}'
+          : 'Torneo: ${widget.modalidad.nombre} | ${fase.fase.descripcionFase} | Serie ${_indiceRepeticion + 1}',
     );
     await _entrenamientoService.guardarSesionCompleta(nuevaSesion, disparos);
 

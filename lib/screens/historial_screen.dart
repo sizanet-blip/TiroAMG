@@ -33,13 +33,21 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
   int _filtroSeleccionado = 0;
   DateTimeRange? _rangoSeleccionado;
 
+  /// IDs de entrenamientos seleccionados para análisis.
+  final Set<int> _entrenosSeleccionados = {};
+  bool get _modoSeleccion => _entrenosSeleccionados.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Refrescar UI al cambiar pestaña para actualizar el botón de estadísticas
     _tabController.addListener(() {
-      if (_tabController.indexIsChanging) setState(() {});
+      if (!_tabController.indexIsChanging) {
+        setState(() {
+          // Al salir de entrenamientos, limpia la selección.
+          if (_tabController.index != 0) _entrenosSeleccionados.clear();
+        });
+      }
     });
     _cargarDatos();
   }
@@ -101,7 +109,81 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
     setState(() {
       _entrenamientosFiltrados = _entrenamientosRaw.where(filtroFecha).toList();
       _competicionesFiltradas = _competicionesRaw.where(filtroFecha).toList();
+      // Quitar de la selección lo que ya no está visible.
+      _entrenosSeleccionados.removeWhere(
+        (id) => !_entrenamientosFiltrados.any((s) => s.id == id),
+      );
     });
+  }
+
+  void _toggleSeleccionEntreno(int id) {
+    setState(() {
+      if (_entrenosSeleccionados.contains(id)) {
+        _entrenosSeleccionados.remove(id);
+      } else {
+        _entrenosSeleccionados.add(id);
+      }
+    });
+  }
+
+  void _seleccionarTodosEntrenamientosVisibles() {
+    setState(() {
+      _entrenosSeleccionados
+        ..clear()
+        ..addAll(_entrenamientosFiltrados.map((s) => s.id));
+    });
+  }
+
+  void _limpiarSeleccion() {
+    setState(() => _entrenosSeleccionados.clear());
+  }
+
+  void _borrarSeleccionados() {
+    final ids = _entrenosSeleccionados.toList();
+    if (ids.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Borrar ${ids.length} entrenamiento${ids.length == 1 ? '' : 's'}'),
+        content: const Text('¿Estás seguro? Se borrarán todos los datos asociados.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.accentDanger),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              for (final id in ids) {
+                await _service.borrarSesion(id);
+              }
+              _entrenosSeleccionados.clear();
+              _cargarDatos();
+            },
+            child: const Text('Borrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _abrirEstadisticas() {
+    final enEntrenamientos = _tabController.index == 0;
+    if (enEntrenamientos && _entrenosSeleccionados.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EstadisticasScreen(
+            modo: 1,
+            idsSesionFijos: _entrenosSeleccionados.toList(),
+          ),
+        ),
+      );
+      return;
+    }
+    final modo = enEntrenamientos ? 1 : 2;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EstadisticasScreen(modo: modo)),
+    );
   }
 
   Future<void> _seleccionarRango() async {
@@ -176,20 +258,41 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const TiroAmgAppBarTitle(section: 'Historial'),
+        title: _modoSeleccion && _tabController.index == 0
+            ? Text('${_entrenosSeleccionados.length} seleccionados')
+            : const TiroAmgAppBarTitle(section: 'Historial'),
+        leading: _modoSeleccion && _tabController.index == 0
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Cancelar selección',
+                onPressed: _limpiarSeleccion,
+              )
+            : null,
         actions: [
-          // Botón de Estadísticas contextual
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: _tabController.index == 0 ? "Estadísticas Entrenamientos" : "Estadísticas Competiciones",
-            onPressed: () {
-              int modo = _tabController.index == 0 ? 1 : 2; 
-              Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (_) => EstadisticasScreen(modo: modo))
-              );
-            },
-          ),
+          if (_modoSeleccion && _tabController.index == 0) ...[
+            IconButton(
+              icon: const Icon(Icons.select_all),
+              tooltip: 'Seleccionar todos los visibles',
+              onPressed: _seleccionarTodosEntrenamientosVisibles,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Borrar selección',
+              onPressed: _borrarSeleccionados,
+            ),
+            IconButton(
+              icon: const Icon(Icons.bar_chart),
+              tooltip: 'Analizar selección',
+              onPressed: _abrirEstadisticas,
+            ),
+          ] else
+            IconButton(
+              icon: const Icon(Icons.bar_chart),
+              tooltip: _tabController.index == 0
+                  ? 'Estadísticas Entrenamientos'
+                  : 'Estadísticas Competiciones',
+              onPressed: _abrirEstadisticas,
+            ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -255,6 +358,40 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
               ],
             ),
           ),
+          if (_tabController.index == 0 && !_modoSeleccion)
+            Material(
+              color: AppColors.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  'Mantén pulsado un entrenamiento para seleccionar varios y analizarlos juntos.',
+                  style: TextStyle(fontSize: 12, color: AppColors.subtitle),
+                ),
+              ),
+            ),
+          if (_modoSeleccion && _tabController.index == 0)
+            Material(
+              color: AppColors.accentAnalytics.withValues(alpha: 0.1),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: AppColors.accentAnalytics),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Toca para marcar/desmarcar. Estadísticas usará solo la selección.',
+                        style: TextStyle(fontSize: 12, color: AppColors.title),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _abrirEstadisticas,
+                      child: const Text('Analizar'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           const Divider(height: 1),
 
           // --- LISTAS ---
@@ -303,32 +440,67 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final item = lista[index];
+        final seleccionado = !esCompe && _entrenosSeleccionados.contains(item.id);
         return Card(
+          color: seleccionado
+              ? AppColors.accentAnalytics.withValues(alpha: 0.08)
+              : null,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            side: BorderSide(
+              color: seleccionado
+                  ? AppColors.accentAnalytics.withValues(alpha: 0.5)
+                  : AppColors.border,
+            ),
+          ),
           child: InkWell(
             borderRadius: BorderRadius.circular(AppRadii.card),
             onTap: () {
-               if (esCompe) {
-                 Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (_) => CompeticionHistorialDetalleScreen(
-                        idModalidad: item.id, 
-                        fecha: item.fecha,
-                        nombreTorneo: item.nombreTitulo,
-                        totalPuntos: item.totalPuntos,
-                    ))
-                 );
-               } else {
-                 Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (_) => SesionDetalleScreen(sesionId: item.id))
-                 );
-               }
+              if (!esCompe && _modoSeleccion) {
+                _toggleSeleccionEntreno(item.id);
+                return;
+              }
+              if (esCompe) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CompeticionHistorialDetalleScreen(
+                      idModalidad: item.id,
+                      fecha: item.fecha,
+                      nombreTorneo: item.nombreTitulo,
+                      totalPuntos: item.totalPuntos,
+                    ),
+                  ),
+                );
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SesionDetalleScreen(sesionId: item.id),
+                  ),
+                );
+              }
             },
-            onLongPress: () => _borrarItem(item, esCompe),
+            onLongPress: () {
+              if (esCompe) {
+                _borrarItem(item, true);
+                return;
+              }
+              // Entrenamientos: long-press inicia/cambia selección.
+              _toggleSeleccionEntreno(item.id);
+            },
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
+                  if (!esCompe && _modoSeleccion) ...[
+                    Checkbox(
+                      value: seleccionado,
+                      onChanged: (_) => _toggleSeleccionEntreno(item.id),
+                      activeColor: AppColors.accentAnalytics,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   // FECHA
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -385,7 +557,28 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
                       ),
                       if (item.totalMoscas > 0) Text('${item.totalMoscas}x', style: TextStyle(fontSize: 12, color: AppColors.subtitle, fontWeight: FontWeight.bold)),
                     ],
-                  )
+                  ),
+                  if (!_modoSeleccion || esCompe)
+                    PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert, color: AppColors.subtitle),
+                      onSelected: (v) {
+                        if (v == 'borrar') _borrarItem(item, esCompe);
+                        if (v == 'seleccionar' && !esCompe) {
+                          _toggleSeleccionEntreno(item.id);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        if (!esCompe)
+                          const PopupMenuItem(
+                            value: 'seleccionar',
+                            child: Text('Seleccionar'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'borrar',
+                          child: Text('Borrar'),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

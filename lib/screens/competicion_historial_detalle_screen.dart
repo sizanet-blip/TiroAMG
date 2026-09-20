@@ -11,7 +11,9 @@ import '../services/municion_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/tiro_amg_app_bar_title.dart';
 import 'sesion_detalle_screen.dart';
-import 'estadisticas_screen.dart'; // <--- NUEVO IMPORT
+import 'estadisticas_screen.dart';
+import 'acta_oficial_screen.dart';
+import '../models/acta_oficial_model.dart';
 
 class CompeticionHistorialDetalleScreen extends StatefulWidget {
   final int idModalidad;
@@ -40,6 +42,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
 
   List<SesionResumen> _fases = [];
   bool _cargando = true;
+  ComparacionActaOficial? _comparacion;
 
   // Datos editables del torneo
   EquipoDetalle? _equipoUsado;
@@ -72,6 +75,12 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
     return parts.join(' | ');
   }
 
+  String _fmt(double v) =>
+      v == v.roundToDouble() ? '${v.round()}' : v.toStringAsFixed(1);
+
+  String _fmtDelta(double v) =>
+      '${v >= 0 ? '+' : ''}${_fmt(v)}';
+
   @override
   void initState() {
     super.initState();
@@ -80,6 +89,10 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
 
   void _cargarDatosCompletos() async {
     final datos = await _service.obtenerFasesDeTorneoRealizado(widget.idModalidad, widget.fecha);
+    final comparacion = await _service.compararActaOficial(
+      idModalidad: widget.idModalidad,
+      fecha: widget.fecha,
+    );
     
     EquipoDetalle? equipoDetectado;
     String notasDetectadas = "";
@@ -125,6 +138,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
     if (mounted) {
       setState(() {
         _fases = datos;
+        _comparacion = comparacion;
         _equipoUsado = equipoDetectado;
         _notasGuardadas = notasDetectadas;
         _lugarGuardado = lugarDetectado;
@@ -382,6 +396,20 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
     );
   }
 
+  void _abrirActaOficial() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ActaOficialScreen(
+          idModalidad: widget.idModalidad,
+          fecha: widget.fecha,
+          nombreTorneo: widget.nombreTorneo,
+        ),
+      ),
+    );
+    if (mounted) _cargarDatosCompletos();
+  }
+
   // --- FUNCIÓN NUEVA: IR A ESTADÍSTICAS ---
   void _irAEstadisticas() {
     if (_fases.isEmpty) return;
@@ -407,7 +435,11 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
       appBar: AppBar(
         title: const TiroAmgAppBarTitle(section: 'Detalle Competición'),
         actions: [
-          // BOTÓN ESTADÍSTICAS (¡NUEVO!)
+          IconButton(
+            icon: const Icon(Icons.gavel),
+            tooltip: 'Acta oficial (árbitro)',
+            onPressed: _abrirActaOficial,
+          ),
           IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: "Analizar Torneo",
@@ -452,6 +484,51 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                      )
                   ]
                 ),
+                if (_comparacion?.tieneOficial == true) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentAnalytics.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(AppRadii.iconBox),
+                      border: Border.all(color: AppColors.accentAnalytics.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.gavel, size: 18, color: AppColors.accentAnalytics),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'App ${_fmt(_comparacion!.totalApp)}  ·  '
+                            'Oficial ${_fmt(_comparacion!.totalOficial!)}  ·  '
+                            'Δ ${_fmtDelta(_comparacion!.delta!)}'
+                            '${_comparacion!.resumenConteos != null && _comparacion!.resumenConteos!.isNotEmpty ? '\n${_comparacion!.resumenConteos}' : ''}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.title,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _abrirActaOficial,
+                          child: const Text('Editar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _abrirActaOficial,
+                      icon: const Icon(Icons.gavel, size: 18),
+                      label: const Text('Introducir acta oficial'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 Row(children: [
                     Icon(Icons.calendar_today, size: 14, color: AppColors.subtitle),
@@ -542,7 +619,29 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('${fase.totalPuntos} pts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: esEnsayo ? AppColors.subtitle : AppColors.title)),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${fase.totalPuntos} pts',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: esEnsayo ? AppColors.subtitle : AppColors.title,
+                              ),
+                            ),
+                            if (!esEnsayo && fase.puntuacionOficialSerie != null)
+                              Text(
+                                'Of. ${_fmt(fase.puntuacionOficialSerie!)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.accentAnalytics,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                          ],
+                        ),
                         const SizedBox(width: 10),
                         Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.chevron),
                       ],

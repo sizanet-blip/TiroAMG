@@ -18,6 +18,8 @@ class Sesion {
   final String? iluminacion;
   /// Si true, la sesión es para regular miras (análisis de clics; sin técnica).
   final bool esCorreccionMira;
+  /// Total oficial de la serie (árbitro), si se introdujo a nivel serie.
+  final double? puntuacionOficialSerie;
 
   Sesion({
     this.id,
@@ -38,6 +40,7 @@ class Sesion {
     this.vientoDireccion,
     this.iluminacion,
     this.esCorreccionMira = false,
+    this.puntuacionOficialSerie,
   });
 
   factory Sesion.fromMap(Map<String, dynamic> map) {
@@ -60,6 +63,7 @@ class Sesion {
       vientoDireccion: map['viento_direccion'],
       iluminacion: map['iluminacion'],
       esCorreccionMira: (map['es_correccion_mira'] as num?)?.toInt() == 1,
+      puntuacionOficialSerie: (map['puntuacion_oficial_serie'] as num?)?.toDouble(),
     );
   }
 
@@ -83,6 +87,7 @@ class Sesion {
       'viento_direccion': vientoDireccion,
       'iluminacion': iluminacion,
       'es_correccion_mira': esCorreccionMira ? 1 : 0,
+      'puntuacion_oficial_serie': puntuacionOficialSerie,
     };
   }
 }
@@ -100,6 +105,7 @@ class SesionResumen {
   final int? idMunicion;
   final String? marcaMunicion;
   final String? loteMunicion;
+  final double? puntuacionOficialSerie;
 
   SesionResumen({
     required this.id,
@@ -114,7 +120,13 @@ class SesionResumen {
     this.idMunicion,
     this.marcaMunicion,
     this.loteMunicion,
+    this.puntuacionOficialSerie,
   });
+
+  bool get esEnsayo {
+    final n = (nota ?? '').toLowerCase();
+    return n.contains('ensayo');
+  }
 
   factory SesionResumen.fromMap(Map<String, dynamic> map) {
     return SesionResumen(
@@ -130,6 +142,7 @@ class SesionResumen {
       idMunicion: map['id_municion'],
       marcaMunicion: map['marca_municion'],
       loteMunicion: map['lote_municion'],
+      puntuacionOficialSerie: (map['puntuacion_oficial_serie'] as num?)?.toDouble(),
     );
   }
 }

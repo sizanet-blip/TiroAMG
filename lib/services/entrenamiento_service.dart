@@ -3,6 +3,7 @@ import '../database/database_provider.dart';
 import '../models/sesion_model.dart';
 import '../models/disparo_model.dart';
 import '../models/informe_model.dart';
+import '../models/acta_oficial_model.dart';
 
 class EntrenamientoService {
   final dbProvider = DatabaseProvider.instance;
@@ -199,6 +200,7 @@ class EntrenamientoService {
     final res = await db.rawQuery('''
       SELECT 
         s.id, s.fecha, s.nota, s.lugar, s.id_municion,
+        s.puntuacion_oficial_serie,
         m.marca AS marca_municion,
         m.lote AS lote_municion,
         e.nombre AS nombre_equipo,
@@ -284,6 +286,11 @@ class EntrenamientoService {
           await txn.delete('Disparos', where: 'id_sesion = ?', whereArgs: [id]);
           await txn.delete('Sesiones', where: 'id = ?', whereArgs: [id]);
       }
+      await txn.delete(
+        'ActaOficialTorneo',
+        where: 'id_modalidad = ? AND fecha_dia = ?',
+        whereArgs: [idModalidad, fechaStr],
+      );
     });
   }
   Future<Sesion?> obtenerSesionPorId(int id) async {
@@ -293,7 +300,170 @@ class EntrenamientoService {
   }
   Future<List<Disparo>> obtenerDisparosDeSesion(int idSesion) async {
     final db = await dbProvider.database;
-    final res = await db.query('Disparos', where: 'id_sesion = ?', whereArgs: [idSesion]);
+    final res = await db.query(
+      'Disparos',
+      where: 'id_sesion = ?',
+      whereArgs: [idSesion],
+      orderBy: 'numero_disparo ASC',
+    );
     return res.map((e) => Disparo.fromMap(e)).toList();
+  }
+
+  String _fechaDia(DateTime fecha) => fecha.toIso8601String().substring(0, 10);
+
+  Future<ActaOficialTorneo?> obtenerActaOficialTorneo(
+    int idModalidad,
+    DateTime fecha,
+  ) async {
+    final db = await dbProvider.database;
+    final rows = await db.query(
+      'ActaOficialTorneo',
+      where: 'id_modalidad = ? AND fecha_dia = ?',
+      whereArgs: [idModalidad, _fechaDia(fecha)],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return ActaOficialTorneo.fromMap(rows.first);
+  }
+
+  Future<void> guardarActaOficialTorneo(ActaOficialTorneo acta) async {
+    final db = await dbProvider.database;
+    await db.insert(
+      'ActaOficialTorneo',
+      acta.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> actualizarPuntuacionOficialSerie({
+    required int idSesion,
+    double? puntuacionOficialSerie,
+  }) async {
+    final db = await dbProvider.database;
+    await db.update(
+      'Sesiones',
+      {'puntuacion_oficial_serie': puntuacionOficialSerie},
+      where: 'id = ?',
+      whereArgs: [idSesion],
+    );
+  }
+
+  Future<void> actualizarPuntuacionOficialDisparo({
+    required int idDisparo,
+    double? puntuacionOficial,
+    bool? esMoscaOficial,
+  }) async {
+    final db = await dbProvider.database;
+    await db.update(
+      'Disparos',
+      {
+        'puntuacion_oficial': puntuacionOficial,
+        'es_mosca_oficial':
+            esMoscaOficial == null ? null : (esMoscaOficial ? 1 : 0),
+      },
+      where: 'id = ?',
+      whereArgs: [idDisparo],
+    );
+  }
+
+  /// Resuelve el total oficial con prioridad:
+  /// torneo explícito → desglose conteos → series → tiros.
+  Future<ComparacionActaOficial> compararActaOficial({
+    required int idModalidad,
+    required DateTime fecha,
+  }) async {
+    final series = await obtenerFasesDeTorneoRealizado(idModalidad, fecha);
+    final puntuables = series.where((s) => !s.esEnsayo).toList();
+    final totalApp =
+        puntuables.fold<double>(0, (a, s) => a + s.totalPuntos);
+
+    final acta = await obtenerActaOficialTorneo(idModalidad, fecha);
+    if (acta?.totalOficial != null) {
+      return ComparacionActaOficial(
+        totalApp: totalApp,
+        totalOficial: acta!.totalOficial,
+        fuenteOficial: 'torneo',
+        seriesConOficial: puntuables.where((s) => s.puntuacionOficialSerie != null).length,
+        tirosConOficial: 0,
+        resumenConteos: acta.tieneConteos ? acta.resumenConteos : null,
+      );
+    }
+
+    if (acta != null && acta.tieneConteos) {
+      return ComparacionActaOficial(
+        totalApp: totalApp,
+        totalOficial: acta.totalDesdeConteos,
+        fuenteOficial: 'conteos',
+        seriesConOficial: 0,
+        tirosConOficial: acta.totalDisparosConteo,
+        resumenConteos: acta.resumenConteos,
+      );
+    }
+
+    double sumaSeries = 0;
+    int seriesCon = 0;
+    int seriesCompletas = 0;
+    int tirosCon = 0;
+    double sumaTiros = 0;
+    bool todasSeriesTienenOficial = puntuables.isNotEmpty;
+
+    for (final s in puntuables) {
+      if (s.puntuacionOficialSerie != null) {
+        sumaSeries += s.puntuacionOficialSerie!;
+        seriesCon++;
+        seriesCompletas++;
+      } else {
+        final disparos = await obtenerDisparosDeSesion(s.id);
+        final conOficial = disparos.where((d) => d.puntuacionOficial != null).toList();
+        tirosCon += conOficial.length;
+        for (final d in conOficial) {
+          sumaTiros += d.puntuacionOficial!;
+        }
+        if (disparos.isNotEmpty && conOficial.length == disparos.length) {
+          sumaSeries += conOficial.fold<double>(0, (a, d) => a + d.puntuacionOficial!);
+          seriesCompletas++;
+        } else {
+          todasSeriesTienenOficial = false;
+        }
+      }
+    }
+
+    if (todasSeriesTienenOficial && seriesCompletas == puntuables.length) {
+      return ComparacionActaOficial(
+        totalApp: totalApp,
+        totalOficial: sumaSeries,
+        fuenteOficial: 'series',
+        seriesConOficial: seriesCon > 0 ? seriesCon : seriesCompletas,
+        tirosConOficial: tirosCon,
+      );
+    }
+
+    if (tirosCon > 0) {
+      return ComparacionActaOficial(
+        totalApp: totalApp,
+        totalOficial: sumaTiros,
+        fuenteOficial: 'tiros',
+        seriesConOficial: seriesCon,
+        tirosConOficial: tirosCon,
+      );
+    }
+
+    if (seriesCon > 0) {
+      return ComparacionActaOficial(
+        totalApp: totalApp,
+        totalOficial: sumaSeries,
+        fuenteOficial: 'series',
+        seriesConOficial: seriesCon,
+        tirosConOficial: tirosCon,
+      );
+    }
+
+    return ComparacionActaOficial(
+      totalApp: totalApp,
+      totalOficial: null,
+      fuenteOficial: 'ninguna',
+      seriesConOficial: 0,
+      tirosConOficial: 0,
+    );
   }
 }

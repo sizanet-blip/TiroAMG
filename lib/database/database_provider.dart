@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseProvider {
-  static const int schemaVersion = 10;
+  static const int schemaVersion = 12;
   static Database? _database;
   static final DatabaseProvider instance = DatabaseProvider._constructor();
 
@@ -195,7 +195,8 @@ class DatabaseProvider {
         viento_ms REAL,
         viento_direccion TEXT,
         iluminacion TEXT,
-        es_correccion_mira INTEGER NOT NULL DEFAULT 0
+        es_correccion_mira INTEGER NOT NULL DEFAULT 0,
+        puntuacion_oficial_serie REAL
       )
     ''');
 
@@ -207,7 +208,21 @@ class DatabaseProvider {
         coordenada_x REAL,
         coordenada_y REAL,
         puntuacion REAL,
-        es_mosca INTEGER
+        es_mosca INTEGER,
+        puntuacion_oficial REAL,
+        es_mosca_oficial INTEGER
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE ActaOficialTorneo (
+        id_modalidad INTEGER NOT NULL,
+        fecha_dia TEXT NOT NULL,
+        total_oficial REAL,
+        moscas_oficiales INTEGER,
+        nota TEXT,
+        conteos_json TEXT,
+        PRIMARY KEY (id_modalidad, fecha_dia)
       )
     ''');
 
@@ -242,6 +257,12 @@ class DatabaseProvider {
     }
     if (oldVersion < 10) {
       await _migrarV9aV10(db);
+    }
+    if (oldVersion < 11) {
+      await _migrarV10aV11(db);
+    }
+    if (oldVersion < 12) {
+      await _migrarV11aV12(db);
     }
   }
 
@@ -531,6 +552,26 @@ class DatabaseProvider {
       'Sesiones',
       'es_correccion_mira INTEGER NOT NULL DEFAULT 0',
     );
+  }
+
+  Future<void> _migrarV10aV11(Database db) async {
+    await _agregarColumnaSiNoExiste(db, 'Disparos', 'puntuacion_oficial REAL');
+    await _agregarColumnaSiNoExiste(db, 'Disparos', 'es_mosca_oficial INTEGER');
+    await _agregarColumnaSiNoExiste(db, 'Sesiones', 'puntuacion_oficial_serie REAL');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ActaOficialTorneo (
+        id_modalidad INTEGER NOT NULL,
+        fecha_dia TEXT NOT NULL,
+        total_oficial REAL,
+        moscas_oficiales INTEGER,
+        nota TEXT,
+        PRIMARY KEY (id_modalidad, fecha_dia)
+      )
+    ''');
+  }
+
+  Future<void> _migrarV11aV12(Database db) async {
+    await _agregarColumnaSiNoExiste(db, 'ActaOficialTorneo', 'conteos_json TEXT');
   }
 
   Future<void> _agregarColumnaSiNoExiste(

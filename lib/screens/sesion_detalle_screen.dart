@@ -326,6 +326,30 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sesión actualizada')));
   }
 
+  Widget _filaDato(IconData icono, String texto, {bool negrita = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        children: [
+          Icon(icono, size: 14, color: AppColors.subtitle),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              texto,
+              style: TextStyle(
+                color: AppColors.title,
+                fontSize: 13,
+                fontWeight: negrita ? FontWeight.w500 : FontWeight.normal,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _generarPDF() async {
     if (_sesion == null) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generando PDF...'), duration: Duration(seconds: 1)));
@@ -431,13 +455,16 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                       ],
                       const SizedBox(height: 5),
                       if (_equipoDetalle != null)
-                        Row(children: [Icon(Icons.hardware, size: 14, color: AppColors.subtitle), const SizedBox(width: 5), Text(_equipoDetalle!.nombre, style: TextStyle(color: AppColors.title, fontSize: 13, fontWeight: FontWeight.w500))]),
+                        _filaDato(Icons.hardware, _equipoDetalle!.nombre, negrita: true),
                       if (_municionDetalle != null)
-                        Row(children: [Icon(Icons.local_fire_department, size: 14, color: AppColors.subtitle), const SizedBox(width: 5), Text('${_municionDetalle!.marca} (${_municionDetalle!.lote})', style: TextStyle(color: AppColors.title, fontSize: 13))]),
+                        _filaDato(
+                          Icons.local_fire_department,
+                          '${_municionDetalle!.marca} (${_municionDetalle!.lote})',
+                        ),
                       if (_sesion?.lugar != null && _sesion!.lugar!.isNotEmpty)
-                        Row(children: [Icon(Icons.place, size: 14, color: AppColors.subtitle), const SizedBox(width: 5), Text(_sesion!.lugar!, style: TextStyle(color: AppColors.title, fontSize: 13))]),
+                        _filaDato(Icons.place, _sesion!.lugar!),
                       if (_sesion?.distanciaMetros != null)
-                        Row(children: [Icon(Icons.straighten, size: 14, color: AppColors.subtitle), const SizedBox(width: 5), Text('${_sesion!.distanciaMetros} m', style: TextStyle(color: AppColors.title, fontSize: 13))]),
+                        _filaDato(Icons.straighten, '${_sesion!.distanciaMetros} m'),
                       if (_sesion?.temperaturaC != null || _sesion?.humedadPct != null || _sesion?.vientoMs != null) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -445,6 +472,8 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                           'Hum: ${_sesion?.humedadPct?.toStringAsFixed(0) ?? '-'}% | '
                           'Viento: ${_sesion?.vientoMs?.toStringAsFixed(1) ?? '-'} m/s ${_sesion?.vientoDireccion ?? ''}',
                           style: TextStyle(color: AppColors.subtitle, fontSize: 12),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                       if (_sesion?.nota != null && _sesion!.nota!.isNotEmpty) ...[
@@ -456,12 +485,19 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text('$puntos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28, color: AppColors.accentTraining)),
                     Text("PUNTOS", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.accentTraining)),
-                    if (moscas > 0) Text('$moscas moscas (x)', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accentCompetition, fontSize: 12)),
+                    if (moscas > 0)
+                      Text(
+                        '$moscas moscas (x)',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accentCompetition, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                   ],
                 ),
               ],

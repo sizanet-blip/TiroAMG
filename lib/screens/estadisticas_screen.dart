@@ -65,7 +65,10 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   List<ComparativoLotesContexto> _comparativoLotes = [];
 
   bool get _esModoDetalle => widget.idsSesionFijos != null && widget.idsSesionFijos!.isNotEmpty;
-  bool get _mostrarCorreccionMira => _esModoDetalle && _esCorreccionMira;
+  bool get _esSesionUnica =>
+      _esModoDetalle && widget.idsSesionFijos!.length == 1;
+  /// Clics de mira solo en análisis de una sesión marcada para corrección.
+  bool get _mostrarCorreccionMira => _esSesionUnica && _esCorreccionMira;
   bool get _mostrarTecnica => !_mostrarCorreccionMira;
 
   @override
@@ -86,7 +89,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       final sesion =
           await _entrenamientoService.obtenerSesionPorId(widget.idsSesionFijos!.first);
       if (sesion != null) {
-        correccion = sesion.esCorreccionMira;
+        // Corrección de miras solo aplica al analizar una sola sesión.
+        correccion = widget.idsSesionFijos!.length == 1 && sesion.esCorreccionMira;
         try {
           equipoDeSesion = e.firstWhere((eq) => eq.id == sesion.idEquipo);
         } catch (_) {}
@@ -265,8 +269,13 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       }
 
       String textoPeriodo = "Histórico";
-      if (_esModoDetalle) textoPeriodo = "Detalle de Sesión";
-      else if (rangoPdf != null) textoPeriodo = "${rangoPdf.start.day}/${rangoPdf.start.month} - ${rangoPdf.end.day}/${rangoPdf.end.month}";
+      final nSel = widget.idsSesionFijos?.length ?? 0;
+      if (_esModoDetalle) {
+        textoPeriodo = nSel == 1 ? "Detalle de Sesión" : "$nSel sesiones seleccionadas";
+      } else if (rangoPdf != null) {
+        textoPeriodo =
+            "${rangoPdf.start.day}/${rangoPdf.start.month} - ${rangoPdf.end.day}/${rangoPdf.end.month}";
+      }
 
       await _pdfService.generarInformeAnalisisCompleto(
         perfil: null, 
@@ -274,7 +283,11 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
         datosDianas: resultados,
         datosProgreso: _datosProgreso,
         comparativoLotes: _comparativoLotes,
-        observaciones: _esModoDetalle ? "Informe detallado de sesión." : "Informe de evolución.",
+        observaciones: _esModoDetalle
+            ? (nSel == 1
+                ? 'Informe detallado de sesión.'
+                : 'Informe de $nSel sesiones seleccionadas.')
+            : 'Informe de evolución.',
         mostrarCorreccionMira: _mostrarCorreccionMira,
         incluirDiagnosticoTecnico: _mostrarTecnica,
       );
@@ -317,7 +330,12 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String titulo = _esModoDetalle ? 'Análisis de Sesión' : (widget.modo == 2 ? 'Análisis Competiciones' : 'Análisis Entrenamientos');
+    final nSel = widget.idsSesionFijos?.length ?? 0;
+    String titulo = _esModoDetalle
+        ? (nSel == 1
+            ? 'Análisis de Sesión'
+            : 'Análisis ($nSel sesiones)')
+        : (widget.modo == 2 ? 'Análisis Competiciones' : 'Análisis Entrenamientos');
 
     return Scaffold(
       backgroundColor: AppColors.background,
