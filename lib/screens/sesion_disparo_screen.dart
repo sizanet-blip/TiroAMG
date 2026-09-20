@@ -9,6 +9,8 @@ import '../models/disparo_model.dart';
 import '../services/catalogo_service.dart';
 import '../services/entrenamiento_service.dart';
 import '../services/audio_service.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
+import '../utils/impacto_visual.dart';
 
 enum FaseSesion { stop, preparacion, espera, fuego, fin }
 
@@ -33,6 +35,8 @@ class SesionDisparoScreen extends StatefulWidget {
   final Function(List<Disparo> disparos, int puntos)? onCompletar;
   /// Si true: panel X/10…0 en lugar de marcar impactos en la diana.
   final bool usarEntradaManualPuntos;
+  /// Sesión orientada a regular miras (análisis de clics).
+  final bool esCorreccionMira;
 
   const SesionDisparoScreen({
     super.key,
@@ -54,6 +58,7 @@ class SesionDisparoScreen extends StatefulWidget {
     this.totalSeries,
     this.onCompletar,
     this.usarEntradaManualPuntos = false,
+    this.esCorreccionMira = false,
   });
 
   @override
@@ -819,6 +824,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       vientoMs: widget.vientoMs,
       vientoDireccion: widget.vientoDireccion,
       iluminacion: widget.iluminacion,
+      esCorreccionMira: widget.esCorreccionMira,
     );
 
     await _entrenamientoService.guardarSesionCompleta(sesion, _listaDisparos);
@@ -981,8 +987,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
           appBar: landscape
               ? null
               : AppBar(
-                  title: Text(
-                    widget.tituloSerie ?? widget.plantilla.nombreDisciplina,
+                  title: TiroAmgAppBarTitle(
+                    section: widget.tituloSerie ?? widget.plantilla.nombreDisciplina,
                   ),
                   backgroundColor: Colors.black,
                   foregroundColor: Colors.white,
@@ -1757,38 +1763,7 @@ class DianaPainter extends CustomPainter {
   });
 
   /// Radio del impacto respecto al ancho de un anillo de puntuación.
-  /// Referencia: diana 25 m (~25 mm/anillo) y .22 LR (~5,6 mm) ≈ 0,11.
-  double _fraccionRadioAnillo() {
-    final c = (nombreCalibre ?? '').toLowerCase();
-    if (c.contains('4.5') ||
-        c.contains('4,5') ||
-        c.contains('.177') ||
-        c.contains('aire')) {
-      return 0.09;
-    }
-    if (c.contains('.32') || c.contains('7.65') || c.contains('7,65')) {
-      return 0.13;
-    }
-    if (c.contains('9mm') ||
-        c.contains('9 mm') ||
-        c.contains('.38') ||
-        c.contains('.45') ||
-        c.contains('40') ||
-        c.contains('.44')) {
-      return 0.17;
-    }
-    // .22 / por defecto
-    return 0.11;
-  }
-
-  void _dibujarImpacto(Canvas canvas, Offset punto, double radio) {
-    // Rojo relleno: máximo contraste y lectura rápida en claro/negro.
-    canvas.drawCircle(
-      punto,
-      radio,
-      Paint()..color = const Color(0xFFE53935),
-    );
-  }
+  /// (vía ImpactoVisual, misma referencia que historial/análisis)
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1847,10 +1822,12 @@ class DianaPainter extends CustomPainter {
     }
     
     // 5. Impactos encima de números (tapa local + doble contraste)
-    final radioImpacto =
-        (anchoZona * _fraccionRadioAnillo()).clamp(2.0, anchoZona * 0.22);
+    final radioImpacto = ImpactoVisual.radioPx(
+      anchoZona: anchoZona,
+      nombreCalibre: nombreCalibre,
+    );
     for (final p in impactos) {
-      _dibujarImpacto(canvas, p, radioImpacto);
+      ImpactoVisual.dibujar(canvas, p, radioImpacto);
     }
   }
 

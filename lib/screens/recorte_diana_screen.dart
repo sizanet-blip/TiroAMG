@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import '../services/hole_detection_service.dart' as hole_service;
 import '../services/corner_detection_service.dart';
 import '../models/disparo_model.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
 
 // Clase auxiliar Point
 class Point<T> {
@@ -1731,7 +1732,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detección Automática de Agujeros'),
+        title: const TiroAmgAppBarTitle(section: 'Detección Automática de Agujeros'),
         backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
         actions: [
@@ -2722,7 +2723,7 @@ class _CropTargetScreenState extends State<CropTargetScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Recortar Diana'),
+        title: const TiroAmgAppBarTitle(section: 'Recortar Diana'),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
         actions: [

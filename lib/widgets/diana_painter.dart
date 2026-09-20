@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/impacto_visual.dart';
 
 class DianaPainter extends CustomPainter {
   final List<Offset> impactos;
@@ -10,9 +11,7 @@ class DianaPainter extends CustomPainter {
   final bool tieneMosca;
   final bool tieneGuias;
   final bool esEstiloDuelo;
-
-  // NUEVO: Centro de Gravedad (MPI)
-  // Si no es null, dibujaremos una cruz indicando el desvío medio
+  final String? nombreCalibre;
   final Offset? centroGravedad; 
 
   DianaPainter({
@@ -23,6 +22,7 @@ class DianaPainter extends CustomPainter {
     required this.tieneMosca,
     required this.tieneGuias,
     required this.esEstiloDuelo,
+    this.nombreCalibre,
     this.centroGravedad,
   });
 
@@ -31,17 +31,22 @@ class DianaPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // 1. Dibujar la Diana Base
     if (esEstiloDuelo) {
       _pintarDianaDuelo(canvas, center, radius);
     } else {
       _pintarDianaPrecision(canvas, center, radius);
     }
 
-    // 2. Dibujar Impactos
-    _pintarImpactos(canvas, radius);
+    final totalZonas = esEstiloDuelo ? 6 : (11 - valorMinimo).clamp(1, 20);
+    final anchoZona = radius / totalZonas;
+    final radioImpacto = ImpactoVisual.radioPx(
+      anchoZona: anchoZona,
+      nombreCalibre: nombreCalibre,
+    );
+    for (final punto in impactos) {
+      ImpactoVisual.dibujar(canvas, punto, radioImpacto);
+    }
 
-    // 3. DIBUJAR CENTRO DE GRAVEDAD (MPI)
     if (centroGravedad != null) {
       _pintarCentroGravedad(canvas, centroGravedad!);
     }
@@ -49,22 +54,15 @@ class DianaPainter extends CustomPainter {
 
   void _pintarCentroGravedad(Canvas canvas, Offset pos) {
     final paintMPI = Paint()
-      ..color = Colors.redAccent // Color llamativo
+      ..color = Colors.redAccent
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
-    // Dibujar una cruz grande
     double sizeCruz = 15.0;
     canvas.drawLine(Offset(pos.dx - sizeCruz, pos.dy), Offset(pos.dx + sizeCruz, pos.dy), paintMPI);
     canvas.drawLine(Offset(pos.dx, pos.dy - sizeCruz), Offset(pos.dx, pos.dy + sizeCruz), paintMPI);
-    
-    // Círculo alrededor
     canvas.drawCircle(pos, sizeCruz / 1.5, paintMPI);
   }
-
-  // ... (El resto de métodos _pintarDianaDuelo, _pintarDianaPrecision, etc. son IDÉNTICOS a los que ya tenías) ...
-  // ... COPIA AQUÍ LOS MÉTODOS DE PINTURA QUE YA TENÍAS FUNCIONANDO EN SESION_DETALLE O DISPARO ...
-  // Para que este código compile limpio, incluyo las versiones resumidas, pero usa tu lógica completa si la tienes personalizada.
 
   void _pintarDianaDuelo(Canvas canvas, Offset center, double radius) {
       final paintNegro = Paint()..color = const Color(0xFF1A1A1A)..style = PaintingStyle.fill;
@@ -90,18 +88,6 @@ class DianaPainter extends CustomPainter {
              canvas.drawCircle(center, r, paintLinea);
           }
       }
-  }
-
-  void _pintarImpactos(Canvas canvas, double radius) {
-    final paintImpacto = Paint()..color = Colors.greenAccent.withOpacity(0.6)..style = PaintingStyle.fill; // Un poco transparente para ver acumulación
-    
-    // Cálculo de tamaño relativo
-    int totalZonas = esEstiloDuelo ? 6 : (11 - valorMinimo);
-    double tamano = (radius * 0.035) * (10 / totalZonas); 
-
-    for (var punto in impactos) {
-      canvas.drawCircle(punto, tamano, paintImpacto);
-    }
   }
 
   @override

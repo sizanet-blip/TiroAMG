@@ -13,6 +13,8 @@ import '../services/pdf_service.dart';
 import '../services/perfil_service.dart';
 import '../services/municion_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
+import '../utils/impacto_visual.dart';
 import 'estadisticas_screen.dart'; // <--- IMPORTANTE: Para navegar a estadísticas
 
 class SesionDetalleScreen extends StatefulWidget {
@@ -357,7 +359,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Detalle de Tirada'),
+        title: const TiroAmgAppBarTitle(section: 'Detalle de Tirada'),
         actions: [
           // --- 1. BOTÓN ESTADÍSTICAS (NUEVO) ---
           IconButton(
@@ -408,6 +410,25 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(_plantilla?.nombreDisciplina ?? 'Desconocido', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.title)),
+                      if (_sesion?.esCorreccionMira == true) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentAnalytics.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(AppRadii.iconBox),
+                            border: Border.all(color: AppColors.accentAnalytics.withValues(alpha: 0.35)),
+                          ),
+                          child: Text(
+                            'Corrección de miras',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.accentAnalytics,
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 5),
                       if (_equipoDetalle != null)
                         Row(children: [Icon(Icons.hardware, size: 14, color: AppColors.subtitle), const SizedBox(width: 5), Text(_equipoDetalle!.nombre, style: TextStyle(color: AppColors.title, fontSize: 13, fontWeight: FontWeight.w500))]),
@@ -473,6 +494,7 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
                         tieneMosca: _tieneMosca,
                         tieneGuias: _tieneGuias,
                         esEstiloDuelo: _esEstiloDuelo,
+                        nombreCalibre: _equipoDetalle?.nombreCalibre,
                       ),
                     );
                   },
@@ -482,7 +504,6 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
           ),
           
           Container(
-            height: 120, 
             decoration: const BoxDecoration(
               color: AppColors.surface,
               border: Border(top: BorderSide(color: AppColors.border)),
@@ -490,39 +511,54 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
             child: SafeArea(
               top: false,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.only(top: 8, bottom: 4),
                     child: Text("Secuencia", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.subtitle)),
                   ),
                   const Divider(height: 1),
-                  Expanded(
+                  SizedBox(
+                    height: 76,
                     child: Scrollbar(
                       controller: _scrollController,
                       thumbVisibility: true,
                       child: ListView.builder(
                         controller: _scrollController,
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         itemCount: _disparos.length,
                         itemBuilder: (context, index) {
                           final tiro = _disparos[index];
+                          final usaDecimal = _plantilla?.puntuacionDecimal == true;
+                          final textoPuntos = usaDecimal
+                              ? tiro.puntuacion.toStringAsFixed(1)
+                              : '${tiro.puntuacion.round()}';
                           return Container(
-                            width: 64, 
-                            margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            width: 64,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                             decoration: BoxDecoration(
-                              color: tiro.esMosca ? AppColors.accentCompetition.withValues(alpha: 0.1) : AppColors.surface,
+                              color: tiro.esMosca
+                                  ? AppColors.accentCompetition.withValues(alpha: 0.1)
+                                  : AppColors.surface,
                               borderRadius: BorderRadius.circular(AppRadii.iconBox),
                               border: Border.all(color: AppColors.border),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                FittedBox(child: Text('#${tiro.numero}', style: TextStyle(fontSize: 10, color: AppColors.subtitle))),
-                                const SizedBox(height: 2),
-                                Expanded(child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text('${tiro.puntuacion.toInt()}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.title))))),
-                                if(tiro.esMosca) FittedBox(child: Text('X', style: TextStyle(fontSize: 12, color: AppColors.accentCompetition, fontWeight: FontWeight.bold))) else const SizedBox(height: 12), 
+                                Text('#${tiro.numero}', style: TextStyle(fontSize: 10, color: AppColors.subtitle)),
+                                Text(
+                                  textoPuntos,
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.title),
+                                ),
+                                SizedBox(
+                                  height: 12,
+                                  child: tiro.esMosca
+                                      ? Text('X', style: TextStyle(fontSize: 11, color: AppColors.accentCompetition, fontWeight: FontWeight.bold))
+                                      : null,
+                                ),
                               ],
                             ),
                           );
@@ -548,6 +584,7 @@ class DianaPainter extends CustomPainter {
   final bool tieneMosca;
   final bool tieneGuias;
   final bool esEstiloDuelo;
+  final String? nombreCalibre;
   final Offset? centroGravedad;
 
   DianaPainter({
@@ -558,6 +595,7 @@ class DianaPainter extends CustomPainter {
     required this.tieneMosca,
     required this.tieneGuias,
     required this.esEstiloDuelo,
+    this.nombreCalibre,
     this.centroGravedad,
   });
 
@@ -566,13 +604,14 @@ class DianaPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    final paintFondo = Paint()..color = esFondoNegro ? const Color(0xFF1A1A1A) : Colors.white..style = PaintingStyle.fill;
+    final paintFondo = Paint()
+      ..color = esFondoNegro ? const Color(0xFF1A1A1A) : Colors.white
+      ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, paintFondo);
 
     int totalZonas = 11 - valorMinimo; 
     if (totalZonas < 1) totalZonas = 1;
     
-    // VARIABLE QUE FALTABA: Declaramos el ancho de cada zona
     double anchoZona = radius / totalZonas; 
 
     final paintNegro = Paint()..color = Colors.black..style = PaintingStyle.fill;
@@ -587,6 +626,7 @@ class DianaPainter extends CustomPainter {
           int numeroAnillo = 5 + i;
           if (numeroAnillo < 10) _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (paso / 2), Colors.white);
        }
+       anchoZona = paso;
     } else {
        for (int i = 0; i < totalZonas; i++) {
           int numeroAnillo = valorMinimo + i;
@@ -621,10 +661,12 @@ class DianaPainter extends CustomPainter {
     canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), Paint()..color = Colors.white..strokeWidth=1);
     canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), Paint()..color = Colors.white..strokeWidth=1);
 
-    final paintImpacto = Paint()..color = Colors.greenAccent.withOpacity(0.6)..style = PaintingStyle.fill;
-    double tamano = (radius * 0.04) * (10 / totalZonas);
-    for(var p in impactos) {
-       canvas.drawCircle(p, tamano, paintImpacto);
+    final radioImpacto = ImpactoVisual.radioPx(
+      anchoZona: anchoZona,
+      nombreCalibre: nombreCalibre,
+    );
+    for (final p in impactos) {
+      ImpactoVisual.dibujar(canvas, p, radioImpacto);
     }
 
     if (centroGravedad != null) {
@@ -656,5 +698,14 @@ class DianaPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant DianaPainter oldDelegate) => true;
+  bool shouldRepaint(covariant DianaPainter oldDelegate) =>
+      oldDelegate.impactos != impactos ||
+      oldDelegate.nombreCalibre != nombreCalibre ||
+      oldDelegate.valorMinimo != valorMinimo ||
+      oldDelegate.anilloNegroInicio != anilloNegroInicio ||
+      oldDelegate.esFondoNegro != esFondoNegro ||
+      oldDelegate.tieneMosca != tieneMosca ||
+      oldDelegate.tieneGuias != tieneGuias ||
+      oldDelegate.esEstiloDuelo != esEstiloDuelo ||
+      oldDelegate.centroGravedad != centroGravedad;
 }

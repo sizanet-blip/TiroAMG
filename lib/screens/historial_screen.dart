@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/sesion_model.dart';
 import '../services/entrenamiento_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
 import 'sesion_detalle_screen.dart';
 import 'competicion_historial_detalle_screen.dart';
 import 'estadisticas_screen.dart';
@@ -175,7 +176,7 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Historial'),
+        title: const TiroAmgAppBarTitle(section: 'Historial'),
         actions: [
           // Botón de Estadísticas contextual
           IconButton(

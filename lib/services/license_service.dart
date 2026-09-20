@@ -922,6 +922,59 @@ class LicenseService {
 
   Future<LicenciaLocal> _guardarPayloadLicencia(Map<String, dynamic> payload) async {
     final db = await DatabaseProvider.instance.database;
+
+    // No permitir que un sync en vuelo borre aceptación legal ya guardada.
+    final actual = await obtenerLicenciaLocal();
+    if (actual != null) {
+      Map<String, dynamic> features = {};
+      final raw = payload['features_json']?.toString();
+      if (raw != null && raw.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map<String, dynamic>) {
+            features = Map<String, dynamic>.from(decoded);
+          } else if (decoded is Map) {
+            features = Map<String, dynamic>.from(decoded);
+          }
+        } catch (_) {}
+      }
+      for (final key in const [
+        'privacy_accepted',
+        'privacy_version',
+        'privacy_accepted_at',
+        'terms_accepted',
+        'terms_version',
+        'terms_accepted_at',
+        'contact_email',
+      ]) {
+        final localVal = actual.features[key];
+        if (localVal != null && !features.containsKey(key)) {
+          features[key] = localVal;
+        } else if (localVal == true && features[key] != true) {
+          // Preferir "aceptado" local frente a un snapshot antiguo sin flags.
+          features[key] = localVal;
+        } else if (key == 'contact_email' &&
+            (features[key] == null || features[key].toString().isEmpty) &&
+            localVal != null &&
+            localVal.toString().isNotEmpty) {
+          features[key] = localVal;
+        }
+      }
+      // Si local ya aceptó, mantener versiones/fechas locales si el payload no las trae.
+      if (actual.privacyAccepted) {
+        features['privacy_accepted'] = true;
+        features['privacy_version'] ??= actual.features['privacy_version'];
+        features['privacy_accepted_at'] ??= actual.features['privacy_accepted_at'];
+      }
+      if (actual.termsAccepted) {
+        features['terms_accepted'] = true;
+        features['terms_version'] ??= actual.features['terms_version'];
+        features['terms_accepted_at'] ??= actual.features['terms_accepted_at'];
+      }
+      payload = Map<String, dynamic>.from(payload);
+      payload['features_json'] = jsonEncode(features);
+    }
+
     await db.insert(
       'Licencias',
       payload,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/competicion_model.dart';
 import '../services/competicion_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
 // Importamos las pantallas de destino
 import 'competicion_detalle_screen.dart'; // Para editar
 import 'competicion_setup_screen.dart'; // Para empezar (Setup)
@@ -192,7 +193,7 @@ class _CompeticionScreenState extends State<CompeticionScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Competiciones'),
+        title: const TiroAmgAppBarTitle(section: 'Competiciones'),
       ),
       body: _lista.isEmpty
           ? Center(

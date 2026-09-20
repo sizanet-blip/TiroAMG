@@ -13,6 +13,7 @@ import '../models/informe_model.dart';
 import '../services/perfil_service.dart';
 import '../models/tipo_diana_model.dart';
 import 'estadisticas_service.dart'; 
+import '../utils/impacto_visual.dart';
 
 class DatosInformeDiana {
   final TipoDiana diana;
@@ -49,7 +50,6 @@ class PdfService {
   static const PdfColor colorGris = PdfColor.fromInt(0xFF9E9E9E);
   static const PdfColor colorGrisClaro = PdfColor.fromInt(0xFFEEEEEE);
   static const PdfColor colorGrisBorde = PdfColor.fromInt(0xFFE0E0E0);
-  static const PdfColor colorVerdeImpacto = PdfColor.fromInt(0xFF00C853);
   static const PdfColor colorAzul = PdfColor.fromInt(0xFF1976D2); 
   static const PdfColor colorAzulClaro = PdfColor.fromInt(0xFFBBDEFB); 
   static const PdfColor colorRojoMPI = PdfColor.fromInt(0xFFD50000);
@@ -81,6 +81,8 @@ class PdfService {
     required List<Map<String, dynamic>> datosProgreso,
     List<ComparativoLotesContexto> comparativoLotes = const [],
     String? observaciones,
+    bool mostrarCorreccionMira = false,
+    bool incluirDiagnosticoTecnico = true,
   }) async {
     final doc = pw.Document();
     
@@ -132,23 +134,39 @@ class PdfService {
                              return pw.CustomPaint(
                                size: PdfPoint(constraints.maxWidth, constraints.maxWidth),
                                painter: (PdfGraphics canvas, PdfPoint size) {
-                                 _dianaFinalV4(canvas, size, datos.diana, datos.analisis, font: fontNativa);
+                                 _dianaFinalV4(
+                                   canvas,
+                                   size,
+                                   datos.diana,
+                                   datos.analisis,
+                                   font: fontNativa,
+                                   nombreCalibre: datos.equipo?.nombreCalibre,
+                                 );
                                }
                              );
                            }),
                          ),
                        ),
                        pw.SizedBox(width: 15),
-                       pw.Expanded(flex: 3, child: _buildPanelCorreccion(datos.analisis, datos.equipo)),
+                       pw.Expanded(
+                         flex: 3,
+                         child: _buildPanelCorreccion(
+                           datos.analisis,
+                           datos.equipo,
+                           mostrarCorreccionMira: mostrarCorreccionMira,
+                         ),
+                       ),
                      ]
                    ),
-                   pw.SizedBox(height: 15),
-                   pw.Text("Diagnóstico de Errores", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: colorAzul)),
-                   pw.Divider(color: colorGrisBorde),
-                   if (datos.diagnostico.isEmpty)
-                      pw.Text("Sin datos suficientes para diagnóstico.", style: const pw.TextStyle(color: PdfColors.grey, fontSize: 10))
-                   else
-                      ...datos.diagnostico.take(5).map((d) => _buildBarraError(d)),
+                   if (incluirDiagnosticoTecnico) ...[
+                     pw.SizedBox(height: 15),
+                     pw.Text("Diagnóstico de Errores", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: colorAzul)),
+                     pw.Divider(color: colorGrisBorde),
+                     if (datos.diagnostico.isEmpty)
+                        pw.Text("Sin datos suficientes para diagnóstico.", style: const pw.TextStyle(color: PdfColors.grey, fontSize: 10))
+                     else
+                        ...datos.diagnostico.take(5).map((d) => _buildBarraError(d)),
+                   ],
                    pw.SizedBox(height: 30),
                 ]
               );
@@ -316,14 +334,28 @@ class PdfService {
     );
   }
   
-  pw.Widget _buildPanelCorreccion(AnalisisAgrupacion a, EquipoDetalle? e) {
-    String consejo = "Miras Correctas";
-    if (!_sane(a.mpi.x).isNaN && !_sane(a.mpi.y).isNaN) {
-        if ((e?.correccionClick??0)>0 && (a.mpi.x.abs()>0.05 || a.mpi.y.abs()>0.05)) { consejo = "CORREGIR MIRAS"; }
+  pw.Widget _buildPanelCorreccion(
+    AnalisisAgrupacion a,
+    EquipoDetalle? e, {
+    required bool mostrarCorreccionMira,
+  }) {
+    String consejo = "Agrupación";
+    if (mostrarCorreccionMira &&
+        !_sane(a.mpi.x).isNaN &&
+        !_sane(a.mpi.y).isNaN) {
+      if ((e?.correccionClick ?? 0) > 0 &&
+          (a.mpi.x.abs() > 0.05 || a.mpi.y.abs() > 0.05)) {
+        consejo = "CORREGIR MIRAS";
+      } else if (a.mpi.x.abs() <= 0.05 && a.mpi.y.abs() <= 0.05) {
+        consejo = "Miras correctas";
+      }
     }
-    return pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
-        pw.Text("CORRECCIÓN",style:pw.TextStyle(fontSize:8,fontWeight:pw.FontWeight.bold,color:PdfColors.grey)),
-        pw.Text(consejo,style:pw.TextStyle(fontSize:14,fontWeight:pw.FontWeight.bold,color:PdfColors.green)),
+    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text(
+          mostrarCorreccionMira ? "CORRECCIÓN" : "AGRUPACIÓN",
+          style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey),
+        ),
+        pw.Text(consejo, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.green)),
         if (a.consejoTendencia.isNotEmpty && a.consejoTendencia != "Agrupación Circular (Equilibrada)")
           pw.Padding(padding: const pw.EdgeInsets.only(top: 8), child: pw.Text(a.consejoTendencia, style: pw.TextStyle(fontSize: 10, color: PdfColors.blueGrey800, fontStyle: pw.FontStyle.italic)))
     ]);
@@ -383,7 +415,14 @@ class PdfService {
     );
   }
 
-  void _dianaFinalV4(PdfGraphics canvas, PdfPoint size, TipoDiana diana, AnalisisAgrupacion analisis, {required PdfFont font}) {
+  void _dianaFinalV4(
+    PdfGraphics canvas,
+    PdfPoint size,
+    TipoDiana diana,
+    AnalisisAgrupacion analisis, {
+    required PdfFont font,
+    String? nombreCalibre,
+  }) {
       if (size.x.isNaN || size.y.isNaN || size.x <= 0 || size.y <= 0) return;
 
       double cx = size.x / 2; double cy = size.y / 2; double radius = size.x / 2;
@@ -398,19 +437,25 @@ class PdfService {
          if (diana.esFondoNegro) { canvas.setColor(PdfColors.white); canvas.setLineWidth(0.5); canvas.drawEllipse(cx, cy, r, r); canvas.strokePath(); } else { if (esNegro) { canvas.setColor(PdfColors.black); canvas.drawEllipse(cx, cy, r, r); canvas.fillPath(); canvas.setColor(PdfColors.white); } else { canvas.setColor(PdfColors.grey); } canvas.setLineWidth(0.5); canvas.drawEllipse(cx, cy, r, r); canvas.strokePath(); }
          if (numAnillo < 10 && r > 10) { PdfColor colorNum = (esNegro || diana.esFondoNegro) ? PdfColors.white : PdfColors.black; canvas.setColor(colorNum); String txt = numAnillo.toString(); double fontSize = 8.0; double offText = 3; canvas.drawString(font, fontSize, txt, cx - offText, cy - r + (anchoZona/2) - offText); canvas.drawString(font, fontSize, txt, cx - offText, cy + r - (anchoZona/2) - offText); canvas.drawString(font, fontSize, txt, cx - r + (anchoZona/2) - offText, cy - offText); canvas.drawString(font, fontSize, txt, cx + r - (anchoZona/2) - offText, cy - offText); }
       }
-      canvas.setColor(colorVerdeImpacto); double tamanoPunto = radius * 0.035;
+      final tamanoPunto = ImpactoVisual.radioPx(
+        anchoZona: anchoZona,
+        nombreCalibre: nombreCalibre,
+      );
+      const colorImpacto = PdfColor.fromInt(0xFFE53935);
+      const colorDesc = PdfColor.fromInt(0xFF9E9E9E);
+      canvas.setColor(colorImpacto);
       for (var d in analisis.disparosValidos) { 
          if (d.x.isNaN || d.y.isNaN || d.x.isInfinite || d.y.isInfinite) continue;
          double x = (d.x * radius) + cx; double y = cy - (d.y * radius); 
-         canvas.drawEllipse(x, y, tamanoPunto, tamanoPunto); canvas.fillPath(); canvas.setColor(diana.esFondoNegro ? PdfColors.white : PdfColors.black); canvas.setLineWidth(0.2); canvas.drawEllipse(x, y, tamanoPunto, tamanoPunto); canvas.strokePath(); canvas.setColor(colorVerdeImpacto); 
+         canvas.drawEllipse(x, y, tamanoPunto, tamanoPunto); canvas.fillPath();
       }
-      canvas.setColor(PdfColors.grey);
-      for (var d in analisis.disparosDescartados) { 
+      canvas.setColor(colorDesc);
+      for (var d in analisis.disparosDescartados) {
          if (d.x.isNaN || d.y.isNaN || d.x.isInfinite || d.y.isInfinite) continue;
-         double x = (d.x * radius) + cx; double y = cy - (d.y * radius); canvas.drawEllipse(x, y, tamanoPunto, tamanoPunto); canvas.fillPath(); 
+         double x = (d.x * radius) + cx; double y = cy - (d.y * radius); canvas.drawEllipse(x, y, tamanoPunto, tamanoPunto); canvas.fillPath();
       }
-      if (analisis.disparosValidos.isNotEmpty && !_sane(analisis.mpi.x).isNaN && !_sane(analisis.mpi.y).isNaN) { 
-         double mpiX = (analisis.mpi.x * radius) + cx; double mpiY = cy - (analisis.mpi.y * radius); canvas.setColor(colorRojoMPI); canvas.setLineWidth(2); double l = 10; canvas.drawLine(mpiX - l, mpiY, mpiX + l, mpiY); canvas.drawLine(mpiX, mpiY - l, mpiX, mpiY + l); canvas.strokePath(); canvas.setLineWidth(1); canvas.drawEllipse(mpiX, mpiY, 4, 4); canvas.strokePath(); 
+      if (analisis.disparosValidos.isNotEmpty && !_sane(analisis.mpi.x).isNaN && !_sane(analisis.mpi.y).isNaN) {
+         double mpiX = (analisis.mpi.x * radius) + cx; double mpiY = cy - (analisis.mpi.y * radius); canvas.setColor(colorRojoMPI); canvas.setLineWidth(2); double l = 10; canvas.drawLine(mpiX - l, mpiY, mpiX + l, mpiY); canvas.drawLine(mpiX, mpiY - l, mpiX, mpiY + l); canvas.strokePath(); canvas.setLineWidth(1); canvas.drawEllipse(mpiX, mpiY, 4, 4); canvas.strokePath();
       }
   }
 }

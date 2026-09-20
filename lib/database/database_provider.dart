@@ -2,16 +2,26 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseProvider {
-  static const int schemaVersion = 9;
+  static const int schemaVersion = 10;
   static Database? _database;
   static final DatabaseProvider instance = DatabaseProvider._constructor();
 
   DatabaseProvider._constructor();
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
+    if (_database != null && _database!.isOpen) return _database!;
     _database = await _initDB();
     return _database!;
+  }
+
+  /// Cierra la conexión y limpia el cache para poder sobrescribir el .db
+  /// (p. ej. tras restaurar un backup) y reabrir el archivo nuevo.
+  Future<void> closeAndReset() async {
+    final db = _database;
+    if (db != null && db.isOpen) {
+      await db.close();
+    }
+    _database = null;
   }
 
   Future<Database> _initDB() async {
@@ -184,7 +194,8 @@ class DatabaseProvider {
         presion_hpa REAL,
         viento_ms REAL,
         viento_direccion TEXT,
-        iluminacion TEXT
+        iluminacion TEXT,
+        es_correccion_mira INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -228,6 +239,9 @@ class DatabaseProvider {
     }
     if (oldVersion < 9) {
       await _migrarV8aV9(db);
+    }
+    if (oldVersion < 10) {
+      await _migrarV9aV10(db);
     }
   }
 
@@ -508,6 +522,14 @@ class DatabaseProvider {
         'Pistola Fuego Central (15+15)',
         '%Aragón%',
       ],
+    );
+  }
+
+  Future<void> _migrarV9aV10(Database db) async {
+    await _agregarColumnaSiNoExiste(
+      db,
+      'Sesiones',
+      'es_correccion_mira INTEGER NOT NULL DEFAULT 0',
     );
   }
 

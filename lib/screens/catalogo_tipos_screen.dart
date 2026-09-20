@@ -3,6 +3,7 @@ import '../models/catalogo_model.dart';
 import '../services/catalogo_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
 
 class CatalogoTiposScreen extends StatefulWidget {
   const CatalogoTiposScreen({super.key});
@@ -127,7 +128,7 @@ class _CatalogoTiposScreenState extends State<CatalogoTiposScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Catálogo: Tipos de Arma'),
+        title: const TiroAmgAppBarTitle(section: 'Catálogo: Tipos de Arma'),
       ),
       body: _lista.isEmpty
           ? Center(

@@ -72,9 +72,20 @@ class _BackupScreenState extends State<BackupScreen> {
                     context: context,
                     builder: (_) => AlertDialog(
                       title: const Text('¡Restauración completada!'),
-                      content: const Text('La base de datos ha sido restaurada.\nPor favor, cierra completamente la aplicación y vuélvela a abrir para ver los cambios.'),
-                      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
-                    )
+                      content: const Text(
+                        'La base de datos ha sido restaurada.\n'
+                        'Vuelve al inicio y abre Historial u otra pantalla para ver los datos restaurados.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context); // cierra el diálogo
+                            Navigator.pop(context); // vuelve atrás (p. ej. al home)
+                          },
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Importación cancelada o fallida')));

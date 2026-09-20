@@ -5,12 +5,15 @@ import '../services/estadisticas_service.dart' hide DateTimeRange;
 import '../services/equipo_service.dart';
 import '../services/catalogo_service.dart';
 import '../services/municion_service.dart';
+import '../services/entrenamiento_service.dart';
 import '../services/pdf_service.dart';
 import '../models/equipo_model.dart';
 import '../models/tipo_diana_model.dart';
 import '../models/disparo_model.dart';
 import '../models/municion_model.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
+import '../utils/impacto_visual.dart';
 
 class EstadisticasScreen extends StatefulWidget {
   final int modo; 
@@ -31,6 +34,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   final _equipoService = EquipoService();
   final _catalogoService = CatalogoService();
   final _municionService = MunicionService();
+  final _entrenamientoService = EntrenamientoService();
   final _pdfService = PdfService(); 
 
   final Color _colorTema = AppColors.accentAnalytics;
@@ -51,6 +55,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   bool _filtrosAbiertos = true; 
   bool _cargando = true;
   bool _soyZurdo = false;
+  /// Solo aplica en detalle de sesión: análisis de clics vs técnica.
+  bool _esCorreccionMira = false;
 
   List<Map<String, dynamic>> _datosProgreso = [];
   AnalisisAgrupacion? _analisis;
@@ -59,6 +65,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   List<ComparativoLotesContexto> _comparativoLotes = [];
 
   bool get _esModoDetalle => widget.idsSesionFijos != null && widget.idsSesionFijos!.isNotEmpty;
+  bool get _mostrarCorreccionMira => _esModoDetalle && _esCorreccionMira;
+  bool get _mostrarTecnica => !_mostrarCorreccionMira;
 
   @override
   void initState() {
@@ -71,13 +79,32 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     final e = await _equipoService.obtenerEquiposDetallados();
     final d = await _catalogoService.obtenerTiposDiana();
     final m = await _municionService.obtenerMunicionDetallada();
+
+    bool correccion = false;
+    EquipoDetalle? equipoDeSesion;
+    if (_esModoDetalle && widget.idsSesionFijos!.isNotEmpty) {
+      final sesion =
+          await _entrenamientoService.obtenerSesionPorId(widget.idsSesionFijos!.first);
+      if (sesion != null) {
+        correccion = sesion.esCorreccionMira;
+        try {
+          equipoDeSesion = e.firstWhere((eq) => eq.id == sesion.idEquipo);
+        } catch (_) {}
+      }
+    }
+
     if (mounted) {
       setState(() {
         _equipos = e;
         _dianas = d;
         _municiones = m;
-        if (d.isNotEmpty) _dianaSel = d.first; 
-        if (e.isNotEmpty) _equipoSel = e.first;
+        if (d.isNotEmpty) _dianaSel = d.first;
+        _esCorreccionMira = correccion;
+        if (equipoDeSesion != null) {
+          _equipoSel = equipoDeSesion;
+        } else if (!_esModoDetalle && e.isNotEmpty) {
+          _equipoSel = e.first;
+        }
       });
       _refrescarDatos();
     }
@@ -224,8 +251,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
            resultados.add(DatosInformeDiana(
              diana: diana,
              analisis: analisis,
-             diagnostico: diag,
-             equipo: _esModoDetalle ? null : _equipoSel
+             diagnostico: _mostrarTecnica ? diag : const [],
+             equipo: _equipoSel,
            ));
          }
       }
@@ -247,7 +274,9 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
         datosDianas: resultados,
         datosProgreso: _datosProgreso,
         comparativoLotes: _comparativoLotes,
-        observaciones: _esModoDetalle ? "Informe detallado de sesión." : "Informe de evolución."
+        observaciones: _esModoDetalle ? "Informe detallado de sesión." : "Informe de evolución.",
+        mostrarCorreccionMira: _mostrarCorreccionMira,
+        incluirDiagnosticoTecnico: _mostrarTecnica,
       );
 
     } catch (e) {
@@ -293,7 +322,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(titulo),
+        title: TiroAmgAppBarTitle(section: titulo),
         actions: [
           IconButton(icon: const Icon(Icons.print), tooltip: "Imprimir PDF", onPressed: !_cargando ? _imprimirInforme : null)
         ],
@@ -367,19 +396,22 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
           
           Expanded(
             child: DefaultTabController(
-              length: 5, 
+              key: ValueKey(_mostrarTecnica ? 5 : 4),
+              length: _mostrarTecnica ? 5 : 4,
               child: Column(
                 children: [
                   TabBar(
                     labelColor: _colorTema,
                     unselectedLabelColor: AppColors.subtitle,
                     indicatorColor: _colorTema,
-                    tabs: const [
-                      Tab(text: 'AGRUPACIÓN', icon: Icon(Icons.gps_fixed)),
-                      Tab(text: 'TÉCNICA', icon: Icon(Icons.psychology)),
-                      Tab(text: 'EVOLUCIÓN', icon: Icon(Icons.show_chart)),
-                      Tab(text: 'MUNICIÓN', icon: Icon(Icons.local_fire_department)),
-                      Tab(text: 'COMPARATIVO', icon: Icon(Icons.compare_arrows)),
+                    isScrollable: true,
+                    tabs: [
+                      const Tab(text: 'AGRUPACIÓN', icon: Icon(Icons.gps_fixed)),
+                      if (_mostrarTecnica)
+                        const Tab(text: 'TÉCNICA', icon: Icon(Icons.psychology)),
+                      const Tab(text: 'EVOLUCIÓN', icon: Icon(Icons.show_chart)),
+                      const Tab(text: 'MUNICIÓN', icon: Icon(Icons.local_fire_department)),
+                      const Tab(text: 'COMPARATIVO', icon: Icon(Icons.compare_arrows)),
                     ],
                   ),
                   Expanded(
@@ -388,7 +420,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
                     : TabBarView(
                         children: [
                           _buildVistaAgrupacion(),
-                          _buildDiagnosticoTecnico(),
+                          if (_mostrarTecnica) _buildDiagnosticoTecnico(),
                           _buildGraficaProgreso(),
                           _buildResumenMunicion(),
                           _buildComparativoLotes(),
@@ -477,17 +509,37 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     double mmX = devX * radioFisicoMm; double mmY = devY * radioFisicoMm; 
     double valorClic = _equipoSel?.correccionClick ?? 0.0;
     
-    if (valorClic > 0) {
-      int clicsH = (mmX.abs() / valorClic).round();
-      int clicsV = (mmY.abs() / valorClic).round();
-      String dirH = mmX > 0 ? "Izquierda (L)" : "Derecha (R)"; String dirV = mmY > 0 ? "Arriba (U)" : "Abajo (D)";      
-      List<String> correcciones = [];
-      if (clicsH > 0) correcciones.add("$clicsH clics $dirH");
-      if (clicsV > 0) correcciones.add("$clicsV clics $dirV");
-      if (correcciones.isNotEmpty) { consejo = "CORREGIR MIRAS"; iconoConsejo = Icons.build_circle; colorConsejo = Colors.orange[800]!; detalleClics = correcciones.join("  y  "); }
+    // Solo sugerir clics si la sesión se marcó como corrección de miras.
+    if (_mostrarCorreccionMira) {
+      if (valorClic > 0) {
+        int clicsH = (mmX.abs() / valorClic).round();
+        int clicsV = (mmY.abs() / valorClic).round();
+        String dirH = mmX > 0 ? "Izquierda (L)" : "Derecha (R)";
+        String dirV = mmY > 0 ? "Arriba (U)" : "Abajo (D)";
+        List<String> correcciones = [];
+        if (clicsH > 0) correcciones.add("$clicsH clics $dirH");
+        if (clicsV > 0) correcciones.add("$clicsV clics $dirV");
+        if (correcciones.isNotEmpty) {
+          consejo = "CORREGIR MIRAS";
+          iconoConsejo = Icons.build_circle;
+          colorConsejo = Colors.orange[800]!;
+          detalleClics = correcciones.join("  y  ");
+        }
+      } else {
+        String horiz = devX > 0.05 ? "IZQUIERDA" : (devX < -0.05 ? "DERECHA" : "");
+        String vert = devY > 0.05 ? "ARRIBA" : (devY < -0.05 ? "ABAJO" : "");
+        if (horiz != "" || vert != "") {
+          consejo = "Mover miras: $horiz $vert";
+          detalleClics = "Configura los mm/clic de tu arma.";
+          iconoConsejo = Icons.info;
+          colorConsejo = _colorTema;
+        }
+      }
     } else {
-      String horiz = devX > 0.05 ? "IZQUIERDA" : (devX < -0.05 ? "DERECHA" : ""); String vert = devY > 0.05 ? "ARRIBA" : (devY < -0.05 ? "ABAJO" : "");
-      if (horiz != "" || vert != "") { consejo = "Mover miras: $horiz $vert"; detalleClics = "Configura los mm/clic de tu arma."; iconoConsejo = Icons.info; colorConsejo = _colorTema; }
+      // Entrenamiento normal: sin sugerencias de clics.
+      consejo = "Análisis de agrupación";
+      iconoConsejo = Icons.gps_fixed;
+      colorConsejo = _colorTema;
     }
     double puntosPerdidos = _analisis!.puntuacionPotencialMedia - _analisis!.puntuacionRealMedia;
     int vm = dianaActiva.valorMinimo; int an = dianaActiva.anilloNegroInicio; bool fn = dianaActiva.esFondoNegro; bool tm = dianaActiva.tieneMosca; bool tg = dianaActiva.tieneGuias; bool ed = an <= 5;
@@ -512,7 +564,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             return CustomPaint(painter: DianaPainter(
               validos: _convertirImpactosAPixeles(_analisis!.disparosValidos, diametro/2), 
               descartados: _convertirImpactosAPixeles(_analisis!.disparosDescartados, diametro/2), 
-              valorMinimo: vm, anilloNegroInicio: an, esFondoNegro: fn, tieneMosca: tm, tieneGuias: tg, esEstiloDuelo: ed, 
+              valorMinimo: vm, anilloNegroInicio: an, esFondoNegro: fn, tieneMosca: tm, tieneGuias: tg, esEstiloDuelo: ed,
+              nombreCalibre: _equipoSel?.nombreCalibre,
               centroGravedad: Offset((_analisis!.mpi.x * (diametro/2)) + (diametro/2), (_analisis!.mpi.y * (diametro/2)) + (diametro/2)))); 
           }))),
           const SizedBox(height: 10), Text("${_analisis!.disparosValidos.length} impactos válidos", style: const TextStyle(color: Colors.grey)), const SizedBox(height: 20),
@@ -693,6 +746,7 @@ class DianaPainter extends CustomPainter {
   final bool tieneMosca;
   final bool tieneGuias;
   final bool esEstiloDuelo;
+  final String? nombreCalibre;
   final Offset? centroGravedad;
 
   DianaPainter({
@@ -704,6 +758,7 @@ class DianaPainter extends CustomPainter {
     required this.tieneMosca,
     required this.tieneGuias,
     required this.esEstiloDuelo,
+    this.nombreCalibre,
     this.centroGravedad,
   });
 
@@ -719,18 +774,19 @@ class DianaPainter extends CustomPainter {
     final paintLineaBlanca = Paint()..color = Colors.white.withOpacity(0.9)..style = PaintingStyle.stroke..strokeWidth = 1.2;
     final paintLineaGris = Paint()..color = Colors.grey[400]!..style = PaintingStyle.stroke..strokeWidth = 1.0;
 
+    double anchoZona;
     if (esEstiloDuelo) {
-       double paso = radius / 6;
+       anchoZona = radius / 6;
        for (int i = 0; i < 6; i++) {
-          double r = radius - (i * paso);
+          double r = radius - (i * anchoZona);
           canvas.drawCircle(center, r, paintLineaBlanca);
           int numeroAnillo = 5 + i;
-          if (numeroAnillo < 10) _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (paso / 2), Colors.white);
+          if (numeroAnillo < 10) _dibujarNumeros4Ejes(canvas, numeroAnillo.toString(), center, r - (anchoZona / 2), Colors.white);
        }
     } else {
        int totalZonas = 11 - valorMinimo; 
        if (totalZonas < 1) totalZonas = 1;
-       double anchoZona = radius / totalZonas;
+       anchoZona = radius / totalZonas;
 
        for (int i = 0; i < totalZonas; i++) {
           int numeroAnillo = valorMinimo + i;
@@ -767,18 +823,15 @@ class DianaPainter extends CustomPainter {
     canvas.drawLine(Offset(center.dx - 4, center.dy), Offset(center.dx + 4, center.dy), Paint()..color = esFondoNegro?Colors.white:Colors.black..strokeWidth=1);
     canvas.drawLine(Offset(center.dx, center.dy - 4), Offset(center.dx, center.dy + 4), Paint()..color = esFondoNegro?Colors.white:Colors.black..strokeWidth=1);
 
-    final paintDescartado = Paint()..color = Colors.grey.withOpacity(0.5)..style = PaintingStyle.fill;
-    final paintValido = Paint()..color = const Color(0xFF00C853).withOpacity(0.8)..style = PaintingStyle.fill;
-    final paintBordeImpacto = Paint()..color = Colors.white.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth=1;
-
-    double tamano = radius * 0.04; 
-
-    for(var p in descartados) {
-       canvas.drawCircle(p, tamano, paintDescartado);
+    final radioImpacto = ImpactoVisual.radioPx(
+      anchoZona: anchoZona,
+      nombreCalibre: nombreCalibre,
+    );
+    for (final p in descartados) {
+      ImpactoVisual.dibujar(canvas, p, radioImpacto, color: ImpactoVisual.colorDescartado);
     }
-    for(var p in validos) {
-       canvas.drawCircle(p, tamano, paintValido);
-       canvas.drawCircle(p, tamano, paintBordeImpacto);
+    for (final p in validos) {
+      ImpactoVisual.dibujar(canvas, p, radioImpacto);
     }
 
     if (centroGravedad != null) {

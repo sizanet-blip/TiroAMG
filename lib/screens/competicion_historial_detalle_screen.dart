@@ -9,6 +9,7 @@ import '../services/perfil_service.dart';
 import '../services/equipo_service.dart';
 import '../services/municion_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
 import 'sesion_detalle_screen.dart';
 import 'estadisticas_screen.dart'; // <--- NUEVO IMPORT
 
@@ -404,7 +405,7 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Detalle Competición'),
+        title: const TiroAmgAppBarTitle(section: 'Detalle Competición'),
         actions: [
           // BOTÓN ESTADÍSTICAS (¡NUEVO!)
           IconButton(

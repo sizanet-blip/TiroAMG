@@ -11,6 +11,7 @@ import '../services/municion_service.dart';
 import 'sesion_disparo_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
 
 class EntrenamientoScreen extends StatefulWidget {
   const EntrenamientoScreen({super.key});
@@ -45,6 +46,8 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
   String? _iluminacion;
   bool _esInterior = true;
   bool _usarEntradaManualPuntos = false;
+  /// false = entrenar (defecto); true = sesión para corregir miras.
+  bool _esCorreccionMira = false;
 
   bool _cargando = true;
 
@@ -100,6 +103,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
           vientoDireccion: _textOrNull(_vientoDirController.text),
           iluminacion: _iluminacion,
           usarEntradaManualPuntos: _usarEntradaManualPuntos,
+          esCorreccionMira: _esCorreccionMira,
         ),
       ),
     );
@@ -147,7 +151,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
     if (_equipos.isEmpty || _plantillas.isEmpty) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(title: const Text('Entrenamiento')),
+        appBar: AppBar(title: const TiroAmgAppBarTitle(section: 'Entrenamiento')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
@@ -208,6 +212,48 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                   }).toList(),
                   onChanged: (val) => setState(() => _plantillaSeleccionada = val),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  'Objetivo de la sesión',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.subtitle,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment<bool>(
+                      value: false,
+                      label: Text('Entrenar'),
+                      icon: Icon(Icons.sports_score, size: 18),
+                    ),
+                    ButtonSegment<bool>(
+                      value: true,
+                      label: Text('Corregir miras'),
+                      icon: Icon(Icons.tune, size: 18),
+                    ),
+                  ],
+                  selected: {_esCorreccionMira},
+                  onSelectionChanged: (sel) {
+                    setState(() => _esCorreccionMira = sel.first);
+                  },
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: WidgetStatePropertyAll(
+                      TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                if (_esCorreccionMira)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'El análisis sugerirá clics de mira. No se mostrará el diagnóstico técnico.',
+                      style: TextStyle(fontSize: 12, color: AppColors.subtitle),
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,

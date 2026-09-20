@@ -16,6 +16,8 @@ class Sesion {
   final double? vientoMs;
   final String? vientoDireccion;
   final String? iluminacion;
+  /// Si true, la sesión es para regular miras (análisis de clics; sin técnica).
+  final bool esCorreccionMira;
 
   Sesion({
     this.id,
@@ -35,6 +37,7 @@ class Sesion {
     this.vientoMs,
     this.vientoDireccion,
     this.iluminacion,
+    this.esCorreccionMira = false,
   });
 
   factory Sesion.fromMap(Map<String, dynamic> map) {
@@ -56,6 +59,7 @@ class Sesion {
       vientoMs: (map['viento_ms'] as num?)?.toDouble(),
       vientoDireccion: map['viento_direccion'],
       iluminacion: map['iluminacion'],
+      esCorreccionMira: (map['es_correccion_mira'] as num?)?.toInt() == 1,
     );
   }
 
@@ -78,6 +82,7 @@ class Sesion {
       'viento_ms': vientoMs,
       'viento_direccion': vientoDireccion,
       'iluminacion': iluminacion,
+      'es_correccion_mira': esCorreccionMira ? 1 : 0,
     };
   }
 }

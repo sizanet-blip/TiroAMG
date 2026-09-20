@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'tiro_amg_app_bar_title.dart';
 
 /// Scaffold de página con fondo unificado y contenido centrado.
 class AppPageScaffold extends StatelessWidget {
@@ -36,7 +37,7 @@ class AppPageScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(title),
+        title: TiroAmgAppBarTitle(section: title),
         actions: actions,
       ),
       floatingActionButton: floatingActionButton,

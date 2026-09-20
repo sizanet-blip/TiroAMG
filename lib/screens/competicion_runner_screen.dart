@@ -9,6 +9,7 @@ import '../services/competicion_service.dart';
 import '../services/entrenamiento_service.dart';
 import '../services/plantilla_tiempos_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
 import 'sesion_disparo_screen.dart'; // La pantalla de la diana
 
 class CompeticionRunnerScreen extends StatefulWidget {
@@ -240,7 +241,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: Text(widget.modalidad.nombre),
+          title: TiroAmgAppBarTitle(section: widget.modalidad.nombre),
         ),
         body: const Center(
           child: Padding(
@@ -260,7 +261,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('Resultados'),
+          title: const TiroAmgAppBarTitle(section: 'Resultados'),
         ),
         body: Center(
           child: Column(
@@ -284,7 +285,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(widget.modalidad.nombre),
+        title: TiroAmgAppBarTitle(section: widget.modalidad.nombre),
       ),
       body: Column(
         children: [

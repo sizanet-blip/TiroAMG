@@ -3,6 +3,7 @@ import '../models/tipo_diana_model.dart';
 import '../services/catalogo_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
 import 'tipo_diana_form_screen.dart'; // Crearemos este formulario ahora
 
 class CatalogoDianasScreen extends StatefulWidget {
@@ -61,7 +62,7 @@ class _CatalogoDianasScreenState extends State<CatalogoDianasScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Catálogo de Dianas')),
+      appBar: AppBar(title: const TiroAmgAppBarTitle(section: 'Catálogo de Dianas')),
       body: _lista.isEmpty
           ? Center(
               child: Padding(

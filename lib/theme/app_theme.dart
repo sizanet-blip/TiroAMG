@@ -7,6 +7,8 @@ abstract final class AppColors {
   static const Color border = Color(0xFFE2E8EE);
   static const Color divider = Color(0xFFE8EEF2);
   static const Color appBar = Color(0xFF546E7A); // blueGrey.shade600-ish
+  /// Subtítulo de sección bajo el logo en el AppBar.
+  static const Color appBarSection = Color(0xFFFFCC80);
   static final Color title = Colors.blueGrey.shade900;
   static final Color subtitle = Colors.blueGrey.shade500;
   static final Color subtitleSoft = Colors.blueGrey.shade400;
@@ -41,7 +43,10 @@ ThemeData buildTiroAmgTheme() {
       backgroundColor: AppColors.appBar,
       foregroundColor: Colors.white,
       elevation: 0,
+      scrolledUnderElevation: 0,
       centerTitle: false,
+      toolbarHeight: 68,
+      titleSpacing: 12,
       iconTheme: IconThemeData(color: Colors.white),
       actionsIconTheme: IconThemeData(color: Colors.white),
       titleTextStyle: TextStyle(

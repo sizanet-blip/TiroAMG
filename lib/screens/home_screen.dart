@@ -55,14 +55,15 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {}
 
     if (!mounted) return;
-    // ignore: unawaited_futures
-    _syncInstallationInBackground();
-
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
     try {
       await _maybeShowIdentifyPrompt();
     } catch (_) {}
+
+    if (!mounted) return;
+    // Sync de red DESPUÉS del diálogo legal: si va antes, puede sobrescribir
+    // la aceptación de privacidad/condiciones con un snapshot antiguo.
+    // ignore: unawaited_futures
+    _syncInstallationInBackground();
 
     if (!mounted) return;
     try {
