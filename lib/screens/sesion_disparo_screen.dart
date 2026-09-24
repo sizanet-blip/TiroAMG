@@ -37,8 +37,8 @@ class SesionDisparoScreen extends StatefulWidget {
   final bool usarEntradaManualPuntos;
   /// Sesión orientada a regular miras (análisis de clics).
   final bool esCorreccionMira;
-  /// Impactos normalizados (−1…1) de series anteriores; solo referencia visual.
-  final List<Offset> impactosFantasmaInicial;
+  /// Capas de series anteriores; solo referencia visual.
+  final CapasFantasma capasFantasmaInicial;
 
   const SesionDisparoScreen({
     super.key,
@@ -61,7 +61,7 @@ class SesionDisparoScreen extends StatefulWidget {
     this.onCompletar,
     this.usarEntradaManualPuntos = false,
     this.esCorreccionMira = false,
-    this.impactosFantasmaInicial = const [],
+    this.capasFantasmaInicial = const [],
   });
 
   @override
@@ -75,10 +75,12 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
   final List<Disparo> _listaDisparos = [];
   final List<Offset> _puntosVisuales = [];
-  /// Coordenadas normalizadas (mismo sistema que [Disparo.x]/[Disparo.y]).
-  late List<Offset> _fantasmasNorm;
+  /// Capas normalizadas (mismo sistema que [Disparo.x]/[Disparo.y]).
+  late CapasFantasma _capasFantasma;
   final GlobalKey _dianaPaintKey = GlobalKey();
   final GlobalKey _dianaStackKey = GlobalKey();
+
+  int get _numFantasmas => ImpactoVisual.contarImpactos(_capasFantasma);
   
   int _puntosTotal = 0;
   int _contadorMoscas = 0;
@@ -184,7 +186,9 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   @override
   void initState() {
     super.initState();
-    _fantasmasNorm = List<Offset>.from(widget.impactosFantasmaInicial);
+    _capasFantasma = [
+      for (final capa in widget.capasFantasmaInicial) List<Offset>.from(capa),
+    ];
     _cargarConfiguracionDiana();
     _resetearValoresTiempo();
     _initAudio();
@@ -839,7 +843,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     final puntosGuardados = _puntosTotal;
     final disparosGuardados = _listaDisparos.length;
     final hayReferenciaPosible = _listaDisparos.any((d) => d.x != 0 || d.y != 0) ||
-        _fantasmasNorm.isNotEmpty;
+        _capasFantasma.isNotEmpty;
 
     final accion = await showDialog<String>(
       context: context,
@@ -879,16 +883,19 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     if (!mounted) return;
 
     if (accion == 'nuevo_fantasma') {
-      final acumulados = <Offset>[
-        ..._fantasmasNorm,
+      final nuevaCapa = <Offset>[
         for (final d in _listaDisparos)
           if (d.x != 0 || d.y != 0) Offset(d.x, d.y),
       ];
-      _prepararNuevaSerie(fijarFantasmas: acumulados);
+      final capas = <List<Offset>>[
+        for (final c in _capasFantasma) List<Offset>.from(c),
+        if (nuevaCapa.isNotEmpty) nuevaCapa,
+      ];
+      _prepararNuevaSerie(fijarCapas: capas);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Referencia: ${acumulados.length} impactos anteriores (no puntúan).',
+            'Referencia: ${ImpactoVisual.contarImpactos(capas)} impactos anteriores (no puntúan).',
           ),
           duration: const Duration(seconds: 2),
         ),
@@ -912,7 +919,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
 
   void _prepararNuevaSerie({
     bool resetFantasmas = false,
-    List<Offset>? fijarFantasmas,
+    CapasFantasma? fijarCapas,
   }) {
     _pausar();
     _inspeccionController.value = Matrix4.identity();
@@ -926,10 +933,12 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       _mostrandoLupa = false;
       _posicionDedo = null;
       _posicionGlobalPuntero = null;
-      if (fijarFantasmas != null) {
-        _fantasmasNorm = List<Offset>.from(fijarFantasmas);
+      if (fijarCapas != null) {
+        _capasFantasma = [
+          for (final c in fijarCapas) List<Offset>.from(c),
+        ];
       } else if (resetFantasmas) {
-        _fantasmasNorm.clear();
+        _capasFantasma.clear();
       }
       _resetearValoresTiempo();
     });
@@ -1456,7 +1465,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                 size: size,
                 painter: DianaPainter(
                   impactos: _puntosVisuales,
-                  impactosFantasmaNorm: _fantasmasNorm,
+                  capasFantasmaNorm: _capasFantasma,
                   valorMinimo: _valorMinimo,
                   anilloNegroInicio: _anilloNegroInicio,
                   esFondoNegro: _esFondoNegro,
@@ -1620,7 +1629,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                 ),
               ),
             ),
-          if (_fantasmasNorm.isNotEmpty && !_modoInspeccion)
+          if (_numFantasmas > 0 && !_modoInspeccion)
             Positioned(
               bottom: 10,
               left: 0,
@@ -1636,7 +1645,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 5),
                       child: Text(
-                        'Referencia: ${_fantasmasNorm.length} anteriores',
+                        'Referencia: $_numFantasmas anteriores',
                         style: const TextStyle(
                           color: ImpactoVisual.colorFantasma,
                           fontWeight: FontWeight.w600,
@@ -1817,8 +1826,8 @@ class _CruzLupaPainter extends CustomPainter {
 
 class DianaPainter extends CustomPainter {
   final List<Offset> impactos;
-  /// Normalizados (−1…1) respecto al radio; se convierten a píxeles al pintar.
-  final List<Offset> impactosFantasmaNorm;
+  /// Capas normalizadas (−1…1); la última es la serie previa (más opaca).
+  final CapasFantasma capasFantasmaNorm;
   final int valorMinimo;
   final int anilloNegroInicio;
   final bool esFondoNegro;
@@ -1829,7 +1838,7 @@ class DianaPainter extends CustomPainter {
 
   DianaPainter({
     required this.impactos,
-    this.impactosFantasmaNorm = const [],
+    this.capasFantasmaNorm = const [],
     required this.valorMinimo,
     required this.anilloNegroInicio,
     required this.esFondoNegro,
@@ -1903,10 +1912,17 @@ class DianaPainter extends CustomPainter {
       anchoZona: anchoZona,
       nombreCalibre: nombreCalibre,
     );
-    // Fantasmas debajo de los impactos actuales.
-    for (final n in impactosFantasmaNorm) {
-      final p = Offset(center.dx + n.dx * radius, center.dy + n.dy * radius);
-      ImpactoVisual.dibujarFantasma(canvas, p, radioImpacto);
+    // Fantasmas: antiguas debajo, última serie de referencia más marcada.
+    final totalCapas = capasFantasmaNorm.length;
+    for (var i = 0; i < totalCapas; i++) {
+      final opacity = ImpactoVisual.opacidadCapa(
+        indiceCapa: i,
+        totalCapas: totalCapas,
+      );
+      for (final n in capasFantasmaNorm[i]) {
+        final p = Offset(center.dx + n.dx * radius, center.dy + n.dy * radius);
+        ImpactoVisual.dibujarFantasma(canvas, p, radioImpacto, opacity: opacity);
+      }
     }
     for (final p in impactos) {
       ImpactoVisual.dibujar(canvas, p, radioImpacto);

@@ -64,10 +64,12 @@ abstract final class HelpContent {
         bullets: [
           'Menú → Entrenamiento.',
           'Elige arma, plantilla (disciplina) y munición si quieres.',
+          'Objetivo: Entrenar (sesión normal) o Corregir miras (el análisis sugerirá clics).',
           'Decide si marcas en diana o «Puntuar por números» (teclado X / 10…0).',
           'Rellena condiciones (lugar, distancia, interior…) si te interesa el histórico.',
           'Pulsa Iniciar y sigue Atención / Fuego / Alto.',
-          'Al terminar guarda la sesión y revísala en Historial.',
+          'Al guardar puedes seguir con referencia (impactos azules) o diana limpia.',
+          'Revisa la sesión en Historial.',
         ],
       ),
       HelpDocSection(
@@ -86,6 +88,8 @@ abstract final class HelpContent {
         title: '5. Consejos express',
         bullets: [
           'Competición = pitidos; Entrenamiento = pitidos + voz.',
+          'En diana: impactos azules = series anteriores (referencia); rojos = serie actual.',
+          'En Historial, mantén pulsado para seleccionar varios entrenamientos y analizarlos juntos.',
           'Haz copias de seguridad con frecuencia.',
           'Identifica la instalación con tu email en Estado de la aplicación.',
           'Si falta un módulo, escribe a $supportEmail con tu device / email.',
@@ -198,6 +202,7 @@ abstract final class HelpContent {
         ],
         bullets: [
           'Arma y reglas/disciplina (plantilla) son esenciales.',
+          'Objetivo de la sesión: Entrenar (uso normal) o Corregir miras (el análisis se centra en sugerir clics; no muestra el diagnóstico técnico habitual).',
           'Munición opcional.',
           'Puntuar tocando diana vs puntuar por números (switch).',
           'Condiciones: lugar, distancia, interior/exterior, posición, iluminación, y si quieres temperatura, humedad, viento, etc.',
@@ -215,7 +220,9 @@ abstract final class HelpContent {
           'En diana: marca solo en Fuego (o pausa, según reglas de la pantalla).',
           'Por números: panel X y 10…0; mismo criterio de fase y límite.',
           'Lupa / inspección: zoom y pan para revisar; no marca tiros.',
-          'Al FIN puedes iniciar otro entrenamiento o volver al menú.',
+          'Al guardar: «Seguir con referencia» deja en azul los impactos anteriores (no puntúan); «Diana limpia» borra la referencia; o vuelve al menú.',
+          'La referencia sirve para contrastar con el papel (telescopio): azul = ya marcados; rojo = serie actual. Solo aplica si puntuaste tocando la diana.',
+          'Si acumulas varias series con referencia, la última queda más marcada y las anteriores más suaves.',
           'En landscape la diana queda a un lado y los controles al otro.',
         ],
       ),
@@ -228,7 +235,10 @@ abstract final class HelpContent {
           'Crea o edita modalidades y sus fases.',
           'Setup: arma, munición, modo de puntuación (diana o números).',
           'Runner: ejecuta fase a fase; al completar avanza según la definición.',
+          'Entre series puedes mantener impactos de referencia (azules) si sigues en el mismo papel; hay interruptor y botón para limpiar.',
+          'Al cambiar de fase, si hay referencia, la app pregunta: mismo papel (mantener) o papel nuevo (limpiar).',
           'Los resultados quedan en Historial → pestaña Competiciones.',
+          'En el detalle del torneo puedes introducir el acta oficial del árbitro (total, desglose tipo 3-X, 2-10, 6-8, series o tiros) y comparar con lo marcado en la app.',
         ],
       ),
       HelpDocSection(
@@ -239,13 +249,15 @@ abstract final class HelpContent {
         bullets: [
           'Cada fila resume fecha, disciplina/arma y puntuación o dato clave.',
           'Al entrar ves el detalle: puntos, impactos, entorno, notas.',
+          'Entrenamientos: mantén pulsado para seleccionar varios y analizarlos juntos (botón Analizar).',
           'Icono de estadísticas en la barra: abre el análisis del modo actual (entreno o compe).',
         ],
       ),
       HelpDocSection(
         title: '13. Estadísticas e informes',
         paragraphs: [
-          'Desde Historial → icono de gráficas, o la pantalla de estadísticas. Filtra por periodo y compara medias, evolución y tendencias.',
+          'Desde Historial → icono de gráficas, o tras seleccionar entrenamientos. Filtra por periodo y compara medias, evolución y tendencias.',
+          'Si la sesión era «Corregir miras», el análisis prioriza la sugerencia de clics.',
           'Según módulos, puedes generar informes PDF o exportar a Excel para archivo o club.',
         ],
       ),
@@ -285,7 +297,22 @@ abstract final class HelpContent {
     HelpFaqItem(
       question: '¿Qué diferencia hay entre puntuar en diana y por números?',
       answer:
-          'En diana marcas el impacto tocando la zona. Con «Puntuar por números» usas X y 10…0. Ambos respetan la fase Fuego y el límite de serie.',
+          'En diana marcas el impacto tocando la zona. Con «Puntuar por números» usas X y 10…0. Ambos respetan la fase Fuego y el límite de serie. La referencia de impactos anteriores solo tiene sentido al marcar en diana.',
+    ),
+    HelpFaqItem(
+      question: '¿Qué es Entrenar vs Corregir miras?',
+      answer:
+          'Entrenar es una sesión normal. Corregir miras marca la sesión para que el análisis sugiera clics de mira y no muestre el diagnóstico técnico habitual.',
+    ),
+    HelpFaqItem(
+      question: '¿Qué son los impactos azules (referencia)?',
+      answer:
+          'Al guardar un entrenamiento (o entre series de competición) puedes mantener los impactos previos en azul. No puntúan: sirven para ver en la app lo que ya hay en el papel (telescopio). Rojo = serie actual. La última serie de referencia se ve más marcada; las anteriores, más suaves.',
+    ),
+    HelpFaqItem(
+      question: 'En competición, ¿se mantienen los impactos al cambiar de fase?',
+      answer:
+          'Si hay referencia, al pasar de fase la app pregunta: mismo papel (mantener) o papel nuevo (limpiar). Entre series de la misma fase puedes usar el interruptor «Mantener impactos de referencia».',
     ),
     HelpFaqItem(
       question: 'No oigo los avisos o la voz',
@@ -310,12 +337,22 @@ abstract final class HelpContent {
     HelpFaqItem(
       question: 'Los impactos en la diana se ven demasiado grandes o pequeños',
       answer:
-          'Revisa calibre y diámetro de impacto del arma en Gestión de Armas.',
+          'Revisa calibre y diámetro de impacto del arma en Gestión de Armas. El tamaño es el mismo en tirada, historial y análisis.',
     ),
     HelpFaqItem(
       question: '¿Puedo editar una sesión después de guardarla?',
       answer:
           'Desde Historial abres el detalle. Lo que se pueda editar depende del tipo de sesión y de la pantalla de detalle.',
+    ),
+    HelpFaqItem(
+      question: '¿Cómo analizo varios entrenamientos a la vez?',
+      answer:
+          'En Historial → Entrenamientos, mantén pulsado una sesión para entrar en modo selección, marca las que quieras y pulsa Analizar. Las estadísticas usarán solo esa selección.',
+    ),
+    HelpFaqItem(
+      question: '¿Qué es el acta oficial en competición?',
+      answer:
+          'En el detalle del torneo puedes introducir lo que dio el árbitro: total, desglose (p. ej. 3-X, 2-10, 6-8), totales por serie o tiro a tiro. La app compara con tu marcado y muestra diferencias.',
     ),
     HelpFaqItem(
       question: 'La lupa / inspección no me deja marcar tiros',

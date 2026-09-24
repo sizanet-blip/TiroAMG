@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+/// Capas de impactos de referencia: cada lista interna es una serie anterior.
+/// La última capa es la más reciente (más opaca).
+typedef CapasFantasma = List<List<Offset>>;
+
 /// Tamaño y color de impactos alineados con la tirada en vivo.
 class ImpactoVisual {
   ImpactoVisual._();
@@ -9,9 +13,37 @@ class ImpactoVisual {
   /// Impactos de series anteriores (solo referencia visual).
   static const Color colorFantasma = Color(0xFF1E88E5);
 
-  /// Mismo estilo que un impacto normal, en azul para diferenciarlo del rojo.
-  static void dibujarFantasma(Canvas canvas, Offset punto, double radio) {
-    dibujar(canvas, punto, radio, color: colorFantasma);
+  /// Opacidad por antigüedad: última serie = 1.0; las previas más suaves.
+  static double opacidadCapa({
+    required int indiceCapa,
+    required int totalCapas,
+  }) {
+    if (totalCapas <= 1) return 1.0;
+    final antiguedad = totalCapas - 1 - indiceCapa; // 0 = más reciente
+    return (1.0 - antiguedad * 0.28).clamp(0.30, 1.0);
+  }
+
+  static int contarImpactos(CapasFantasma capas) {
+    var n = 0;
+    for (final c in capas) {
+      n += c.length;
+    }
+    return n;
+  }
+
+  /// Mismo estilo que un impacto normal, en azul (opacidad según capa).
+  static void dibujarFantasma(
+    Canvas canvas,
+    Offset punto,
+    double radio, {
+    double opacity = 1.0,
+  }) {
+    dibujar(
+      canvas,
+      punto,
+      radio,
+      color: colorFantasma.withValues(alpha: opacity.clamp(0.0, 1.0)),
+    );
   }
 
   /// Fracción del ancho de un anillo de puntuación.

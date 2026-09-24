@@ -9,6 +9,7 @@ import '../services/competicion_service.dart';
 import '../services/entrenamiento_service.dart';
 import '../services/plantilla_tiempos_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/impacto_visual.dart';
 import '../widgets/tiro_amg_app_bar_title.dart';
 import 'sesion_disparo_screen.dart'; // La pantalla de la diana
 
@@ -72,9 +73,11 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
   // Historial visual para mostrar en la lista de abajo
   final List<String> _logEventos = [];
 
-  /// Impactos normalizados acumulados de series previas (referencia visual).
-  final List<Offset> _fantasmasAcumulados = [];
+  /// Capas de series previas (referencia visual); última = más marcada.
+  final CapasFantasma _capasFantasma = [];
   bool _mantenerReferencia = true;
+
+  int get _numFantasmas => ImpactoVisual.contarImpactos(_capasFantasma);
 
   @override
   void initState() {
@@ -139,8 +142,10 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
           vientoDireccion: widget.vientoDireccion,
           iluminacion: widget.iluminacion,
           usarEntradaManualPuntos: widget.usarEntradaManualPuntos,
-          impactosFantasmaInicial: _mantenerReferencia
-              ? List<Offset>.from(_fantasmasAcumulados)
+          capasFantasmaInicial: _mantenerReferencia
+              ? [
+                  for (final c in _capasFantasma) List<Offset>.from(c),
+                ]
               : const [],
           
           // PARÁMETROS NUEVOS PARA INFORMACIÓN VISUAL
@@ -181,12 +186,16 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     );
     await _entrenamientoService.guardarSesionCompleta(nuevaSesion, disparos);
 
-    // Acumular impactos con posición real para referencia en la siguiente serie.
-    for (final d in disparos) {
-      if (d.x != 0 || d.y != 0) {
-        _fantasmasAcumulados.add(Offset(d.x, d.y));
-      }
+    // Nueva capa de referencia (solo impactos con posición real).
+    final nuevaCapa = <Offset>[
+      for (final d in disparos)
+        if (d.x != 0 || d.y != 0) Offset(d.x, d.y),
+    ];
+    if (nuevaCapa.isNotEmpty) {
+      _capasFantasma.add(nuevaCapa);
     }
+
+    var cambioDeFase = false;
 
     // 2. Actualizar Marcador del Torneo
     setState(() {
@@ -207,18 +216,58 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
 
       // ¿Hemos terminado las repeticiones de esta fase?
       if (_indiceRepeticion >= fase.fase.repeticiones) {
-        // Fin de la fase -> Pasar a la siguiente
-        _indiceRepeticion = 0; // Reset contador de series
-        _puntosFaseActual = 0; // Reset puntos parciales
-        _indiceFase++;         // Siguiente fase en la lista
+        _indiceRepeticion = 0;
+        _puntosFaseActual = 0;
+        _indiceFase++;
+        cambioDeFase = true;
 
-        // ¿Hemos terminado todas las fases?
         if (_indiceFase >= _fases.length) {
           _torneoFinalizado = true;
           _mostrarFinTorneo();
+          cambioDeFase = false;
         }
       }
     });
+
+    // Nueva fase: preguntar si mantienen el mismo papel (referencia).
+    if (cambioDeFase && mounted && _capasFantasma.isNotEmpty) {
+      await _preguntarReferenciaNuevaFase();
+    }
+  }
+
+  Future<void> _preguntarReferenciaNuevaFase() async {
+    final limpiar = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nueva fase'),
+        content: const Text(
+          '¿Cambias de papel/diana?\n\n'
+          'Si sigues en el mismo papel, puedes mantener los impactos de referencia.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Mismo papel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Papel nuevo'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (limpiar == true) {
+      setState(() {
+        _capasFantasma.clear();
+        _mantenerReferencia = true;
+      });
+    } else {
+      setState(() => _mantenerReferencia = true);
+    }
   }
 
   void _mostrarFinTorneo() {
@@ -383,7 +432,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                       ),
                     ),
 
-                    if (_fantasmasAcumulados.isNotEmpty) ...[
+                    if (_numFantasmas > 0) ...[
                       const SizedBox(height: 12),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
@@ -394,7 +443,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                         ),
                         subtitle: Text(
                           _mantenerReferencia
-                              ? '${_fantasmasAcumulados.length} impactos grises (no puntúan)'
+                              ? '$_numFantasmas impactos azules (no puntúan)'
                               : 'Próxima serie con diana limpia',
                           style: const TextStyle(fontSize: 12),
                         ),
@@ -405,7 +454,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () => setState(() {
-                            _fantasmasAcumulados.clear();
+                            _capasFantasma.clear();
                             _mantenerReferencia = true;
                           }),
                           child: const Text('Limpiar referencia'),

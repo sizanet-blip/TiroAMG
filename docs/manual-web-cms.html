@@ -1,7 +1,7 @@
 <!--
   Manual web TiroAMG — pegar en el campo "contenido" del CMS.
 
-  Sube ANTES estos PNG a https://panel.albertomaestre.es/uploads/cms/
+  Sube ANTES estos PNG a /uploads/cms/
   (origen: carpeta assets/help/ del proyecto)
 
   01_home.png
@@ -23,6 +23,8 @@
   20_competicion_detalle.png
   21_estadisticas.png
   22_sesion_detalle.png
+  23_referencia_impactos.png
+  24_acta_oficial.png
 -->
 <article class="manual-tiroamg">
   <style>
@@ -79,7 +81,7 @@
     <li><strong>Buscar actualizaciones</strong>: comprueba si hay una versión nueva y abre la descarga.</li>
   </ul>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/03_estado_app.png" alt="Estado de la aplicación" />
+    <img src="/uploads/cms/03_estado_app.png" alt="Estado de la aplicación" />
     <figcaption>Estado de la aplicación: licencia, módulos y versiones</figcaption>
   </figure>
 
@@ -96,7 +98,7 @@
     <li><strong>Recorte Diana</strong> — análisis fotográfico (módulo detección).</li>
   </ul>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/01_home.png" alt="Menú principal TiroAMG" />
+    <img src="/uploads/cms/01_home.png" alt="Menú principal TiroAMG" />
     <figcaption>Inicio de TiroAMG</figcaption>
   </figure>
 
@@ -104,50 +106,50 @@
   <h2 id="config">3. Configuración</h2>
   <p>Desde aquí gestionas perfil, material, plantillas, catálogos, avisos y el estado del sistema.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/02_configuracion.png" alt="Configuración" />
+    <img src="/uploads/cms/02_configuracion.png" alt="Configuración" />
     <figcaption>Menú de configuración</figcaption>
   </figure>
 
   <h3>3.1 Perfil del tirador</h3>
   <p>Mis Datos: nombre, licencia federativa, club y categoría. Aparecen en actas y PDFs.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/12_perfil.png" alt="Perfil del tirador" />
+    <img src="/uploads/cms/12_perfil.png" alt="Perfil del tirador" />
     <figcaption>Mis Datos de Tirador</figcaption>
   </figure>
 
   <h3>3.2 Armas</h3>
   <p>Gestión de Armas: crea un perfil por arma (tipo, calibre, diámetro de impacto). El tamaño visual del impacto en sesión depende de estos datos.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/13_gestion_armas.png" alt="Gestión de armas" />
+    <img src="/uploads/cms/13_gestion_armas.png" alt="Gestión de armas" />
     <figcaption>Lista de armas</figcaption>
   </figure>
 
   <h3>3.3 Munición</h3>
   <p>Registra marca, lote y stock. Puedes anotar compras, usos manuales y ver en qué sesiones se usó cada lote.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/14_gestion_municion.png" alt="Gestión de munición" />
+    <img src="/uploads/cms/14_gestion_municion.png" alt="Gestión de munición" />
     <figcaption>Municiones y stock</figcaption>
   </figure>
 
   <h3>3.4 Plantillas de tiempos y series</h3>
   <p>Definen la disciplina: Atención / Fuego / Alto y disparos por serie. Sin al menos una plantilla no puedes iniciar un entrenamiento.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/15_tiempos_series.png" alt="Plantillas de tiempos" />
+    <img src="/uploads/cms/15_tiempos_series.png" alt="Plantillas de tiempos" />
     <figcaption>Plantillas de tiempos (precisión, duelo, aire…)</figcaption>
   </figure>
 
   <h3>3.5 Catálogos</h3>
   <p>Datos maestros (suelen requerir módulo): tipos de arma, calibres y dianas (anillos, zona negra, mosca X).</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/16_catalogo_tipos.png" alt="Catálogo tipos de arma" />
+    <img src="/uploads/cms/16_catalogo_tipos.png" alt="Catálogo tipos de arma" />
     <figcaption>Catálogo: tipos de arma</figcaption>
   </figure>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/17_catalogo_calibres.png" alt="Catálogo calibres" />
+    <img src="/uploads/cms/17_catalogo_calibres.png" alt="Catálogo calibres" />
     <figcaption>Catálogo: calibres</figcaption>
   </figure>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/18_catalogo_dianas.png" alt="Catálogo dianas" />
+    <img src="/uploads/cms/18_catalogo_dianas.png" alt="Catálogo dianas" />
     <figcaption>Catálogo: dianas</figcaption>
   </figure>
 
@@ -159,7 +161,7 @@
     <li>«Probar pitido» para comprobar el dispositivo.</li>
   </ul>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/11_avisos.png" alt="Avisos de tiro" />
+    <img src="/uploads/cms/11_avisos.png" alt="Avisos de tiro" />
     <figcaption>Perfiles y volumen de avisos</figcaption>
   </figure>
 
@@ -167,9 +169,13 @@
   <h2 id="entrenamiento">4. Entrenamiento</h2>
   <h3>4.1 Configurar sesión</h3>
   <p>Elige arma, plantilla (disciplina), munición opcional y si marcas en diana o por números. Puedes anotar condiciones (lugar, distancia, interior, posición, iluminación…).</p>
+  <ul>
+    <li><strong>Objetivo de la sesión</strong>: <em>Entrenar</em> (sesión normal) o <em>Corregir miras</em> (el análisis sugerirá clics; sin diagnóstico técnico habitual).</li>
+    <li><strong>Puntuar tocando diana</strong> vs <strong>por números</strong> (panel X / 10…0).</li>
+  </ul>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/08_entrenamiento.png" alt="Configurar sesión" />
-    <figcaption>Configurar sesión de entrenamiento</figcaption>
+    <img src="/uploads/cms/08_entrenamiento.png" alt="Configurar sesión" />
+    <figcaption>Configurar sesión: objetivo Entrenar / Corregir miras</figcaption>
   </figure>
 
   <h3>4.2 Durante la sesión</h3>
@@ -179,42 +185,69 @@
     <li><strong>Diana</strong>: toca el impacto en fase Fuego.</li>
     <li><strong>Por números</strong>: panel X / 10…0.</li>
     <li><strong>Lupa / inspección</strong>: zoom y pan; no marca tiros.</li>
-    <li>Al finalizar puedes empezar otra sesión o volver al menú.</li>
   </ul>
+
+  <h3>4.3 Al guardar: referencia de impactos</h3>
+  <p>Tras guardar puedes:</p>
+  <ul>
+    <li><strong>Seguir con referencia</strong> — deja en <strong>azul</strong> los impactos anteriores (no puntúan). Útil para contrastar con el papel al telescopio.</li>
+    <li><strong>Diana limpia</strong> — nueva serie sin referencia.</li>
+    <li><strong>Volver al menú</strong>.</li>
+  </ul>
+  <p><strong>Rojo</strong> = serie actual · <strong>Azul</strong> = series anteriores. Si acumulas varias con referencia, la última se ve más marcada y las previas más suaves. Solo aplica si puntuaste tocando la diana (no con el panel numérico).</p>
+  <figure>
+    <img src="/uploads/cms/23_referencia_impactos.png" alt="Impactos de referencia en azul" />
+    <figcaption>Diana con referencia (azul) y disparos de la serie actual (rojo)</figcaption>
+  </figure>
 
   <!-- 5 -->
   <h2 id="competicion">5. Competición</h2>
   <p>Listado de modalidades (ISSF y otras). Puedes crear nuevas con el botón +. Algunas pueden aparecer bloqueadas según licencia.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/19_competicion.png" alt="Listado de competiciones" />
+    <img src="/uploads/cms/19_competicion.png" alt="Listado de competiciones" />
     <figcaption>Competiciones / modalidades</figcaption>
   </figure>
   <p>En el detalle de una modalidad configuras fases, arma, munición y modo de puntuación; luego ejecutas fase a fase.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/20_competicion_detalle.png" alt="Detalle de competición" />
+    <img src="/uploads/cms/20_competicion_detalle.png" alt="Detalle de competición" />
     <figcaption>Detalle / setup de modalidad</figcaption>
+  </figure>
+
+  <h3>5.1 Referencia entre series</h3>
+  <ul>
+    <li>Tras cada serie se pueden acumular impactos azules de referencia (mismo papel).</li>
+    <li>En la tarjeta de «Tirar serie» puedes activar/desactivar <strong>Mantener impactos de referencia</strong> o <strong>Limpiar referencia</strong>.</li>
+    <li>Al <strong>cambiar de fase</strong>, si hay referencia, la app pregunta: <em>Mismo papel</em> (mantener) o <em>Papel nuevo</em> (limpiar).</li>
+  </ul>
+
+  <h3>5.2 Acta oficial del árbitro</h3>
+  <p>En el detalle del torneo (Historial → Competiciones) puedes introducir el acta oficial: total del torneo, desglose tipo <code>3-X, 2-10, 6-8</code>, totales por serie o tiro a tiro. La app compara con lo marcado y muestra diferencias.</p>
+  <figure>
+    <img src="/uploads/cms/24_acta_oficial.png" alt="Acta oficial del árbitro" />
+    <figcaption>Acta oficial: comparación y desglose (3-X, 2-10…)</figcaption>
   </figure>
 
   <!-- 6 -->
   <h2 id="historial">6. Historial, detalle y estadísticas</h2>
   <h3>6.1 Historial</h3>
   <p>Pestañas Entrenamientos / Competiciones y filtros por fecha. Cada fila resume disciplina, arma y puntuación.</p>
+  <p>En entrenamientos: <strong>mantén pulsado</strong> una sesión para seleccionar varias y analizarlas juntas (botón Analizar).</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/09_historial.png" alt="Historial" />
-    <figcaption>Historial de sesiones</figcaption>
+    <img src="/uploads/cms/09_historial.png" alt="Historial" />
+    <figcaption>Historial: selección múltiple de entrenamientos</figcaption>
   </figure>
 
   <h3>6.2 Detalle de sesión</h3>
-  <p>Resumen, diana con impactos, secuencia de tiros. Acciones típicas: estadísticas, editar, imprimir/PDF.</p>
+  <p>Resumen, diana con impactos, secuencia de tiros. Acciones típicas: estadísticas, editar, imprimir/PDF. Si la sesión era «Corregir miras», aparece etiquetada.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/22_sesion_detalle.png" alt="Detalle de sesión" />
+    <img src="/uploads/cms/22_sesion_detalle.png" alt="Detalle de sesión" />
     <figcaption>Detalle de tirada con diana y secuencia</figcaption>
   </figure>
 
   <h3>6.3 Estadísticas / análisis</h3>
-  <p>Desde el icono de gráficas del historial: filtros (periodo, arma, munición, diana), pestañas de agrupación, técnica, evolución, munición y comparación. Incluye consejos (p. ej. corrección de miras) y media real vs potencial.</p>
+  <p>Desde el icono de gráficas del historial o tras seleccionar entrenamientos: filtros (periodo, arma, munición, diana), pestañas de agrupación, técnica, evolución, munición y comparación. Incluye consejos (p. ej. corrección de miras) y media real vs potencial.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/21_estadisticas.png" alt="Estadísticas de entrenamientos" />
+    <img src="/uploads/cms/21_estadisticas.png" alt="Estadísticas de entrenamientos" />
     <figcaption>Análisis de entrenamientos</figcaption>
   </figure>
 
@@ -222,7 +255,7 @@
   <h2 id="backup">7. Copia de seguridad</h2>
   <p><strong>Exportar</strong> crea un archivo de la base de datos (guárdalo fuera del móvil). <strong>Importar</strong> restaura esa copia y sustituye los datos actuales: exporta antes si quieres conservar lo de ahora.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/10_backup.png" alt="Copia de seguridad" />
+    <img src="/uploads/cms/10_backup.png" alt="Copia de seguridad" />
     <figcaption>Exportar e importar base de datos</figcaption>
   </figure>
 
@@ -234,7 +267,7 @@
   <h2 id="ayuda-app">9. Ayuda en la app</h2>
   <p>Desde el menú o Configuración → Ayuda: guía rápida, manual y preguntas frecuentes, más el correo de soporte.</p>
   <figure>
-    <img src="https://panel.albertomaestre.es/uploads/cms/04_ayuda.png" alt="Ayuda en la app" />
+    <img src="/uploads/cms/04_ayuda.png" alt="Ayuda en la app" />
     <figcaption>Centro de ayuda</figcaption>
   </figure>
 
@@ -247,7 +280,19 @@
   </details>
   <details>
     <summary>¿Diana o puntuar por números?</summary>
-    <p>En diana tocas el impacto. Por números usas X y 10…0. Ambos respetan Fuego y el límite de serie.</p>
+    <p>En diana tocas el impacto. Por números usas X y 10…0. Ambos respetan Fuego y el límite de serie. La referencia de impactos anteriores solo aplica al marcar en diana.</p>
+  </details>
+  <details>
+    <summary>¿Entrenar o Corregir miras?</summary>
+    <p>Entrenar es sesión normal. Corregir miras hace que el análisis sugiera clics de mira y no muestre el diagnóstico técnico habitual.</p>
+  </details>
+  <details>
+    <summary>¿Qué son los impactos azules?</summary>
+    <p>Referencia de series anteriores: no puntúan. Rojo = serie actual. Sirven para contrastar con el papel (telescopio). La última serie de referencia se ve más marcada.</p>
+  </details>
+  <details>
+    <summary>Al cambiar de fase en competición, ¿qué pasa con la referencia?</summary>
+    <p>La app pregunta: mismo papel (mantener impactos) o papel nuevo (limpiar).</p>
   </details>
   <details>
     <summary>No oigo avisos o voz</summary>
@@ -267,7 +312,15 @@
   </details>
   <details>
     <summary>Impactos demasiado grandes o pequeños</summary>
-    <p>Ajusta calibre / diámetro de impacto en Gestión de Armas.</p>
+    <p>Ajusta calibre / diámetro de impacto en Gestión de Armas. El tamaño es el mismo en tirada, historial y análisis.</p>
+  </details>
+  <details>
+    <summary>¿Cómo analizo varios entrenamientos juntos?</summary>
+    <p>En Historial → Entrenamientos, mantén pulsado una sesión, selecciona varias y pulsa Analizar.</p>
+  </details>
+  <details>
+    <summary>¿Qué es el acta oficial?</summary>
+    <p>En el detalle del torneo introduces lo del árbitro (total, desglose 3-X / 2-10…, series o tiros) y la app lo compara con tu marcado.</p>
   </details>
   <details>
     <summary>La lupa no deja marcar tiros</summary>
@@ -283,7 +336,7 @@
   </details>
   <details>
     <summary>¿Cómo identifico la instalación?</summary>
-    <p>Estado de la aplicación → Identificar (email).</p>
+    <p>Al abrir la app aceptas privacidad y condiciones. El email es opcional: Estado de la aplicación → Identificar (email).</p>
   </details>
 
   <h2 id="soporte">11. Soporte</h2>
