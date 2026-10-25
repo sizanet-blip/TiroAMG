@@ -52,6 +52,7 @@ abstract final class HelpContent {
       HelpDocSection(
         title: '2. Primeros pasos (obligatorio)',
         bullets: [
+          'Si la app pide cuenta AMG: regístrate (usuario/contraseña), acepta privacidad y condiciones, y espera la aprobación del administrador si queda pendiente. Guarda el código de recuperación.',
           'Abre Configuración → Mis Datos y completa tu perfil.',
           'Configuración → Gestión de Armas: crea al menos un arma.',
           'Configuración → Tiempos y series: crea una plantilla (Precisión, Duelo, Aire 10m…).',
@@ -104,16 +105,18 @@ abstract final class HelpContent {
     subtitle: 'Referencia detallada para el día a día',
     sections: [
       HelpDocSection(
-        title: '1. Introducción y licencia',
+        title: '1. Introducción, cuenta AMG y licencia',
         paragraphs: [
-          'TiroAMG combina configuración de material, control de tiempos, puntuación y análisis. La instalación se valida contra el servidor de licencias cuando hay red.',
-          'Módulos típicos: Inicio (base), Competición, Análisis/Historial, Backup, Detección de diana, catálogos avanzados. Sin módulo, la opción no aparece o muestra aviso de bloqueo.',
+          'TiroAMG combina configuración de material, control de tiempos, puntuación y análisis.',
+          'El acceso puede requerir una cuenta AMG (usuario/contraseña). Tras registrarte, la cuenta puede quedar pendiente hasta que un administrador la active. Guarda el código de recuperación.',
+          'La instalación se valida contra el servidor de licencias cuando hay red. Módulos típicos: Inicio (base), Competición, Análisis/Historial, Backup, Detección de diana, catálogos avanzados. Sin módulo, la opción no aparece o muestra aviso de bloqueo.',
           'En Configuración → Estado de la aplicación ves: activa/bloqueada, módulos, email, última sync, device, versión de app y de base de datos, y el botón de buscar actualizaciones.',
         ],
         bullets: [
-          'Identificar (email): asocia el dispositivo a tu cuenta para soporte y módulos.',
+          'Identificar (email): asocia el dispositivo para soporte y módulos (opcional).',
           'Refrescar: vuelve a consultar el servidor.',
           'Buscar actualizaciones: en instalaciones de prueba puede abrir la descarga de tu servidor; en la versión de Google Play abre la ficha de la tienda.',
+          'Privacidad y condiciones: propias de TiroAMG; en Ayuda y al registrarte.',
         ],
       ),
       HelpDocSection(
@@ -360,9 +363,19 @@ abstract final class HelpContent {
           'Es normal: solo sirve para ampliar y mover la vista. Desactívala para volver a puntuar.',
     ),
     HelpFaqItem(
+      question: '¿Qué es la cuenta AMG?',
+      answer:
+          'Usuario y contraseña para acceder a TiroAMG cuando el build tiene autenticación. Al registrarte aceptas privacidad y condiciones; la cuenta puede quedar pendiente hasta la aprobación del administrador. Guarda el código de recuperación.',
+    ),
+    HelpFaqItem(
+      question: 'Me he registrado y no puedo entrar',
+      answer:
+          'Es normal si la cuenta está pendiente. Cuando el administrador la active en el panel, inicia sesión con tu usuario y contraseña.',
+    ),
+    HelpFaqItem(
       question: '¿Cómo identifico mi instalación?',
       answer:
-          'Al abrir la app debes aceptar la política de privacidad y las condiciones de uso (obligatorio). El email es opcional; puedes añadirlo luego en Configuración → Estado de la aplicación → Identificar (email).',
+          'Al registrarte aceptas privacidad y condiciones (obligatorio). El email de instalación es opcional; puedes añadirlo en Configuración → Estado de la aplicación → Identificar (email).',
     ),
     HelpFaqItem(
       question: '¿El desarrollador responde si la app falla?',

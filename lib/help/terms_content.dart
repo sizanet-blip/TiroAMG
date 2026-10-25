@@ -2,12 +2,15 @@ import 'help_content.dart';
 
 /// Condiciones de uso y limitación de responsabilidad (texto en la app).
 abstract final class TermsContent {
-  static const String version = '1.0';
+  static const String version = '1.1';
+  static const String versionDate = '2026-10-25';
   static const String responsable = 'Alberto Maestre Gutiérrez';
   static const String emailContacto = 'info@albertomaestre.es';
   static const String web =
       'https://www.albertomaestre.es/pagina/condiciones-de-uso';
   static const String appName = 'TiroAMG';
+
+  static const String acceptanceVersion = '$version-$versionDate';
 
   static const String resumenCorto =
       '$appName se ofrece “tal cual”, sin garantía de ausencia de errores. '
@@ -32,6 +35,7 @@ abstract final class TermsContent {
         paragraphs: [
           '$appName es una herramienta de apoyo al tiro deportivo. El uso básico se ofrece sin cobro al usuario final.',
           'No sustituye las normas de seguridad del polígono, del arma, de la federación ni el criterio del tirador.',
+          'El acceso puede requerir una cuenta AMG (usuario/contraseña) sujeta a aprobación del administrador.',
         ],
       ),
       HelpDocSection(

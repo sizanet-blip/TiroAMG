@@ -16,6 +16,9 @@ import 'license_api_http.dart';
 class LicenseService {
   const LicenseService();
 
+  /// Id canónico en el inventario unificado del panel AMG.
+  static const String appName = 'TiroAMG';
+
   static const String apiBaseUrl = String.fromEnvironment(
     'LICENSE_API_URL',
     defaultValue: '',
@@ -465,7 +468,7 @@ class LicenseService {
 
   /// Registro silencioso B+C (sin email).
   Future<LicenciaCheckResult> registrarInstalacion({
-    String nombreApp = 'TiroAMG',
+    String nombreApp = appName,
   }) async {
     var local = await _ensureLocalDefaultInstallation();
     final base = apiBaseUrl.trim();
@@ -488,6 +491,7 @@ class LicenseService {
         'app_version': package?.version ?? '0.0.0',
         'build_number': package?.buildNumber ?? '0',
         'app_name': nombreApp,
+        'app_id': nombreApp,
       });
 
       Future<http.Response> post(String path) {
@@ -604,6 +608,8 @@ class LicenseService {
         path: '/installations/identify',
         body: jsonEncode({
           'device_id': deviceId,
+          'app_name': appName,
+          'app_id': appName,
           'email': trimmed,
           'platform': _platformKey,
           'app_version': package.version,
@@ -871,7 +877,7 @@ class LicenseService {
     // Compat: ahora es identify + register.
     final email = identificadorUsuario.trim();
     final reg = await registrarInstalacion(
-      nombreApp: nombreApp ?? 'TiroAMG',
+      nombreApp: nombreApp ?? appName,
     );
     if (email.isEmpty) return reg;
     return identificarEmail(email: email);
@@ -884,6 +890,8 @@ class LicenseService {
 
     final body = <String, dynamic>{
       'device_id': deviceId,
+      'app_name': appName,
+      'app_id': appName,
       'platform': _platformKey,
       'app_version': package.version,
       'build_number': package.buildNumber,

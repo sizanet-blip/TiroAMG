@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'screens/auth_gate_screen.dart';
 import 'screens/home_screen.dart';
+import 'services/app_auth_service.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -28,11 +30,33 @@ class TiroTrackerApp extends StatefulWidget {
 
 class _TiroTrackerAppState extends State<TiroTrackerApp>
     with WidgetsBindingObserver {
+  var _authReady = !AppAuthService.isConfigured;
+  var _checkingAuth = AppAuthService.isConfigured;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _setWakelock(true);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAuth());
+  }
+
+  Future<void> _checkAuth() async {
+    if (!AppAuthService.isConfigured) {
+      if (mounted) {
+        setState(() {
+          _authReady = true;
+          _checkingAuth = false;
+        });
+      }
+      return;
+    }
+    final ok = await AppAuthService().hasSession();
+    if (!mounted) return;
+    setState(() {
+      _authReady = ok;
+      _checkingAuth = false;
+    });
   }
 
   @override
@@ -73,7 +97,13 @@ class _TiroTrackerAppState extends State<TiroTrackerApp>
       ],
       // -----------------------------------------
 
-      home: const HomeScreen(),
+      home: _checkingAuth
+          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          : (_authReady
+              ? const HomeScreen()
+              : AuthGateScreen(
+                  onAuthenticated: () => setState(() => _authReady = true),
+                )),
     );
   }
 }

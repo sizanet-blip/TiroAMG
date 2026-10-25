@@ -3,13 +3,17 @@ import 'help_content.dart';
 /// Política de privacidad de TiroAMG (texto en la app).
 /// Alineada con la política web en albertomaestre.es.
 abstract final class PrivacyContent {
-  static const String version = '1.1';
+  static const String version = '1.2';
+  static const String versionDate = '2026-10-25';
   static const String responsable = 'Alberto Maestre Gutiérrez';
   static const String emailContacto = 'info@albertomaestre.es';
   static const String web = 'https://www.albertomaestre.es/';
   static const String webPrivacidad =
       'https://www.albertomaestre.es/pagina/politica-de-privacidad';
   static const String appName = 'TiroAMG';
+
+  /// Identificador enviado al panel al aceptar (APP_AUTH).
+  static const String acceptanceVersion = '$version-$versionDate';
 
   static const HelpDoc documento = HelpDoc(
     id: 'privacidad',
@@ -36,13 +40,13 @@ abstract final class PrivacyContent {
       HelpDocSection(
         title: '3. Qué se envía al servidor',
         paragraphs: [
-          'Al arrancar, la app puede registrar la instalación de forma silenciosa (sin email) para obtener licencia y módulos. Según el uso, el servidor puede tratar:',
+          'Para usar $appName necesitas una cuenta AMG (usuario y contraseña). La solicitud puede quedar pendiente hasta la aprobación del administrador. El servidor puede tratar:',
         ],
         bullets: [
+          'Usuario, contraseña (hash en servidor), email opcional y código de recuperación.',
           'Identificador técnico de instalación (device ID generado por la app; no es IMEI ni identificador publicitario).',
           'Plataforma (Android, Windows, etc.), versión de la app y número de build.',
           'Clave de licencia, estado y módulos habilitados (p. ej. Inicio, detección automática).',
-          'Email de contacto, solo si tú lo aportas después (opcional) para identificar la instalación o soporte.',
           'Comprobaciones puntuales de capacidad/módulo y, si las solicitas, peticiones de mejora de módulos.',
         ],
       ),
