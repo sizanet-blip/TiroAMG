@@ -3,7 +3,7 @@ import '../models/catalogo_model.dart';
 import '../services/catalogo_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class CatalogoCalibresScreen extends StatefulWidget {
   const CatalogoCalibresScreen({super.key});
@@ -125,9 +125,7 @@ class _CatalogoCalibresScreenState extends State<CatalogoCalibresScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const TiroAmgAppBarTitle(section: 'Catálogo: Calibres'),
-      ),
+      appBar: const TiroAmgAppBar(section: 'Catálogo: Calibres'),
       body: _lista.isEmpty
           ? Center(
               child: Padding(

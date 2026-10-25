@@ -125,6 +125,21 @@ class _EstadoAppScreenState extends State<EstadoAppScreen> {
     if (!mounted) return;
     setState(() => _comprobandoActualizacion = false);
 
+    if (result.openPlayStore) {
+      final opened = await _updateService.openPlayStore();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            opened
+                ? 'Abriendo Google Play…'
+                : 'No se pudo abrir Google Play.',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (result.hasUpdate && result.info != null) {
       await _showUpdateDialog(result.info!, force: result.forceUpdate);
       return;

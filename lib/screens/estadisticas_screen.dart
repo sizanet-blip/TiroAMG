@@ -12,8 +12,8 @@ import '../models/tipo_diana_model.dart';
 import '../models/disparo_model.dart';
 import '../models/municion_model.dart';
 import '../theme/app_theme.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
 import '../utils/impacto_visual.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class EstadisticasScreen extends StatefulWidget {
   final int modo; 
@@ -339,8 +339,8 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: TiroAmgAppBarTitle(section: titulo),
+      appBar: TiroAmgAppBar(
+        section: titulo,
         actions: [
           IconButton(icon: const Icon(Icons.print), tooltip: "Imprimir PDF", onPressed: !_cargando ? _imprimirInforme : null)
         ],

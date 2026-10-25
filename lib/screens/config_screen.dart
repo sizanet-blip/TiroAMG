@@ -14,7 +14,7 @@ import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class ConfigScreen extends StatefulWidget {
   const ConfigScreen({super.key});
@@ -105,7 +105,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const TiroAmgAppBarTitle(section: 'Configuración')),
+      appBar: const TiroAmgAppBar(section: 'Configuración'),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),

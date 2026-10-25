@@ -3,8 +3,8 @@ import '../models/equipo_model.dart';
 import '../services/equipo_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
 import 'equipo_form_screen.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class GestionEquiposScreen extends StatefulWidget {
   const GestionEquiposScreen({super.key});
@@ -67,9 +67,7 @@ class _GestionEquiposScreenState extends State<GestionEquiposScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const TiroAmgAppBarTitle(section: 'Mis Armas'),
-      ),
+      appBar: const TiroAmgAppBar(section: 'Mis Armas'),
       body: _lista.isEmpty
           ? Center(
               child: Padding(

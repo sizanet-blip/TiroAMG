@@ -9,8 +9,9 @@ import '../models/disparo_model.dart';
 import '../services/catalogo_service.dart';
 import '../services/entrenamiento_service.dart';
 import '../services/audio_service.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
+import '../theme/app_theme.dart';
 import '../utils/impacto_visual.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 enum FaseSesion { stop, preparacion, espera, fuego, fin }
 
@@ -101,6 +102,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   int _segundosRestantes = 0;
   int _msRestantes = 0;
   DateTime? _faseEndsAt;
+  /// Invalida arranques de cronómetro pendientes (pausa / salto de fase).
+  int _faseCambioId = 0;
   Color _colorEstado = Colors.grey;
   bool _haIniciado = false;
   AvisoTiroPerfil _perfilAvisos = AvisoTiroPerfil.competicion;
@@ -326,8 +329,11 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   }
 
   void _pausar() {
+    _faseCambioId++;
     _timer?.cancel();
     _faseEndsAt = null;
+    // ignore: unawaited_futures
+    _audioService.detenerVoz();
     setState(() {
       _faseActual = FaseSesion.stop;
       _mensajeEstado = "PAUSADO";
@@ -335,7 +341,10 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
     });
   }
 
-  void _cambiarFase(FaseSesion fase, int tiempo) {
+  /// Cambia de fase. El tiempo de la fase empieza al terminar la señal
+  /// (pitidos + voz, p. ej. «Preparación. Cargar.»).
+  Future<void> _cambiarFase(FaseSesion fase, int tiempo) async {
+    final cambioId = ++_faseCambioId;
     final ms = (tiempo * 1000).clamp(0, 24 * 60 * 60 * 1000);
     final omitirPitidoFuego = fase == FaseSesion.fuego && _fuegoPitidoAnticipado;
     _fuegoPitidoAnticipado = false;
@@ -345,31 +354,56 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
       _faseActual = fase;
       _segundosRestantes = tiempo;
       _msRestantes = ms;
-      _faseEndsAt = ms > 0
-          ? DateTime.now().add(Duration(milliseconds: ms))
-          : null;
+      // No arrancar hasta terminar la señal de la fase.
+      _faseEndsAt = null;
       _pulsoFinal = false;
 
       if (fase == FaseSesion.preparacion) {
         _mensajeEstado = "PREPARACIÓN";
         _colorEstado = Colors.amber[800]!;
-        _audioService.senalPreparacion();
       } else if (fase == FaseSesion.espera) {
         _mensajeEstado = "ATENCIÓN";
         _colorEstado = Colors.red[700]!;
-        _audioService.senalAtencion();
         _dispararFlash();
       } else if (fase == FaseSesion.fuego) {
         _mensajeEstado = "FUEGO";
         _colorEstado = Colors.green[600]!;
-        _audioService.senalFuego(omitirPitido: omitirPitidoFuego);
         _dispararFlash();
       } else if (fase == FaseSesion.fin) {
         _mensajeEstado = "ALTO";
         _colorEstado = Colors.blueGrey;
-        _audioService.senalAlto(serieTerminada: true);
       }
     });
+
+    Future<void> senal;
+    switch (fase) {
+      case FaseSesion.preparacion:
+        senal = _audioService.senalPreparacion();
+        break;
+      case FaseSesion.espera:
+        senal = _audioService.senalAtencion();
+        break;
+      case FaseSesion.fuego:
+        senal = _audioService.senalFuego(omitirPitido: omitirPitidoFuego);
+        break;
+      case FaseSesion.fin:
+        senal = _audioService.senalAlto(serieTerminada: true);
+        break;
+      case FaseSesion.stop:
+        return;
+    }
+
+    await senal;
+    if (!mounted || cambioId != _faseCambioId) return;
+    if (_faseActual != fase) return;
+
+    if (ms > 0) {
+      setState(() {
+        _faseEndsAt = DateTime.now().add(Duration(milliseconds: ms));
+        _msRestantes = ms;
+        _segundosRestantes = tiempo;
+      });
+    }
   }
 
   void _iniciarTicker() {
@@ -468,6 +502,9 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
   // --- FUNCIÓN SALTAR FASE (SKIP) ---
   void _avanzarFaseManual() {
     if (!_enCurso) return;
+    _faseCambioId++;
+    // ignore: unawaited_futures
+    _audioService.detenerVoz();
     // Forzamos el cambio inmediato como si el tiempo hubiera llegado a 0
     _gestionarCambioFase();
   }
@@ -1040,14 +1077,8 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
           // En landscape no usamos AppBar a todo el ancho: controles van al panel.
           appBar: landscape
               ? null
-              : AppBar(
-                  title: TiroAmgAppBarTitle(
-                    section: widget.tituloSerie ?? widget.plantilla.nombreDisciplina,
-                  ),
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  iconTheme: const IconThemeData(color: Colors.white),
-                  actionsIconTheme: const IconThemeData(color: Colors.white),
+              : TiroAmgAppBar(
+                  section: widget.tituloSerie ?? widget.plantilla.nombreDisciplina,
                   actions: _buildAppBarActions(),
                 ),
           body: landscape ? _buildLandscapeBody() : _buildPortraitBody(),
@@ -1063,7 +1094,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         onPressed: _toggleMute,
         icon: Icon(
           _mute ? Icons.volume_off : Icons.volume_up,
-          color: _mute ? Colors.orangeAccent : Colors.white70,
+          color: _mute ? Colors.orangeAccent : AppColors.title,
         ),
       ),
       IconButton(
@@ -1085,7 +1116,7 @@ class _SesionDisparoScreenState extends State<SesionDisparoScreen> {
         child: const Text(
           'FIN',
           style: TextStyle(
-            color: Colors.tealAccent,
+            color: AppColors.accentTraining,
             fontWeight: FontWeight.bold,
           ),
         ),

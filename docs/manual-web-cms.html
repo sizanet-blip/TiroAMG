@@ -37,7 +37,19 @@
     .manual-tiroamg li { margin: 0.3rem 0; }
     .manual-tiroamg .lead { color: #607d8b; font-size: 1.05rem; }
     .manual-tiroamg figure { margin: 1rem 0 1.4rem; text-align: center; }
-    .manual-tiroamg figure img { max-width: 300px; width: 100%; height: auto; border-radius: 12px; border: 1px solid #e2e8ee; box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+    /* Gana a .program-content .content-html img { max-width: 100% } del CMS */
+    .manual-tiroamg figure img,
+    .program-content .content-html .manual-tiroamg figure img {
+      max-width: 200px;
+      width: 200px;
+      height: auto;
+      margin: 0.5rem auto;
+      display: block;
+      border-radius: 12px;
+      border: 1px solid #e2e8ee;
+      box-shadow: 0 4px 16px rgba(0,0,0,.06);
+      background: #f4f6f8;
+    }
     .manual-tiroamg figcaption { margin-top: 0.45rem; font-size: 0.85rem; color: #78909c; }
     .manual-tiroamg details { background: #fff; border: 1px solid #e2e8ee; border-radius: 10px; padding: 0.7rem 1rem; margin: 0.45rem 0; }
     .manual-tiroamg summary { font-weight: 600; cursor: pointer; color: #37474f; }
@@ -87,7 +99,7 @@
 
   <!-- 2 -->
   <h2 id="home">2. Menú principal</h2>
-  <p>La pantalla de inicio muestra el logo TiroAMG y los accesos principales. El orden y la presencia de filas dependen de tu licencia.</p>
+  <p>La pantalla de inicio muestra el wordmark TiroAMG (icono, nombre y lema). En el resto de pantallas el mismo logo queda en la cabecera, con el nombre de la sección debajo. El orden y la presencia de filas dependen de tu licencia.</p>
   <ul>
     <li><strong>Competición</strong> — modalidades y fases oficiales.</li>
     <li><strong>Entrenamiento</strong> — series, tiempos y puntuación.</li>
@@ -168,7 +180,7 @@
   <!-- 4 -->
   <h2 id="entrenamiento">4. Entrenamiento</h2>
   <h3>4.1 Configurar sesión</h3>
-  <p>Elige arma, plantilla (disciplina), munición opcional y si marcas en diana o por números. Puedes anotar condiciones (lugar, distancia, interior, posición, iluminación…).</p>
+  <p>Elige arma, plantilla (disciplina), munición opcional y si marcas en diana o por números. <strong>Condiciones de tiro</strong> (lugar, distancia, interior, posición, iluminación, temperatura, humedad, viento…) está plegada: pulsa el título para abrirla. Lo que escribas se conserva al cerrarla.</p>
   <ul>
     <li><strong>Objetivo de la sesión</strong>: <em>Entrenar</em> (sesión normal) o <em>Corregir miras</em> (el análisis sugerirá clics; sin diagnóstico técnico habitual).</li>
     <li><strong>Puntuar tocando diana</strong> vs <strong>por números</strong> (panel X / 10…0).</li>
@@ -207,7 +219,7 @@
     <img src="/uploads/cms/19_competicion.png" alt="Listado de competiciones" />
     <figcaption>Competiciones / modalidades</figcaption>
   </figure>
-  <p>En el detalle de una modalidad configuras fases, arma, munición y modo de puntuación; luego ejecutas fase a fase.</p>
+  <p>Al elegir una modalidad puedes editar fases o empezar. En la preparación, igual que en entrenamiento, <strong>Condiciones de tiro</strong> empieza plegada y se abre al pulsarla.</p>
   <figure>
     <img src="/uploads/cms/20_competicion_detalle.png" alt="Detalle de competición" />
     <figcaption>Detalle / setup de modalidad</figcaption>

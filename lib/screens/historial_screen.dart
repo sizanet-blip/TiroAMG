@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import '../models/sesion_model.dart';
 import '../services/entrenamiento_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
 import 'sesion_detalle_screen.dart';
 import 'competicion_historial_detalle_screen.dart';
 import 'estadisticas_screen.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class HistorialScreen extends StatefulWidget {
   const HistorialScreen({super.key});
@@ -257,10 +257,11 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
+      appBar: TiroAmgAppBar(
+        section: 'Historial',
         title: _modoSeleccion && _tabController.index == 0
             ? Text('${_entrenosSeleccionados.length} seleccionados')
-            : const TiroAmgAppBarTitle(section: 'Historial'),
+            : null,
         leading: _modoSeleccion && _tabController.index == 0
             ? IconButton(
                 icon: const Icon(Icons.close),
@@ -296,9 +297,6 @@ class _HistorialScreenState extends State<HistorialScreen> with SingleTickerProv
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicatorColor: Colors.white,
           tabs: const [
             Tab(text: 'ENTRENAMIENTOS', icon: Icon(Icons.sports_baseball)),
             Tab(text: 'COMPETICIONES', icon: Icon(Icons.emoji_events)),

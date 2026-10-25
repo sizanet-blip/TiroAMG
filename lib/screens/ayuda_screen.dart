@@ -7,7 +7,7 @@ import '../widgets/app_ui.dart';
 import 'ayuda_documento_screen.dart';
 import 'ayuda_faq_screen.dart';
 import '../widgets/identificar_instalacion_dialog.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class AyudaScreen extends StatelessWidget {
   const AyudaScreen({super.key});
@@ -33,7 +33,7 @@ class AyudaScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const TiroAmgAppBarTitle(section: 'Ayuda')),
+      appBar: const TiroAmgAppBar(section: 'Ayuda'),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),

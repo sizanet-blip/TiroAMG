@@ -66,7 +66,7 @@ abstract final class HelpContent {
           'Elige arma, plantilla (disciplina) y munición si quieres.',
           'Objetivo: Entrenar (sesión normal) o Corregir miras (el análisis sugerirá clics).',
           'Decide si marcas en diana o «Puntuar por números» (teclado X / 10…0).',
-          'Rellena condiciones (lugar, distancia, interior…) si te interesa el histórico.',
+          'Condiciones de tiro está plegada: pulsa el título si quieres anotar lugar, distancia, interior, etc.',
           'Pulsa Iniciar y sigue Atención / Fuego / Alto.',
           'Al guardar puedes seguir con referencia (impactos azules) o diana limpia.',
           'Revisa la sesión en Historial.',
@@ -113,13 +113,13 @@ abstract final class HelpContent {
         bullets: [
           'Identificar (email): asocia el dispositivo a tu cuenta para soporte y módulos.',
           'Refrescar: vuelve a consultar el servidor.',
-          'Buscar actualizaciones: comprueba versión remota y abre la descarga si hay una nueva.',
+          'Buscar actualizaciones: en instalaciones de prueba puede abrir la descarga de tu servidor; en la versión de Google Play abre la ficha de la tienda.',
         ],
       ),
       HelpDocSection(
         title: '2. Menú principal',
         paragraphs: [
-          'La home muestra el logo TiroAMG y accesos directos. El orden y la presencia de filas dependen de tu licencia.',
+          'La home muestra el wordmark TiroAMG. En el resto de pantallas el logo va en la cabecera, con el nombre de la sección debajo. El orden y la presencia de filas dependen de tu licencia.',
         ],
         bullets: [
           'Competición — modalidades, fases y ejecución oficial.',
@@ -205,7 +205,7 @@ abstract final class HelpContent {
           'Objetivo de la sesión: Entrenar (uso normal) o Corregir miras (el análisis se centra en sugerir clics; no muestra el diagnóstico técnico habitual).',
           'Munición opcional.',
           'Puntuar tocando diana vs puntuar por números (switch).',
-          'Condiciones: lugar, distancia, interior/exterior, posición, iluminación, y si quieres temperatura, humedad, viento, etc.',
+          'Condiciones de tiro (lugar, distancia, interior/exterior, posición, iluminación, temperatura, humedad, viento…) va plegada: pulsa el título para abrirla. Al cerrarla no se borra lo escrito.',
           'Al iniciar se abre la sesión de tiro con los avisos de la plantilla.',
         ],
       ),
@@ -233,7 +233,7 @@ abstract final class HelpContent {
         ],
         bullets: [
           'Crea o edita modalidades y sus fases.',
-          'Setup: arma, munición, modo de puntuación (diana o números).',
+          'Setup: arma, munición, modo de puntuación (diana o números). Condiciones de tiro va plegada hasta que pulses el título.',
           'Runner: ejecuta fase a fase; al completar avanza según la definición.',
           'Entre series puedes mantener impactos de referencia (azules) si sigues en el mismo papel; hay interruptor y botón para limpiar.',
           'Al cambiar de fase, si hay referencia, la app pregunta: mismo papel (mantener) o papel nuevo (limpiar).',
@@ -281,7 +281,7 @@ abstract final class HelpContent {
       HelpDocSection(
         title: '16. Actualizaciones y soporte',
         paragraphs: [
-          'Estado de la aplicación → Buscar actualizaciones. Si hay versión nueva, puedes abrir el enlace de descarga del servidor.',
+          'Estado de la aplicación → Buscar actualizaciones. Canal propio (JSON en tu servidor) o, en el build de tienda, la ficha de Google Play.',
           'Soporte: $supportEmail. Indica versión de app, módulos, email de instalación y, si puedes, capturas.',
         ],
       ),

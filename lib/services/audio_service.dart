@@ -60,6 +60,7 @@ class AudioService {
     await _flutterTts.setLanguage('es-ES');
     await _flutterTts.setSpeechRate(0.5);
     await _flutterTts.setPitch(1.0);
+    await _flutterTts.awaitSpeakCompletion(true);
 
     try {
       await AudioPlayer.global.setAudioContext(
@@ -250,7 +251,16 @@ class AudioService {
 
   Future<void> _hablar(String texto) async {
     if (_mute) return;
+    try {
+      await _flutterTts.stop();
+    } catch (_) {}
     await _flutterTts.speak(texto);
+  }
+
+  Future<void> detenerVoz() async {
+    try {
+      await _flutterTts.stop();
+    } catch (_) {}
   }
 
   Future<void> _playAsset(String assetPath, {required int waitMs}) async {

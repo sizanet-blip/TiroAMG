@@ -13,9 +13,9 @@ import '../services/pdf_service.dart';
 import '../services/perfil_service.dart';
 import '../services/municion_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
 import '../utils/impacto_visual.dart';
 import 'estadisticas_screen.dart'; // <--- IMPORTANTE: Para navegar a estadísticas
+import '../widgets/tiro_amg_app_bar.dart';
 
 class SesionDetalleScreen extends StatefulWidget {
   final int sesionId;
@@ -382,8 +382,8 @@ class _SesionDetalleScreenState extends State<SesionDetalleScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const TiroAmgAppBarTitle(section: 'Detalle de Tirada'),
+      appBar: TiroAmgAppBar(
+        section: 'Detalle de Tirada',
         actions: [
           // --- 1. BOTÓN ESTADÍSTICAS (NUEVO) ---
           IconButton(

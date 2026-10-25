@@ -11,7 +11,7 @@ import '../services/municion_service.dart';
 import 'sesion_disparo_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class EntrenamientoScreen extends StatefulWidget {
   const EntrenamientoScreen({super.key});
@@ -151,7 +151,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
     if (_equipos.isEmpty || _plantillas.isEmpty) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(title: const TiroAmgAppBarTitle(section: 'Entrenamiento')),
+        appBar: const TiroAmgAppBar(section: 'Entrenamiento'),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
@@ -302,6 +302,8 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
             title: 'Condiciones de tiro',
             titleIcon: Icons.thermostat_outlined,
             titleIconColor: AppColors.subtitle,
+            collapsible: true,
+            initiallyExpanded: false,
             child: Column(
               children: [
                 TextFormField(

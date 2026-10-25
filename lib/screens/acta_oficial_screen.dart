@@ -4,8 +4,8 @@ import '../models/sesion_model.dart';
 import '../models/acta_oficial_model.dart';
 import '../services/entrenamiento_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
 import '../widgets/app_ui.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 /// Permite introducir puntuación oficial del árbitro a cualquier nivel:
 /// total del torneo, total por serie y/o tiro a tiro.
@@ -312,8 +312,8 @@ class _ActaOficialScreenState extends State<ActaOficialScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const TiroAmgAppBarTitle(section: 'Acta oficial'),
+      appBar: TiroAmgAppBar(
+        section: 'Acta oficial',
         actions: [
           TextButton(
             onPressed: _guardando ? null : _guardar,
@@ -323,7 +323,7 @@ class _ActaOficialScreenState extends State<ActaOficialScreen> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Guardar', style: TextStyle(color: Colors.white)),
+                : Text('Guardar', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),

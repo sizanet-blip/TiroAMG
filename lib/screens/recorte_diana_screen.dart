@@ -10,7 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import '../services/hole_detection_service.dart' as hole_service;
 import '../services/corner_detection_service.dart';
 import '../models/disparo_model.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
+import '../theme/app_theme.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 // Clase auxiliar Point
 class Point<T> {
@@ -1731,10 +1732,8 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const TiroAmgAppBarTitle(section: 'Detección Automática de Agujeros'),
-        backgroundColor: Colors.deepOrange,
-        foregroundColor: Colors.white,
+      appBar: TiroAmgAppBar(
+        section: 'Detección Automática de Agujeros',
         actions: [
           if (_croppedImage != null) ...[
             // Botón para detectar zona blanca
@@ -1742,7 +1741,7 @@ class _RecorteDianaScreenState extends State<RecorteDianaScreen> {
               icon: const Icon(Icons.brightness_1),
               onPressed: _isProcessing ? null : _detectarZonaBlanca,
               tooltip: 'Detectar Zona Blanca',
-              color: Colors.white,
+              color: AppColors.subtitle,
             ),
             // Botón para detectar zona negra
             IconButton(
@@ -2722,10 +2721,8 @@ class _CropTargetScreenState extends State<CropTargetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const TiroAmgAppBarTitle(section: 'Recortar Diana'),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
+      appBar: TiroAmgAppBar(
+        section: 'Recortar Diana',
         actions: [
           IconButton(
             icon: const Icon(Icons.check),

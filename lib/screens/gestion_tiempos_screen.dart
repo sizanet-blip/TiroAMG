@@ -3,8 +3,8 @@ import '../models/plantilla_tiempos_model.dart';
 import '../services/plantilla_tiempos_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
 import 'plantilla_tiempos_form_screen.dart'; // Importaremos el formulario aquí
+import '../widgets/tiro_amg_app_bar.dart';
 
 class GestionTiemposScreen extends StatefulWidget {
   const GestionTiemposScreen({super.key});
@@ -67,7 +67,7 @@ class _GestionTiemposScreenState extends State<GestionTiemposScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const TiroAmgAppBarTitle(section: 'Plantillas de Tiempos')),
+      appBar: const TiroAmgAppBar(section: 'Plantillas de Tiempos'),
       body: _lista.isEmpty
           ? Center(
               child: Padding(

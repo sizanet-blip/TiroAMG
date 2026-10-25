@@ -208,6 +208,8 @@ class _CompeticionSetupScreenState extends State<CompeticionSetupScreen> {
             title: 'Condiciones de tiro',
             titleIcon: Icons.thermostat_outlined,
             titleIconColor: AppColors.subtitle,
+            collapsible: true,
+            initiallyExpanded: false,
             child: Column(
               children: [
                 TextFormField(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Título de AppBar: logo TiroAMG y, opcionalmente, la pantalla actual.
+/// Título de AppBar: wordmark TiroAMG y, opcionalmente, la pantalla actual.
 class TiroAmgAppBarTitle extends StatelessWidget {
   const TiroAmgAppBarTitle({
     super.key,
@@ -15,49 +15,40 @@ class TiroAmgAppBarTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasSection = section != null && section!.trim().isNotEmpty;
-    final logoSize = hasSection ? 28.0 : 40.0;
+    final logoHeight = hasSection ? 54.0 : 68.0;
 
-    final brand = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(hasSection ? 7 : 10),
-          child: Image.asset(
-            'assets/logo.png',
-            width: logoSize,
-            height: logoSize,
-            fit: BoxFit.cover,
-            filterQuality: FilterQuality.high,
-            errorBuilder: (_, __, ___) => Icon(
-              Icons.gps_fixed,
-              size: logoSize * 0.75,
-              color: Colors.white,
+    final logo = SizedBox(
+      height: logoHeight,
+      width: double.infinity,
+      child: FittedBox(
+        alignment: Alignment.centerLeft,
+        fit: BoxFit.contain,
+        child: Image.asset(
+          'assets/tiroamg_wordmark.png',
+          width: 933,
+          height: 269,
+          fit: BoxFit.fill,
+          filterQuality: FilterQuality.high,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => Text(
+            'TiroAMG',
+            style: TextStyle(
+              color: AppColors.title,
+              fontSize: hasSection ? 18 : 22,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
-        SizedBox(width: hasSection ? 8 : 10),
-        Text(
-          'TiroAMG',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: hasSection ? 16 : 20,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
-            height: 1,
-          ),
-        ),
-      ],
+      ),
     );
 
-    if (!hasSection) {
-      return Align(alignment: Alignment.centerLeft, child: brand);
-    }
+    if (!hasSection) return logo;
 
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        brand,
+        logo,
         const SizedBox(height: 2),
         Text(
           section!,
@@ -72,6 +63,35 @@ class TiroAmgAppBarTitle extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Wordmark completo (con eslogan) para cabeceras de página como la home.
+class TiroAmgWordmark extends StatelessWidget {
+  const TiroAmgWordmark({
+    super.key,
+    this.height = 88,
+  });
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/tiroamg_wordmark.png',
+      height: height,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (_, __, ___) => Text(
+        'TiroAMG',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: height * 0.35,
+          fontWeight: FontWeight.w700,
+          color: AppColors.title,
+        ),
+      ),
     );
   }
 }

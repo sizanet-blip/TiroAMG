@@ -9,11 +9,11 @@ import '../services/perfil_service.dart';
 import '../services/equipo_service.dart';
 import '../services/municion_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
 import 'sesion_detalle_screen.dart';
 import 'estadisticas_screen.dart';
 import 'acta_oficial_screen.dart';
 import '../models/acta_oficial_model.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class CompeticionHistorialDetalleScreen extends StatefulWidget {
   final int idModalidad;
@@ -432,8 +432,8 @@ class _CompeticionHistorialDetalleScreenState extends State<CompeticionHistorial
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const TiroAmgAppBarTitle(section: 'Detalle Competición'),
+      appBar: TiroAmgAppBar(
+        section: 'Detalle Competición',
         actions: [
           IconButton(
             icon: const Icon(Icons.gavel),

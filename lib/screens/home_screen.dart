@@ -16,6 +16,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_exit.dart';
 import '../widgets/app_ui.dart';
 import '../widgets/identificar_instalacion_dialog.dart';
+import '../widgets/tiro_amg_app_bar_title.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -168,6 +169,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkUpdatesOnStart() async {
     if (_updateDialogShown || !mounted) return;
+    // Solo aviso automático con canal propio (UPDATE_METADATA_URL).
+    // En builds de Play, Google gestiona las actualizaciones.
+    if (!AppUpdateService.usesServerUpdates) return;
 
     final result = await _updateService.checkForUpdates();
     if (!mounted) return;
@@ -408,47 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBrandHeader() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                'assets/logo.png',
-                width: 64,
-                height: 64,
-                fit: BoxFit.cover,
-                filterQuality: FilterQuality.high,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Text(
-              'TiroAMG',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-                height: 1,
-                color: Colors.blueGrey.shade800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Tiro deportivo · entrenamientos y competiciones',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.35,
-            fontWeight: FontWeight.w500,
-            color: AppColors.subtitle,
-          ),
-        ),
-      ],
-    );
+    return const TiroAmgWordmark(height: 96);
   }
 }
 

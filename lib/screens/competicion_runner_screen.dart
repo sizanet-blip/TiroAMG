@@ -10,8 +10,8 @@ import '../services/entrenamiento_service.dart';
 import '../services/plantilla_tiempos_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/impacto_visual.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
 import 'sesion_disparo_screen.dart'; // La pantalla de la diana
+import '../widgets/tiro_amg_app_bar.dart';
 
 class CompeticionRunnerScreen extends StatefulWidget {
   final Modalidad modalidad;
@@ -305,9 +305,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     if (_fases.isEmpty) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: TiroAmgAppBarTitle(section: widget.modalidad.nombre),
-        ),
+        appBar: TiroAmgAppBar(section: widget.modalidad.nombre),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
@@ -325,9 +323,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
     if (_torneoFinalizado) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const TiroAmgAppBarTitle(section: 'Resultados'),
-        ),
+        appBar: const TiroAmgAppBar(section: 'Resultados'),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -349,9 +345,7 @@ class _CompeticionRunnerScreenState extends State<CompeticionRunnerScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: TiroAmgAppBarTitle(section: widget.modalidad.nombre),
-      ),
+      appBar: TiroAmgAppBar(section: widget.modalidad.nombre),
       body: Column(
         children: [
           // 1. MARCADOR GENERAL

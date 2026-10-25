@@ -6,9 +6,9 @@ abstract final class AppColors {
   static const Color surface = Colors.white;
   static const Color border = Color(0xFFE2E8EE);
   static const Color divider = Color(0xFFE8EEF2);
-  static const Color appBar = Color(0xFF546E7A); // blueGrey.shade600-ish
-  /// Subtítulo de sección bajo el logo en el AppBar.
-  static const Color appBarSection = Color(0xFFFFCC80);
+  static const Color appBar = Color(0xFFFFFFFF);
+  /// Subtítulo de sección bajo el wordmark en el AppBar.
+  static const Color appBarSection = Color(0xFF1E88E5);
   static final Color title = Colors.blueGrey.shade900;
   static final Color subtitle = Colors.blueGrey.shade500;
   static final Color subtitleSoft = Colors.blueGrey.shade400;
@@ -39,20 +39,24 @@ ThemeData buildTiroAmgTheme() {
       surface: AppColors.surface,
     ),
     scaffoldBackgroundColor: AppColors.background,
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: AppColors.appBar,
-      foregroundColor: Colors.white,
+      foregroundColor: AppColors.title,
       elevation: 0,
       scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.transparent,
       centerTitle: false,
-      toolbarHeight: 68,
-      titleSpacing: 12,
-      iconTheme: IconThemeData(color: Colors.white),
-      actionsIconTheme: IconThemeData(color: Colors.white),
+      toolbarHeight: 100,
+      titleSpacing: 8,
+      iconTheme: IconThemeData(color: AppColors.title),
+      actionsIconTheme: IconThemeData(color: AppColors.title),
       titleTextStyle: TextStyle(
-        color: Colors.white,
+        color: AppColors.title,
         fontSize: 18,
         fontWeight: FontWeight.w600,
+      ),
+      shape: const Border(
+        bottom: BorderSide(color: AppColors.border),
       ),
     ),
     cardTheme: CardThemeData(
@@ -110,10 +114,10 @@ ThemeData buildTiroAmgTheme() {
       iconColor: AppColors.primary,
       textColor: AppColors.title,
     ),
-    tabBarTheme: const TabBarThemeData(
-      labelColor: Colors.white,
-      unselectedLabelColor: Colors.white60,
-      indicatorColor: Colors.white,
+    tabBarTheme: TabBarThemeData(
+      labelColor: AppColors.primary,
+      unselectedLabelColor: AppColors.subtitle,
+      indicatorColor: AppColors.appBarSection,
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: AppColors.surface,

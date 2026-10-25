@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import 'tiro_amg_app_bar_title.dart';
+import 'tiro_amg_app_bar.dart';
 
 /// Scaffold de página con fondo unificado y contenido centrado.
 class AppPageScaffold extends StatelessWidget {
@@ -36,8 +36,8 @@ class AppPageScaffold extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: TiroAmgAppBarTitle(section: title),
+      appBar: TiroAmgAppBar(
+        section: title,
         actions: actions,
       ),
       floatingActionButton: floatingActionButton,
@@ -47,12 +47,14 @@ class AppPageScaffold extends StatelessWidget {
 }
 
 /// Bloque blanco con borde suave (como el menú de home).
-class AppSectionCard extends StatelessWidget {
+class AppSectionCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final String? title;
   final IconData? titleIcon;
   final Color? titleIconColor;
+  final bool collapsible;
+  final bool initiallyExpanded;
 
   const AppSectionCard({
     super.key,
@@ -61,10 +63,27 @@ class AppSectionCard extends StatelessWidget {
     this.title,
     this.titleIcon,
     this.titleIconColor,
+    this.collapsible = false,
+    this.initiallyExpanded = true,
   });
 
   @override
+  State<AppSectionCard> createState() => _AppSectionCardState();
+}
+
+class _AppSectionCardState extends State<AppSectionCard> {
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = !widget.collapsible || widget.initiallyExpanded;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final showBody = widget.title == null || _expanded;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -81,36 +100,49 @@ class AppSectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (title != null) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-              child: Row(
-                children: [
-                  if (titleIcon != null) ...[
-                    Icon(
-                      titleIcon,
-                      size: 20,
-                      color: titleIconColor ?? AppColors.primary,
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-                  Expanded(
-                    child: Text(
-                      title!,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.title,
+          if (widget.title != null) ...[
+            InkWell(
+              onTap: widget.collapsible
+                  ? () => setState(() => _expanded = !_expanded)
+                  : null,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 14, 12, showBody ? 0 : 14),
+                child: Row(
+                  children: [
+                    if (widget.titleIcon != null) ...[
+                      Icon(
+                        widget.titleIcon,
+                        size: 20,
+                        color: widget.titleIconColor ?? AppColors.primary,
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: Text(
+                        widget.title!,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.title,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    if (widget.collapsible)
+                      Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                        color: AppColors.chevron,
+                      ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            const Divider(height: 1, indent: 16, endIndent: 16),
+            if (showBody) ...[
+              const SizedBox(height: 8),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+            ],
           ],
-          Padding(padding: padding, child: child),
+          if (showBody) Padding(padding: widget.padding, child: widget.child),
         ],
       ),
     );

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class AvisosTiroScreen extends StatefulWidget {
   const AvisosTiroScreen({super.key});
@@ -44,7 +44,7 @@ class _AvisosTiroScreenState extends State<AvisosTiroScreen> {
     if (_cargando) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(title: const TiroAmgAppBarTitle(section: 'Avisos de tiro')),
+        appBar: const TiroAmgAppBar(section: 'Avisos de tiro'),
         body: const Center(child: CircularProgressIndicator()),
       );
     }

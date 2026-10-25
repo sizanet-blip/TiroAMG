@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/competicion_model.dart';
 import '../services/competicion_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/tiro_amg_app_bar_title.dart';
 import 'fase_form_screen.dart';
+import '../widgets/tiro_amg_app_bar.dart';
 
 class CompeticionDetalleScreen extends StatefulWidget {
   final Modalidad modalidad;
@@ -88,9 +88,7 @@ class _CompeticionDetalleScreenState extends State<CompeticionDetalleScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: TiroAmgAppBarTitle(section: widget.modalidad.nombre),
-      ),
+      appBar: TiroAmgAppBar(section: widget.modalidad.nombre),
       body: Column(
         children: [
           // Cabecera informativa

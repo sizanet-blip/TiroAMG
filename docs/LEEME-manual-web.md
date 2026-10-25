@@ -42,6 +42,8 @@ Abre `docs/manual-web-cms.html`, selecciona todo, copia y pégalo en el campo **
 En la app el manual de texto está en `lib/help/help_content.dart` (guía, manual completo y FAQ, sin imágenes). Las capturas son solo para la web.
 
 ### Novedades documentadas
+- Cabecera con wordmark TiroAMG en las capturas
+- Condiciones de tiro plegadas hasta que se pulsa el título (entrenamiento y competición)
 - Objetivo Entrenar / Corregir miras
 - Impactos de referencia (azul) en entrenamiento y competición; capas; pregunta al cambiar de fase
 - Selección múltiple de entrenamientos para estadísticas

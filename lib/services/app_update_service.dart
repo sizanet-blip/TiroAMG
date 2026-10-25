@@ -28,12 +28,15 @@ class AppUpdateInfo {
 class AppUpdateCheckResult {
   final bool hasUpdate;
   final bool forceUpdate;
+  /// Sin UPDATE_METADATA_URL en Android: abrir ficha de Google Play.
+  final bool openPlayStore;
   final AppUpdateInfo? info;
   final String? message;
 
   const AppUpdateCheckResult({
     required this.hasUpdate,
     required this.forceUpdate,
+    this.openPlayStore = false,
     this.info,
     this.message,
   });
@@ -47,12 +50,25 @@ class AppUpdateService {
     defaultValue: '',
   );
 
+  static const String playStorePackageId = 'es.albertomaestre.tiroamg';
+
+  /// Build con `--dart-define=UPDATE_METADATA_URL=...` (canal propio).
+  static bool get usesServerUpdates => metadataUrl.trim().isNotEmpty;
+
   Future<AppUpdateCheckResult> checkForUpdates() async {
-    if (metadataUrl.isEmpty) {
+    if (!usesServerUpdates) {
+      // Build de Play Store: sin JSON propio → Google Play.
+      if (!kIsWeb && Platform.isAndroid) {
+        return const AppUpdateCheckResult(
+          hasUpdate: false,
+          forceUpdate: false,
+          openPlayStore: true,
+        );
+      }
       return const AppUpdateCheckResult(
         hasUpdate: false,
         forceUpdate: false,
-        message: 'No se ha configurado UPDATE_METADATA_URL.',
+        message: 'Sin canal de actualizaciones configurado.',
       );
     }
 
@@ -75,7 +91,7 @@ class AppUpdateService {
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final latestVersion = (data['latestVersion'] as String?)?.trim() ?? '';
-      final latestBuild = data['latestBuild'] as int? ?? 0;
+      final latestBuild = _asInt(data['latestBuild']) ?? 0;
       final minSupportedVersion =
           (data['minSupportedVersion'] as String?)?.trim() ?? '0.0.0';
       final mandatory = data['mandatory'] as bool? ?? false;
@@ -128,6 +144,21 @@ class AppUpdateService {
     return launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  /// Abre la ficha de TiroAMG en Google Play (market:// o web).
+  Future<bool> openPlayStore() async {
+    final market = Uri.parse('market://details?id=$playStorePackageId');
+    try {
+      if (await canLaunchUrl(market)) {
+        return launchUrl(market, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+
+    final web = Uri.parse(
+      'https://play.google.com/store/apps/details?id=$playStorePackageId',
+    );
+    return launchUrl(web, mode: LaunchMode.externalApplication);
+  }
+
   String? _extractDownloadUrl(Map<String, dynamic> data) {
     final downloads = data['downloads'];
     if (downloads is! Map<String, dynamic>) return null;
@@ -160,6 +191,13 @@ class AppUpdateService {
     if (Platform.isMacOS) return 'macos';
     if (Platform.isLinux) return 'linux';
     return 'unknown';
+  }
+
+  static int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
   }
 
   static int _compareSemver(String a, String b) {
