@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -11,6 +12,7 @@ import '../help/privacy_content.dart';
 import '../help/terms_content.dart';
 import 'license_api_http.dart';
 import 'license_service.dart';
+import 'local_unlock_service.dart';
 
 /// Auth unificado AMG (panel Yii2 `/app-auth/*`).
 class AppAuthService {
@@ -41,6 +43,16 @@ class AppAuthService {
 
   /// Token solo en memoria: al cerrar la app se pierde y hay que volver a entrar.
   static String? _sessionToken;
+
+  static bool _offlineUnlockNotice = false;
+
+  final LocalUnlockService _unlock = LocalUnlockService();
+
+  static bool takeOfflineUnlockNotice() {
+    final pending = _offlineUnlockNotice;
+    _offlineUnlockNotice = false;
+    return pending;
+  }
 
   static String get apiBaseUrl {
     for (final c in [_apiAuth, _apiInstall, _apiLicense]) {
@@ -191,20 +203,53 @@ class AppAuthService {
           'terms_accepted_version': termsVersion,
         },
       };
-      final response = await _post('/app-auth/login', body);
+      final offlineReady = await _unlock.verify(
+            username: username,
+            password: password,
+          ) ==
+          LocalUnlockVerdict.ok;
+      final response = await _post(
+        '/app-auth/login',
+        body,
+        timeout: offlineReady
+            ? const Duration(seconds: 4)
+            : const Duration(seconds: 12),
+      );
       final data = _decode(response.body);
       final account = data['account'];
       final status = account is Map ? account['status']?.toString() : null;
 
-      if (response.statusCode == 403 && status == 'pending') {
-        final p = await _prefs;
-        await p.setString(_kUsername, username.trim());
-        await p.setString(_kStatus, 'pending');
-        await _setSessionToken(null);
+      if (response.statusCode == 403) {
+        await _unlock.clear();
+        if (status == 'pending') {
+          final p = await _prefs;
+          await p.setString(_kUsername, username.trim());
+          await p.setString(_kStatus, 'pending');
+          await _setSessionToken(null);
+          return AppAuthResult(
+            ok: false,
+            pending: true,
+            message: data['message']?.toString() ?? 'Pendiente de aprobación.',
+          );
+        }
         return AppAuthResult(
           ok: false,
-          pending: true,
-          message: data['message']?.toString() ?? 'Pendiente de aprobación.',
+          message: data['message']?.toString() ?? 'Tu cuenta no puede entrar.',
+          status: status,
+        );
+      }
+
+      if (response.statusCode == 401) {
+        if (await _unlock.matchesPassword(
+              username: username,
+              password: password,
+            ) ==
+            true) {
+          await _unlock.clear();
+        }
+        return AppAuthResult(
+          ok: false,
+          message: data['message']?.toString() ?? 'Usuario o contraseña incorrectos.',
         );
       }
 
@@ -216,6 +261,7 @@ class AppAuthService {
         await p.setString(_kUsername, username.trim());
         await p.setString(_kStatus, status ?? 'active');
         await _syncLocalLegalAcceptance();
+        await _unlock.save(username: username, password: password);
         return AppAuthResult(
           ok: true,
           message: data['message']?.toString() ?? 'Login correcto.',
@@ -229,8 +275,73 @@ class AppAuthService {
             'Error ${response.statusCode}',
       );
     } catch (e) {
+      if (_isNetworkError(e)) {
+        return _loginOffline(username: username, password: password);
+      }
       return AppAuthResult(ok: false, message: e.toString());
     }
+  }
+
+  Future<AppAuthResult> _loginOffline({
+    required String username,
+    required String password,
+  }) async {
+    final verdict = await _unlock.verify(username: username, password: password);
+    switch (verdict) {
+      case LocalUnlockVerdict.ok:
+        final p = await _prefs;
+        await p.setString(_kUsername, username.trim());
+        await p.setString(_kStatus, 'active');
+        await _setSessionToken(null);
+        _offlineUnlockNotice = true;
+        return const AppAuthResult(
+          ok: true,
+          offline: true,
+          message:
+              'Sin conexión. Acceso con los datos de este dispositivo.',
+        );
+      case LocalUnlockVerdict.expired:
+        return const AppAuthResult(
+          ok: false,
+          offline: true,
+          message:
+              'Sin conexión y hace más de 14 días que no se comprueba la cuenta. Conéctate para entrar.',
+        );
+      case LocalUnlockVerdict.mismatch:
+        return const AppAuthResult(
+          ok: false,
+          offline: true,
+          message: 'Usuario o contraseña incorrectos.',
+        );
+      case LocalUnlockVerdict.missing:
+        return const AppAuthResult(
+          ok: false,
+          offline: true,
+          message:
+              'Sin conexión. La primera vez necesitas internet para identificarte.',
+        );
+    }
+  }
+
+  /// Con red, confirma que la cuenta sigue activa. `true` si hay que salir.
+  Future<bool> refreshAccountOrRevoke() async {
+    final user = await username();
+    if (user == null || user.isEmpty) return false;
+    final r = await checkStatus(username: user);
+    if (r.networkError || r.status == null || r.status!.isEmpty) return false;
+    final blocked = r.status == 'blocked' ||
+        r.status == 'rejected' ||
+        r.status == 'pending';
+    final noAccess = r.status == 'active' && r.hasAppAccess == false;
+    if (blocked || noAccess) {
+      await _unlock.clear();
+      await logout();
+      return true;
+    }
+    if (r.status == 'active') {
+      await _unlock.touch();
+    }
+    return false;
   }
 
   /// ¿Privacidad + condiciones ya aceptadas en local para la versión actual?
@@ -271,9 +382,16 @@ class AppAuthService {
         pending: status == 'pending',
         message: data['message']?.toString() ?? 'Estado desconocido.',
         status: status,
+        hasAppAccess: data['has_app_access'] is bool
+            ? data['has_app_access'] as bool
+            : null,
       );
     } catch (e) {
-      return AppAuthResult(ok: false, message: e.toString());
+      return AppAuthResult(
+        ok: false,
+        networkError: _isNetworkError(e),
+        message: e.toString(),
+      );
     }
   }
 
@@ -297,6 +415,10 @@ class AppAuthService {
         if (recovery != null) {
           await (await _prefs).setString(_kRecoveryShown, recovery);
         }
+        await _unlock.updatePasswordIfPresent(
+          username: username,
+          password: newPassword,
+        );
         return AppAuthResult(
           ok: true,
           message: data['message']?.toString() ?? 'Contraseña actualizada.',
@@ -314,7 +436,7 @@ class AppAuthService {
 
   Future<void> logout() async {
     final t = await token();
-    // Primero limpia local (la UI no debe esperar a la red).
+    // Cierra la sesión en pantalla, pero conserva el acceso local de 14 días.
     await _setSessionToken(null);
 
     if (t != null && isConfigured) {
@@ -352,6 +474,7 @@ class AppAuthService {
     String path,
     Map<String, dynamic> body, {
     String? bearer,
+    Duration timeout = const Duration(seconds: 12),
   }) async {
     // En Android + *.desarrollo usa el puente 10.0.2.2 (el emulador no resuelve hosts de Windows).
     return LicenseApiHttp.postJson(
@@ -361,7 +484,7 @@ class AppAuthService {
       headers: {
         if (bearer != null) 'Authorization': 'Bearer $bearer',
       },
-      timeout: const Duration(seconds: 12),
+      timeout: timeout,
     );
   }
 
@@ -384,6 +507,15 @@ class AppAuthService {
     return 'tdamg-auth-$ts-$randomPart';
   }
 
+  bool _isNetworkError(Object e) {
+    return e is SocketException ||
+        e is TimeoutException ||
+        e is http.ClientException ||
+        e is HandshakeException ||
+        e is TlsException ||
+        e is HttpException;
+  }
+
   String get _platformKey {
     if (kIsWeb) return 'web';
     if (Platform.isAndroid) return 'android';
@@ -398,16 +530,22 @@ class AppAuthResult {
     this.skipped = false,
     this.pending = false,
     this.needsLegal = false,
+    this.offline = false,
+    this.networkError = false,
     this.message,
     this.recoveryCode,
     this.status,
+    this.hasAppAccess,
   });
 
   final bool ok;
   final bool skipped;
   final bool pending;
   final bool needsLegal;
+  final bool offline;
+  final bool networkError;
   final String? message;
   final String? recoveryCode;
   final String? status;
+  final bool? hasAppAccess;
 }

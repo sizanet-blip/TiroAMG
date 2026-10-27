@@ -3,8 +3,8 @@ import 'help_content.dart';
 /// Política de privacidad de TiroAMG (texto en la app).
 /// Alineada con la política web en albertomaestre.es.
 abstract final class PrivacyContent {
-  static const String version = '1.2';
-  static const String versionDate = '2026-10-25';
+  static const String version = '1.3';
+  static const String versionDate = '2026-10-27';
   static const String responsable = 'Alberto Maestre Gutiérrez';
   static const String emailContacto = 'info@albertomaestre.es';
   static const String web = 'https://www.albertomaestre.es/';
@@ -59,6 +59,8 @@ abstract final class PrivacyContent {
           'Perfil deportivo (nombre, licencia federativa, club, categoría, etc.).',
           'Sesiones, disparos, puntuaciones, material, munición, fotos de diana y preferencias (p. ej. avisos de tiro).',
           'Aceptación de esta política (versión y fecha), necesaria para usar la app.',
+          'Un verificador de la contraseña (hash y sal; no la contraseña en claro) para poder entrar en este dispositivo sin internet, como máximo 14 días desde la última comprobación correcta con el servidor. Cerrar sesión no lo borra. Se elimina si la cuenta queda bloqueada o rechazada, si la contraseña ya no coincide con el servidor, o al caducar ese plazo.',
+          'Si activas la huella, el usuario y la contraseña se guardan en el almacén seguro del sistema, solo para desbloquear el acceso en este teléfono.',
           'Copias de seguridad que exportes o importes (tú eliges el destino del archivo).',
         ],
       ),
@@ -87,7 +89,7 @@ abstract final class PrivacyContent {
       HelpDocSection(
         title: '7. Conservación',
         paragraphs: [
-          'Los datos en el dispositivo permanecen mientras uses la app o hasta que los borres (desinstalación, borrado de datos o restauración).',
+          'Los datos en el dispositivo permanecen mientras uses la app o hasta que los borres (desinstalación, borrado de datos o restauración). El verificador de acceso local caduca a los 14 días sin una comprobación correcta con el servidor.',
           'Los datos de instalación/licencia en servidor se conservan mientras la instalación esté activa o sea necesario para licencia, soporte y seguridad (orientativo: hasta 24 meses desde la última actividad), y después según plazos legales aplicables.',
           'Si solicitas la eliminación, se atenderá salvo obligaciones de conservación o motivos legítimos de bloqueo.',
         ],
@@ -118,7 +120,7 @@ abstract final class PrivacyContent {
       HelpDocSection(
         title: '11. Seguridad',
         paragraphs: [
-          'Se aplican medidas técnicas y organizativas razonables (comunicaciones cifradas hacia el servidor cuando se usa HTTPS, control de acceso al panel, minimización de datos). Ningún sistema es 100 % seguro; te recomendamos proteger el dispositivo y las copias de seguridad exportadas.',
+          'Se aplican medidas técnicas y organizativas razonables (comunicaciones cifradas hacia el servidor cuando se usa HTTPS, control de acceso al panel, minimización de datos, almacén seguro del sistema para la huella y el verificador local). Ningún sistema es 100 % seguro; te recomendamos proteger el dispositivo y las copias de seguridad exportadas.',
         ],
       ),
       HelpDocSection(

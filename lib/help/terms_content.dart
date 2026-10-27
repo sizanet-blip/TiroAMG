@@ -35,7 +35,7 @@ abstract final class TermsContent {
         paragraphs: [
           '$appName es una herramienta de apoyo al tiro deportivo. El uso básico se ofrece sin cobro al usuario final.',
           'No sustituye las normas de seguridad del polígono, del arma, de la federación ni el criterio del tirador.',
-          'El acceso puede requerir una cuenta AMG (usuario/contraseña) sujeta a aprobación del administrador.',
+          'El acceso puede requerir una cuenta AMG (usuario/contraseña) sujeta a aprobación del administrador. Tras un acceso correcto con internet, este dispositivo puede volver a identificarte sin red durante un plazo limitado; si la cuenta se bloquea o rechaza, el acceso se retira en cuanto el panel puede comprobarlo.',
         ],
       ),
       HelpDocSection(

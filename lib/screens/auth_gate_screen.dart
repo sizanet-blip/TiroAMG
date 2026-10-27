@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../help/help_content.dart';
 import '../help/privacy_content.dart';
 import '../help/terms_content.dart';
 import '../services/app_auth_service.dart';
 import '../services/biometric_auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 import '../widgets/tiro_amg_app_bar_title.dart';
 import 'ayuda_documento_screen.dart';
 
@@ -246,6 +248,7 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
     required String password,
   }) async {
     if (!_biometricAvailable || username.isEmpty || password.isEmpty) return;
+    if (await _biometric.offerDeclined) return;
     if (await _biometric.isEnabled) {
       // Renueva credenciales guardadas tras login con contraseña.
       await _biometric.enable(username: username, password: password);
@@ -272,6 +275,10 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
         ],
       ),
     );
+    if (enable == false) {
+      await _biometric.declineOffer();
+      return;
+    }
     if (enable == true) {
       final enrolled = await _biometric.hasEnrolledBiometrics;
       if (!enrolled) {
@@ -347,6 +354,133 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
     });
   }
 
+  void _setTab(_AuthTab next) {
+    setState(() {
+      _tab = next;
+      _message = null;
+    });
+    if (next == _AuthTab.pending) {
+      _startStatusPolling();
+    } else {
+      _stopStatusPolling();
+    }
+  }
+
+  void _openDoc(HelpDoc doc) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AyudaDocumentoScreen(doc: doc),
+      ),
+    );
+  }
+
+  Widget _field({
+    required TextEditingController controller,
+    required String label,
+    bool obscure = false,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(labelText: label),
+    );
+  }
+
+  Widget _legalBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _acceptLegal,
+          onChanged: (v) => setState(() => _acceptLegal = v ?? false),
+          title: Text(
+            'Acepto la política de privacidad y las condiciones de uso '
+            'de TiroAMG (v. ${PrivacyContent.version}).',
+            style: TextStyle(fontSize: 13, color: AppColors.title),
+          ),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
+        Row(
+          children: [
+            TextButton(
+              onPressed: () => _openDoc(PrivacyContent.documento),
+              child: const Text('Leer privacidad'),
+            ),
+            TextButton(
+              onPressed: () => _openDoc(TermsContent.documento),
+              child: const Text('Leer condiciones'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _feedback() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_message != null) ...[
+          const SizedBox(height: 12),
+          Text(_message!, style: TextStyle(color: AppColors.subtitle)),
+        ],
+        if (_recoveryCode != null) ...[
+          const SizedBox(height: 12),
+          SelectableText(
+            'Código: $_recoveryCode',
+            style: const TextStyle(fontFamily: 'monospace'),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () =>
+                  Clipboard.setData(ClipboardData(text: _recoveryCode!)),
+              icon: const Icon(Icons.copy, size: 18),
+              label: const Text('Copiar código'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _authSwitch() {
+    if (_tab == _AuthTab.login) {
+      return Column(
+        children: [
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                '¿No tienes cuenta?',
+                style: TextStyle(color: AppColors.subtitle, fontSize: 13.5),
+              ),
+              TextButton(
+                onPressed: () => _setTab(_AuthTab.register),
+                child: const Text('Crear cuenta'),
+              ),
+            ],
+          ),
+          TextButton(
+            onPressed: () => _setTab(_AuthTab.recover),
+            child: const Text('Tengo un código de recuperación'),
+          ),
+        ],
+      );
+    }
+
+    return Center(
+      child: TextButton(
+        onPressed: () => _setTab(_AuthTab.login),
+        child: const Text('Ya tengo cuenta'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!AppAuthService.isConfigured) {
@@ -374,259 +508,171 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-        children: [
-          const TiroAmgWordmark(height: 96),
-          const SizedBox(height: 28),
-          SegmentedButton<_AuthTab>(
-            segments: const [
-              ButtonSegment(value: _AuthTab.login, label: Text('Entrar')),
-              ButtonSegment(value: _AuthTab.register, label: Text('Crear')),
-              ButtonSegment(value: _AuthTab.recover, label: Text('Código')),
-            ],
-            selected: {_tab == _AuthTab.pending ? _AuthTab.login : _tab},
-            onSelectionChanged: (s) {
-              final next = s.first;
-              setState(() {
-                _tab = next;
-                _message = null;
-              });
-              if (next == _AuthTab.pending) {
-                _startStatusPolling();
-              } else {
-                _stopStatusPolling();
-              }
-            },
-          ),
-          const SizedBox(height: 20),
-          if (_tab == _AuthTab.pending) ...[
-            Text(
-              'Solicitud enviada para «${_userCtrl.text.trim()}».',
-              style: TextStyle(
-                color: AppColors.title,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Está pendiente de aprobación. Esta pantalla comprueba sola cada 5 segundos; cuando te activen, te avisará para iniciar sesión.',
-              style: TextStyle(color: AppColors.subtitle),
-            ),
-            const SizedBox(height: 16),
-            if (_checkingStatus)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: LinearProgressIndicator(),
-              ),
-            FilledButton(
-              onPressed: _checkingStatus
-                  ? null
-                  : () => _checkApprovalStatus(silent: false),
-              child: Text(
-                _checkingStatus ? 'Comprobando…' : 'Comprobar ahora',
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                _stopStatusPolling();
-                setState(() => _tab = _AuthTab.login);
-              },
-              child: const Text('Ir a iniciar sesión'),
-            ),
-          ],
-          if (_tab == _AuthTab.login) ...[
-            TextField(
-              controller: _userCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Usuario',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Contraseña',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            if (_needsLegal) ...[
-              const SizedBox(height: 8),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _acceptLegal,
-                onChanged: (v) => setState(() => _acceptLegal = v ?? false),
-                title: Text(
-                  'Acepto la política de privacidad y las condiciones de uso '
-                  'de TiroAMG (v. ${PrivacyContent.version}).',
-                  style: const TextStyle(fontSize: 13),
-                ),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => AyudaDocumentoScreen(
-                            doc: PrivacyContent.documento,
-                          ),
-                        ),
-                      );
-                    },
-                    child: const Text('Leer privacidad'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => AyudaDocumentoScreen(
-                            doc: TermsContent.documento,
-                          ),
-                        ),
-                      );
-                    },
-                    child: const Text('Leer condiciones'),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: _busy ? null : _submitLogin,
-              child: Text(_busy ? 'Entrando…' : 'Iniciar sesión'),
-            ),
-            if (_biometricAvailable && _biometricEnabled) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _loginWithBiometric,
-                icon: const Icon(Icons.fingerprint),
-                label: const Text('Entrar con huella'),
-              ),
-            ],
-          ],
-          if (_tab == _AuthTab.register) ...[
-            TextField(
-              controller: _userCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Usuario',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Contraseña (mín. 6)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email (opcional)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _acceptLegal,
-              onChanged: (v) => setState(() => _acceptLegal = v ?? false),
-              title: Text(
-                'Acepto la política de privacidad y las condiciones de uso '
-                'de TiroAMG (v. ${PrivacyContent.version}).',
-                style: const TextStyle(fontSize: 13),
-              ),
-              controlAffinity: ListTileControlAffinity.leading,
-            ),
-            Row(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
               children: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => AyudaDocumentoScreen(
-                          doc: PrivacyContent.documento,
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Text('Leer privacidad'),
+                const TiroAmgWordmark(height: 96),
+                const SizedBox(height: 8),
+                Text(
+                  'Cuenta AMG',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.subtitle,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => AyudaDocumentoScreen(
-                          doc: TermsContent.documento,
+                const SizedBox(height: 24),
+                if (_tab == _AuthTab.pending)
+                  AppSectionCard(
+                    title: 'Pendiente de aprobación',
+                    titleIcon: Icons.hourglass_top_outlined,
+                    titleIconColor: AppColors.accentCompetition,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Solicitud enviada para «${_userCtrl.text.trim()}».',
+                          style: TextStyle(
+                            color: AppColors.title,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                  child: const Text('Leer condiciones'),
-                ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Está pendiente de aprobación. Esta pantalla comprueba sola cada 5 segundos; cuando te activen, te avisará para iniciar sesión.',
+                          style: TextStyle(color: AppColors.subtitle),
+                        ),
+                        if (_checkingStatus) ...[
+                          const SizedBox(height: 16),
+                          const LinearProgressIndicator(),
+                        ],
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: _checkingStatus
+                              ? null
+                              : () => _checkApprovalStatus(silent: false),
+                          child: Text(
+                            _checkingStatus ? 'Comprobando…' : 'Comprobar ahora',
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => _setTab(_AuthTab.login),
+                          child: const Text('Ir a iniciar sesión'),
+                        ),
+                        _feedback(),
+                      ],
+                    ),
+                  )
+                else ...[
+                  if (_tab == _AuthTab.login)
+                  AppSectionCard(
+                    title: 'Entrar',
+                    titleIcon: Icons.login,
+                    titleIconColor: AppColors.accentTraining,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _field(controller: _userCtrl, label: 'Usuario'),
+                        const SizedBox(height: 12),
+                        _field(
+                          controller: _passCtrl,
+                          label: 'Contraseña',
+                          obscure: true,
+                        ),
+                        if (_needsLegal) ...[
+                          const SizedBox(height: 8),
+                          _legalBlock(),
+                        ],
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: _busy ? null : _submitLogin,
+                          child: Text(_busy ? 'Entrando…' : 'Iniciar sesión'),
+                        ),
+                        if (_biometricAvailable && _biometricEnabled) ...[
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: _busy ? null : _loginWithBiometric,
+                            icon: const Icon(Icons.fingerprint),
+                            label: const Text('Entrar con huella'),
+                          ),
+                        ],
+                        _feedback(),
+                      ],
+                    ),
+                  ),
+                if (_tab == _AuthTab.register)
+                  AppSectionCard(
+                    title: 'Crear cuenta',
+                    titleIcon: Icons.person_add_outlined,
+                    titleIconColor: AppColors.accentAnalytics,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _field(controller: _userCtrl, label: 'Usuario'),
+                        const SizedBox(height: 12),
+                        _field(
+                          controller: _passCtrl,
+                          label: 'Contraseña (mín. 6)',
+                          obscure: true,
+                        ),
+                        const SizedBox(height: 12),
+                        _field(
+                          controller: _emailCtrl,
+                          label: 'Email (opcional)',
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 8),
+                        _legalBlock(),
+                        FilledButton(
+                          onPressed: _busy ? null : _submitRegister,
+                          child: Text(_busy ? 'Enviando…' : 'Solicitar acceso'),
+                        ),
+                        _feedback(),
+                      ],
+                    ),
+                  ),
+                if (_tab == _AuthTab.recover)
+                  AppSectionCard(
+                    title: 'Código de recuperación',
+                    titleIcon: Icons.key_outlined,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Usa el código que te dimos al crear la cuenta.',
+                          style: TextStyle(
+                            color: AppColors.subtitleSoft,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _field(controller: _userCtrl, label: 'Usuario'),
+                        const SizedBox(height: 12),
+                        _field(
+                          controller: _codeCtrl,
+                          label: 'Código de recuperación',
+                        ),
+                        const SizedBox(height: 12),
+                        _field(
+                          controller: _newPassCtrl,
+                          label: 'Nueva contraseña',
+                          obscure: true,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: _busy ? null : _submitRecover,
+                          child: Text(
+                            _busy ? 'Guardando…' : 'Cambiar contraseña',
+                          ),
+                        ),
+                        _feedback(),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _authSwitch(),
+                ],
               ],
-            ),
-            FilledButton(
-              onPressed: _busy ? null : _submitRegister,
-              child: Text(_busy ? 'Enviando…' : 'Solicitar acceso'),
-            ),
-          ],
-          if (_tab == _AuthTab.recover) ...[
-            TextField(
-              controller: _userCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Usuario',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _codeCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Código de recuperación',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _newPassCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Nueva contraseña',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: _busy ? null : _submitRecover,
-              child: Text(_busy ? 'Guardando…' : 'Cambiar contraseña'),
-            ),
-          ],
-          if (_message != null) ...[
-            const SizedBox(height: 16),
-            Text(_message!, style: TextStyle(color: AppColors.subtitle)),
-          ],
-          if (_recoveryCode != null) ...[
-            const SizedBox(height: 12),
-            SelectableText(
-              'Código: $_recoveryCode',
-              style: const TextStyle(fontFamily: 'monospace'),
-            ),
-            TextButton.icon(
-              onPressed: () =>
-                  Clipboard.setData(ClipboardData(text: _recoveryCode!)),
-              icon: const Icon(Icons.copy, size: 18),
-              label: const Text('Copiar código'),
-            ),
-          ],
-        ],
             ),
           ),
         ),

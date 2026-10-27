@@ -23,6 +23,7 @@ class BiometricAuthService {
   BiometricAuthService();
 
   static const _kEnabled = 'app_auth_biometric_enabled';
+  static const _kOfferDeclined = 'app_auth_biometric_offer_declined';
   static const _kUser = 'app_auth_biometric_user';
   static const _kPass = 'app_auth_biometric_pass';
 
@@ -63,6 +64,17 @@ class BiometricAuthService {
     return prefs.getBool(_kEnabled) == true;
   }
 
+  /// El usuario eligió «Ahora no» al ofrecer la huella.
+  Future<bool> get offerDeclined async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_kOfferDeclined) == true;
+  }
+
+  Future<void> declineOffer() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kOfferDeclined, true);
+  }
+
   Future<String?> savedUsername() async {
     if (!await isEnabled) return null;
     return _secure.read(key: _kUser);
@@ -78,6 +90,7 @@ class BiometricAuthService {
     await _secure.write(key: _kUser, value: username.trim());
     await _secure.write(key: _kPass, value: password);
     await prefs.setBool(_kEnabled, true);
+    await prefs.setBool(_kOfferDeclined, false);
     return true;
   }
 

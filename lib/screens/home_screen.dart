@@ -8,6 +8,8 @@ import 'config_screen.dart';
 import 'ayuda_screen.dart';
 import 'recorte_diana_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../main.dart';
+import '../services/app_auth_service.dart';
 import '../services/app_update_service.dart';
 import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
@@ -43,6 +45,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _runStartupChecks() async {
+    if (AppAuthService.isConfigured) {
+      final revoke = await AppAuthService().refreshAccountOrRevoke();
+      if (!mounted) return;
+      if (revoke) {
+        TiroTrackerApp.signOut(context);
+        return;
+      }
+      if (AppAuthService.takeOfflineUnlockNotice()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Sin conexión. Has entrado con este dispositivo. '
+              'La cuenta se comprobará cuando haya internet.',
+            ),
+          ),
+        );
+      }
+    }
+
     // Ficha local primero (rápido). La red va en segundo plano.
     try {
       final quick = await _licenseService
@@ -403,6 +424,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                   ],
                 ),
+                if (AppAuthService.isConfigured) ...[
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    onPressed: _confirmSignOut,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Cerrar sesión'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.accentDanger,
+                      side: const BorderSide(color: AppColors.accentDanger),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -413,6 +447,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBrandHeader() {
     return const TiroAmgWordmark(height: 96);
+  }
+
+  Future<void> _confirmSignOut() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AppDialog(
+        title: 'Cerrar sesión',
+        icon: Icons.logout,
+        iconColor: AppColors.accentDanger,
+        content: const Text(
+          '¿Cerrar la sesión de la cuenta AMG en este dispositivo?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    TiroTrackerApp.signOut(context);
+    // ignore: unawaited_futures
+    AppAuthService().logout();
   }
 }
 

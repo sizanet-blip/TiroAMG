@@ -54,8 +54,9 @@ abstract final class HelpContent {
         bullets: [
           'Si la app pide cuenta AMG: regístrate (usuario/contraseña), acepta privacidad y condiciones, y espera la aprobación del administrador si queda pendiente. Guarda el código de recuperación.',
           'La pantalla de pendiente comprueba sola cada unos segundos; cuando te aprueben, te avisa para iniciar sesión.',
-          'Opcional: activa Entrar con huella tras el primer login (o en Cuenta AMG).',
-          'Al cerrar la app se cierra la sesión: al reabrir hay que identificarse otra vez (huella o contraseña).',
+          'Opcional: activa Entrar con huella tras el primer login (o en Cuenta AMG). Si pulsas «Ahora no», no se vuelve a preguntar.',
+          'Al abrir la app hay que identificarse (contraseña o huella). La primera vez hace falta internet. Después puedes entrar sin red hasta 14 días desde la última comprobación con el panel.',
+          'Cerrar sesión (en Inicio o en Cuenta AMG) pide confirmación y vuelve al acceso, pero este teléfono sigue pudiendo entrar esos 14 días.',
           'Configuración → Cuenta AMG: usuario, huella, cambiar contraseña y cerrar sesión. Mis Datos es el perfil de tirador (nombre, club…).',
           'Configuración → Gestión de Armas: crea al menos un arma.',
           'Configuración → Tiempos y series: crea una plantilla (Precisión, Duelo, Aire 10m…).',
@@ -112,7 +113,8 @@ abstract final class HelpContent {
           'TiroAMG combina configuración de material, control de tiempos, puntuación y análisis.',
           'El acceso requiere cuenta AMG (usuario/contraseña) cuando el build está enlazado al panel. Al registrarte aceptas privacidad y condiciones y recibes un código de recuperación: guárdalo.',
           'Si la cuenta queda pendiente, la app lo indica y comprueba sola el estado; cuando el administrador la active, te avisa para iniciar sesión.',
-          'Puedes activar Entrar con huella (biometría del teléfono). Al cerrar la aplicación se cierra la sesión: al volver a abrir hay que identificarse otra vez.',
+          'Puedes activar Entrar con huella (biometría del teléfono). Si rechazas el aviso, no se repite; actívala luego en Cuenta AMG.',
+          'Al abrir la app hay que identificarse otra vez. Con internet se comprueba la cuenta. Sin internet, tras un acceso correcto previo, la contraseña o la huella valen en este dispositivo hasta 14 días. Cerrar sesión no anula ese plazo.',
           'La instalación se valida contra el servidor de licencias cuando hay red. Módulos típicos: Inicio (base), Competición, Análisis/Historial, Backup, Detección de diana, catálogos. Sin módulo, la opción no aparece o muestra aviso.',
           'En Configuración → Estado de la aplicación ves: activa/bloqueada, módulos, email, última sync, device, versión de app y de base de datos, y buscar actualizaciones.',
         ],
@@ -126,7 +128,7 @@ abstract final class HelpContent {
       HelpDocSection(
         title: '2. Menú principal',
         paragraphs: [
-          'La home muestra el wordmark TiroAMG. En el resto de pantallas el logo va en la cabecera, con el nombre de la sección debajo. El orden y la presencia de filas dependen de tu licencia.',
+          'La home muestra el wordmark TiroAMG y, debajo del menú, Cerrar sesión (pide confirmación). En el resto de pantallas el logo va en la cabecera, con el nombre de la sección debajo. El orden y la presencia de filas dependen de tu licencia.',
         ],
         bullets: [
           'Competición — modalidades, fases y ejecución oficial.',
@@ -147,8 +149,8 @@ abstract final class HelpContent {
         bullets: [
           'Huella: actívala tras el login o desde Cuenta AMG (el teléfono debe tener huella registrada en Ajustes).',
           'Cambiar contraseña: usa el código de recuperación.',
-          'Cerrar sesión: vuelve a la pantalla de acceso; la huella puede seguir activa para el siguiente login.',
-          'Al cerrar la app por completo también se cierra la sesión.',
+          'Cerrar sesión: pide confirmación y vuelve a la pantalla de acceso. La huella y el acceso de este teléfono siguen disponibles hasta 14 días.',
+          'Sin internet puedes entrar con la misma contraseña o la huella si el último acceso comprobado no tiene más de 14 días. Si la cuenta se bloquea, al haber red se cierra el acceso.',
         ],
       ),
       HelpDocSection(
@@ -385,12 +387,17 @@ abstract final class HelpContent {
     HelpFaqItem(
       question: '¿Cómo activo la huella?',
       answer:
-          'Tras un login correcto la app puede ofrecerlo. También en Configuración → Cuenta AMG → Entrar con huella. El teléfono debe tener huella (o biometría) configurada en Ajustes del sistema. En el emulador hay que añadir una huella de prueba.',
+          'Tras un login correcto la app puede ofrecerlo. Si pulsas «Ahora no», no vuelve a preguntar. También puedes activarla en Configuración → Cuenta AMG → Entrar con huella. El teléfono debe tener huella (o biometría) configurada en Ajustes del sistema.',
     ),
     HelpFaqItem(
       question: '¿Por qué me pide acceso cada vez que abro la app?',
       answer:
-          'Al cerrar la aplicación se cierra la sesión a propósito. Vuelve a identificarte con huella (si la activaste) o con usuario y contraseña.',
+          'Hay que identificarse al abrirla (contraseña o huella). No se queda la sesión abierta. La primera vez hace falta internet; después este dispositivo puede comprobar la contraseña o la huella sin red hasta 14 días.',
+    ),
+    HelpFaqItem(
+      question: '¿Puedo entrar sin internet?',
+      answer:
+          'Sí, después de haber entrado al menos una vez con conexión. Durante 14 días desde la última comprobación con el panel, la contraseña o la huella de este teléfono bastan. Cerrar sesión no borra ese plazo. Si la cuenta está bloqueada, al recuperar internet se cierra el acceso.',
     ),
     HelpFaqItem(
       question: '¿Cómo identifico mi instalación?',
