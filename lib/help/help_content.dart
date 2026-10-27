@@ -53,11 +53,13 @@ abstract final class HelpContent {
         title: '2. Primeros pasos (obligatorio)',
         bullets: [
           'Si la app pide cuenta AMG: regístrate (usuario/contraseña), acepta privacidad y condiciones, y espera la aprobación del administrador si queda pendiente. Guarda el código de recuperación.',
-          'Abre Configuración → Mis Datos y completa tu perfil.',
+          'La pantalla de pendiente comprueba sola cada unos segundos; cuando te aprueben, te avisa para iniciar sesión.',
+          'Opcional: activa Entrar con huella tras el primer login (o en Cuenta AMG).',
+          'Al cerrar la app se cierra la sesión: al reabrir hay que identificarse otra vez (huella o contraseña).',
+          'Configuración → Cuenta AMG: usuario, huella, cambiar contraseña y cerrar sesión. Mis Datos es el perfil de tirador (nombre, club…).',
           'Configuración → Gestión de Armas: crea al menos un arma.',
           'Configuración → Tiempos y series: crea una plantilla (Precisión, Duelo, Aire 10m…).',
-          'Opcional: Gestiona munición para llevar stock por lote.',
-          'Opcional: Ajusta Avisos de tiro (volumen, perfil, vibración).',
+          'Opcional: Gestiona munición y Avisos de tiro.',
         ],
       ),
       HelpDocSection(
@@ -108,15 +110,17 @@ abstract final class HelpContent {
         title: '1. Introducción, cuenta AMG y licencia',
         paragraphs: [
           'TiroAMG combina configuración de material, control de tiempos, puntuación y análisis.',
-          'El acceso puede requerir una cuenta AMG (usuario/contraseña). Tras registrarte, la cuenta puede quedar pendiente hasta que un administrador la active. Guarda el código de recuperación.',
-          'La instalación se valida contra el servidor de licencias cuando hay red. Módulos típicos: Inicio (base), Competición, Análisis/Historial, Backup, Detección de diana, catálogos avanzados. Sin módulo, la opción no aparece o muestra aviso de bloqueo.',
-          'En Configuración → Estado de la aplicación ves: activa/bloqueada, módulos, email, última sync, device, versión de app y de base de datos, y el botón de buscar actualizaciones.',
+          'El acceso requiere cuenta AMG (usuario/contraseña) cuando el build está enlazado al panel. Al registrarte aceptas privacidad y condiciones y recibes un código de recuperación: guárdalo.',
+          'Si la cuenta queda pendiente, la app lo indica y comprueba sola el estado; cuando el administrador la active, te avisa para iniciar sesión.',
+          'Puedes activar Entrar con huella (biometría del teléfono). Al cerrar la aplicación se cierra la sesión: al volver a abrir hay que identificarse otra vez.',
+          'La instalación se valida contra el servidor de licencias cuando hay red. Módulos típicos: Inicio (base), Competición, Análisis/Historial, Backup, Detección de diana, catálogos. Sin módulo, la opción no aparece o muestra aviso.',
+          'En Configuración → Estado de la aplicación ves: activa/bloqueada, módulos, email, última sync, device, versión de app y de base de datos, y buscar actualizaciones.',
         ],
         bullets: [
-          'Identificar (email): asocia el dispositivo para soporte y módulos (opcional).',
-          'Refrescar: vuelve a consultar el servidor.',
-          'Buscar actualizaciones: en instalaciones de prueba puede abrir la descarga de tu servidor; en la versión de Google Play abre la ficha de la tienda.',
-          'Privacidad y condiciones: propias de TiroAMG; en Ayuda y al registrarte.',
+          'Configuración → Cuenta AMG: usuario, huella, cambiar contraseña (con código), cerrar sesión.',
+          'Identificar (email) en Estado: opcional, para soporte y módulos.',
+          'Buscar actualizaciones: canal propio o ficha de Google Play según el build.',
+          'Privacidad y condiciones: en Ayuda y al registrarte.',
         ],
       ),
       HelpDocSection(
@@ -129,16 +133,22 @@ abstract final class HelpContent {
           'Entrenamiento — siempre disponible con el módulo base.',
           'Historial y Análisis — listados, filtros, estadísticas e informes.',
           'Copia de Seguridad — exportar e importar la BD.',
-          'Configuración — todo el material y preferencias.',
+          'Configuración — material, Cuenta AMG, avisos y estado.',
           'Ayuda — documentación y contacto.',
           'Recorte Diana — foto → impactos (si tienes detección).',
         ],
       ),
       HelpDocSection(
-        title: '3. Perfil del tirador',
+        title: '3. Cuenta AMG y perfil del tirador',
         paragraphs: [
-          'Configuración → Mis Datos (Perfil). Guarda nombre, licencia federativa, club y contacto.',
-          'Esos datos se usan en informes y ayudan a identificar la instalación junto con el email de licencia.',
+          'Configuración → Cuenta AMG: gestiona la cuenta de acceso (no es el perfil deportivo).',
+          'Configuración → Mis Datos (Perfil): nombre, licencia federativa, club y categoría para actas y PDFs.',
+        ],
+        bullets: [
+          'Huella: actívala tras el login o desde Cuenta AMG (el teléfono debe tener huella registrada en Ajustes).',
+          'Cambiar contraseña: usa el código de recuperación.',
+          'Cerrar sesión: vuelve a la pantalla de acceso; la huella puede seguir activa para el siguiente login.',
+          'Al cerrar la app por completo también se cierra la sesión.',
         ],
       ),
       HelpDocSection(
@@ -365,12 +375,22 @@ abstract final class HelpContent {
     HelpFaqItem(
       question: '¿Qué es la cuenta AMG?',
       answer:
-          'Usuario y contraseña para acceder a TiroAMG cuando el build tiene autenticación. Al registrarte aceptas privacidad y condiciones; la cuenta puede quedar pendiente hasta la aprobación del administrador. Guarda el código de recuperación.',
+          'Usuario y contraseña para acceder a TiroAMG. Al registrarte aceptas privacidad y condiciones; la cuenta puede quedar pendiente hasta la aprobación del administrador. Guarda el código de recuperación. Gestiona la cuenta en Configuración → Cuenta AMG.',
     ),
     HelpFaqItem(
       question: 'Me he registrado y no puedo entrar',
       answer:
-          'Es normal si la cuenta está pendiente. Cuando el administrador la active en el panel, inicia sesión con tu usuario y contraseña.',
+          'Es normal si la cuenta está pendiente. Deja la pantalla de pendiente abierta: comprueba sola y te avisará al aprobarte. También puedes pulsar «Comprobar ahora» o, cuando esté activa, Entrar con usuario y contraseña.',
+    ),
+    HelpFaqItem(
+      question: '¿Cómo activo la huella?',
+      answer:
+          'Tras un login correcto la app puede ofrecerlo. También en Configuración → Cuenta AMG → Entrar con huella. El teléfono debe tener huella (o biometría) configurada en Ajustes del sistema. En el emulador hay que añadir una huella de prueba.',
+    ),
+    HelpFaqItem(
+      question: '¿Por qué me pide acceso cada vez que abro la app?',
+      answer:
+          'Al cerrar la aplicación se cierra la sesión a propósito. Vuelve a identificarte con huella (si la activaste) o con usuario y contraseña.',
     ),
     HelpFaqItem(
       question: '¿Cómo identifico mi instalación?',

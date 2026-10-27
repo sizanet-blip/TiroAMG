@@ -40,29 +40,29 @@ class LicenseApiHttp {
     required String baseUrl,
     required String path,
     required String body,
+    Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 8),
   }) async {
     final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
     final logical = Uri.parse('$base$path');
+    final merged = <String, String>{
+      'Content-Type': 'application/json',
+      ...?headers,
+    };
 
     if (_needsAndroidDevBridgeFor(logical)) {
       return _requestViaDevBridge(
         logical: logical,
         method: 'POST',
         body: body,
-        contentType: 'application/json',
+        contentType: merged['Content-Type'] ?? 'application/json',
+        extraHeaders: merged,
         timeout: timeout,
         logTag: 'License',
       );
     }
 
-    return http
-        .post(
-          logical,
-          headers: const {'Content-Type': 'application/json'},
-          body: body,
-        )
-        .timeout(timeout);
+    return http.post(logical, headers: merged, body: body).timeout(timeout);
   }
 
   static bool _needsAndroidDevBridgeFor(Uri uri) {
@@ -76,6 +76,7 @@ class LicenseApiHttp {
     required String method,
     required String? body,
     required String? contentType,
+    Map<String, String>? extraHeaders,
     required Duration timeout,
     required String logTag,
   }) async {
@@ -113,14 +114,23 @@ class LicenseApiHttp {
       final headers = StringBuffer()
         ..write('$method $path HTTP/1.1\r\n')
         ..write('Host: ${logical.host}\r\n');
-      if (contentType != null) {
+      final skip = {'host', 'content-length', 'connection'};
+      if (extraHeaders != null) {
+        for (final e in extraHeaders.entries) {
+          if (skip.contains(e.key.toLowerCase())) continue;
+          headers.write('${e.key}: ${e.value}\r\n');
+        }
+      } else if (contentType != null) {
         headers.write('Content-Type: $contentType\r\n');
       }
       if (payload.isNotEmpty) {
         headers.write('Content-Length: ${payload.length}\r\n');
       }
+      if (extraHeaders == null ||
+          !extraHeaders.keys.any((k) => k.toLowerCase() == 'accept')) {
+        headers.write('Accept: application/json,*/*\r\n');
+      }
       headers
-        ..write('Accept: application/json,*/*\r\n')
         ..write('Connection: close\r\n')
         ..write('\r\n');
 

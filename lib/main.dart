@@ -24,18 +24,28 @@ void main() {
 class TiroTrackerApp extends StatefulWidget {
   const TiroTrackerApp({super.key});
 
+  /// Cierra la sesión de UI y vuelve a la pantalla de acceso.
+  static void signOut([BuildContext? context]) {
+    final fromContext =
+        context?.findAncestorStateOfType<_TiroTrackerAppState>();
+    (fromContext ?? _TiroTrackerAppState.instance)?.signOut();
+  }
+
   @override
   State<TiroTrackerApp> createState() => _TiroTrackerAppState();
 }
 
 class _TiroTrackerAppState extends State<TiroTrackerApp>
     with WidgetsBindingObserver {
+  static _TiroTrackerAppState? instance;
+
   var _authReady = !AppAuthService.isConfigured;
   var _checkingAuth = AppAuthService.isConfigured;
 
   @override
   void initState() {
     super.initState();
+    instance = this;
     WidgetsBinding.instance.addObserver(this);
     _setWakelock(true);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkAuth());
@@ -51,10 +61,19 @@ class _TiroTrackerAppState extends State<TiroTrackerApp>
       }
       return;
     }
-    final ok = await AppAuthService().hasSession();
+    // Al abrir/reiniciar la app no se reutiliza sesión guardada en disco.
+    await AppAuthService.discardPersistedSession();
     if (!mounted) return;
     setState(() {
-      _authReady = ok;
+      _authReady = false;
+      _checkingAuth = false;
+    });
+  }
+
+  void signOut() {
+    if (!mounted) return;
+    setState(() {
+      _authReady = false;
       _checkingAuth = false;
     });
   }
@@ -74,6 +93,7 @@ class _TiroTrackerAppState extends State<TiroTrackerApp>
 
   @override
   void dispose() {
+    if (identical(instance, this)) instance = null;
     WidgetsBinding.instance.removeObserver(this);
     _setWakelock(false);
     super.dispose();
@@ -81,22 +101,26 @@ class _TiroTrackerAppState extends State<TiroTrackerApp>
 
   @override
   Widget build(BuildContext context) {
+    // ValueKey: al cerrar sesión se recrea el Navigator y no quedan
+    // pantallas apiladas (Config / Cuenta AMG) encima del AuthGate.
     return MaterialApp(
+      key: ValueKey<String>(
+        _checkingAuth
+            ? 'checking'
+            : (_authReady ? 'in-app' : 'auth-gate'),
+      ),
       debugShowCheckedModeBanner: false,
-      title: 'TiroAMG', 
+      title: 'TiroAMG',
       theme: buildTiroAmgTheme(),
-      // --- CONFIGURACIÓN DE IDIOMA (¡NUEVO!) ---
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
-        Locale('es', 'ES'), // Español
-        Locale('en', 'US'), // Inglés (por si acaso)
+        Locale('es', 'ES'),
+        Locale('en', 'US'),
       ],
-      // -----------------------------------------
-
       home: _checkingAuth
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : (_authReady

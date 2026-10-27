@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../help/privacy_content.dart';
 import '../help/terms_content.dart';
+import 'license_api_http.dart';
+import 'license_service.dart';
 
 /// Auth unificado AMG (panel Yii2 `/app-auth/*`).
 class AppAuthService {
@@ -37,6 +39,9 @@ class AppAuthService {
   static const _kDeviceId = 'app_auth_device_id';
   static const _kRecoveryShown = 'app_auth_recovery_code';
 
+  /// Token solo en memoria: al cerrar la app se pierde y hay que volver a entrar.
+  static String? _sessionToken;
+
   static String get apiBaseUrl {
     for (final c in [_apiAuth, _apiInstall, _apiLicense]) {
       final t = c.trim();
@@ -49,7 +54,14 @@ class AppAuthService {
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
-  Future<String?> token() async => (await _prefs).getString(_kToken);
+  /// Elimina tokens antiguos guardados en disco (versiones previas).
+  static Future<void> discardPersistedSession() async {
+    final p = await SharedPreferences.getInstance();
+    await p.remove(_kToken);
+    _sessionToken = null;
+  }
+
+  Future<String?> token() async => _sessionToken;
 
   Future<String?> username() async => (await _prefs).getString(_kUsername);
 
@@ -58,6 +70,13 @@ class AppAuthService {
   Future<bool> hasSession() async {
     final t = await token();
     return t != null && t.isNotEmpty;
+  }
+
+  Future<void> _setSessionToken(String? value) async {
+    _sessionToken = value;
+    // Nunca persistir: al matar el proceso debe pedir acceso otra vez.
+    final p = await _prefs;
+    await p.remove(_kToken);
   }
 
   Future<String> deviceId() async {
@@ -118,6 +137,8 @@ class AppAuthService {
         if (recovery != null && recovery.isNotEmpty) {
           await p.setString(_kRecoveryShown, recovery);
         }
+        // Evita el diálogo legal duplicado al entrar en Home.
+        await _syncLocalLegalAcceptance(email: email);
         return AppAuthResult(
           ok: true,
           pending: status == 'pending',
@@ -138,6 +159,7 @@ class AppAuthService {
   Future<AppAuthResult> login({
     required String username,
     required String password,
+    bool acceptedLegal = false,
   }) async {
     if (!isConfigured) {
       return const AppAuthResult(
@@ -149,7 +171,12 @@ class AppAuthService {
     try {
       final package = await PackageInfo.fromPlatform();
       final id = await deviceId();
-      final body = {
+      // Si ya se aceptó en esta instalación (o el usuario marca el checkbox),
+      // reenviamos las versiones al panel: el login 428 no se resuelve solo
+      // con privacy_current_version.
+      final sendAcceptance =
+          acceptedLegal || await hasLocalLegalAcceptance();
+      final body = <String, dynamic>{
         'username': username.trim(),
         'password': password,
         'app_id': appId,
@@ -159,6 +186,10 @@ class AppAuthService {
         'build_number': package.buildNumber,
         'privacy_current_version': privacyPolicyVersion,
         'terms_current_version': termsVersion,
+        if (sendAcceptance) ...{
+          'privacy_accepted_version': privacyPolicyVersion,
+          'terms_accepted_version': termsVersion,
+        },
       };
       final response = await _post('/app-auth/login', body);
       final data = _decode(response.body);
@@ -169,7 +200,7 @@ class AppAuthService {
         final p = await _prefs;
         await p.setString(_kUsername, username.trim());
         await p.setString(_kStatus, 'pending');
-        await p.remove(_kToken);
+        await _setSessionToken(null);
         return AppAuthResult(
           ok: false,
           pending: true,
@@ -181,9 +212,10 @@ class AppAuthService {
           response.statusCode < 300 &&
           data['token'] != null) {
         final p = await _prefs;
-        await p.setString(_kToken, data['token'].toString());
+        await _setSessionToken(data['token'].toString());
         await p.setString(_kUsername, username.trim());
         await p.setString(_kStatus, status ?? 'active');
+        await _syncLocalLegalAcceptance();
         return AppAuthResult(
           ok: true,
           message: data['message']?.toString() ?? 'Login correcto.',
@@ -195,6 +227,50 @@ class AppAuthService {
         needsLegal: response.statusCode == 428,
         message: data['message']?.toString() ??
             'Error ${response.statusCode}',
+      );
+    } catch (e) {
+      return AppAuthResult(ok: false, message: e.toString());
+    }
+  }
+
+  /// ¿Privacidad + condiciones ya aceptadas en local para la versión actual?
+  Future<bool> hasLocalLegalAcceptance() async {
+    try {
+      const license = LicenseService();
+      final local = await license.obtenerLicenciaLocal();
+      if (local == null || !local.puedeUsarApp) return false;
+      final pv = local.features['privacy_version']?.toString();
+      final tv = local.features['terms_version']?.toString();
+      final privacyOk = pv == PrivacyContent.version ||
+          pv == PrivacyContent.acceptanceVersion;
+      final termsOk = tv == TermsContent.version ||
+          tv == TermsContent.acceptanceVersion;
+      return privacyOk && termsOk;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Consulta si la solicitud ya fue aprobada (sin contraseña).
+  Future<AppAuthResult> checkStatus({required String username}) async {
+    if (!isConfigured) {
+      return const AppAuthResult(ok: false, message: 'API no configurada.');
+    }
+    try {
+      final response = await _post('/app-auth/status', {
+        'username': username.trim(),
+        'app_id': appId,
+      });
+      final data = _decode(response.body);
+      final status = data['status']?.toString();
+      if (status != null && status.isNotEmpty) {
+        await (await _prefs).setString(_kStatus, status);
+      }
+      return AppAuthResult(
+        ok: response.statusCode >= 200 && response.statusCode < 300,
+        pending: status == 'pending',
+        message: data['message']?.toString() ?? 'Estado desconocido.',
+        status: status,
       );
     } catch (e) {
       return AppAuthResult(ok: false, message: e.toString());
@@ -238,40 +314,55 @@ class AppAuthService {
 
   Future<void> logout() async {
     final t = await token();
+    // Primero limpia local (la UI no debe esperar a la red).
+    await _setSessionToken(null);
+
     if (t != null && isConfigured) {
       try {
         await _post(
           '/app-auth/logout',
           {},
           bearer: t,
-        );
+        ).timeout(const Duration(seconds: 3));
       } catch (_) {}
     }
-    final p = await _prefs;
-    await p.remove(_kToken);
-    await p.remove(_kStatus);
   }
 
   Future<String?> lastRecoveryCode() async =>
       (await _prefs).getString(_kRecoveryShown);
+
+  /// Marca privacidad/condiciones en la instalación local (mismo gate que Home).
+  Future<void> _syncLocalLegalAcceptance({String? email}) async {
+    try {
+      const license = LicenseService();
+      await license.registrarAceptacionLegal(
+        privacyVersion: PrivacyContent.version,
+        termsVersion: TermsContent.version,
+      );
+      final trimmed = email?.trim() ?? '';
+      if (trimmed.isNotEmpty) {
+        await license.identificarEmail(email: trimmed);
+      }
+    } catch (e) {
+      debugPrint('[AppAuth] sync legal local: $e');
+    }
+  }
 
   Future<http.Response> _post(
     String path,
     Map<String, dynamic> body, {
     String? bearer,
   }) async {
-    final base = apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      if (bearer != null) 'Authorization': 'Bearer $bearer',
-    };
-    return http
-        .post(
-          Uri.parse('$base$path'),
-          headers: headers,
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 12));
+    // En Android + *.desarrollo usa el puente 10.0.2.2 (el emulador no resuelve hosts de Windows).
+    return LicenseApiHttp.postJson(
+      baseUrl: apiBaseUrl,
+      path: path,
+      body: jsonEncode(body),
+      headers: {
+        if (bearer != null) 'Authorization': 'Bearer $bearer',
+      },
+      timeout: const Duration(seconds: 12),
+    );
   }
 
   Map<String, dynamic> _decode(String body) {
@@ -309,6 +400,7 @@ class AppAuthResult {
     this.needsLegal = false,
     this.message,
     this.recoveryCode,
+    this.status,
   });
 
   final bool ok;
@@ -317,4 +409,5 @@ class AppAuthResult {
   final bool needsLegal;
   final String? message;
   final String? recoveryCode;
+  final String? status;
 }

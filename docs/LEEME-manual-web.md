@@ -12,7 +12,7 @@ Copia todos los PNG de `assets/help/` a la carpeta del panel:
 Lista:
 
 - `01_home.png`
-- `02_configuracion.png`
+- `02_configuracion.png` ← incluye entrada Cuenta AMG
 - `03_estado_app.png`
 - `04_ayuda.png`
 - `08_entrenamiento.png` ← Objetivo Entrenar / Corregir miras
@@ -32,6 +32,13 @@ Lista:
 - `22_sesion_detalle.png`
 - `23_referencia_impactos.png` ← impactos azules (referencia) + rojos
 - `24_acta_oficial.png` ← acta / desglose oficial
+- `25_tiroamg_login.png` ← acceso (contraseña / huella)
+- `26_tiroamg_registro.png`
+- `27_tiroamg_privacidad.png`
+- `28_tiroamg_condiciones.png`
+- `29_tiroamg_recuperar.png`
+- `30_cuenta_amg.png` ← Configuración → Cuenta AMG
+- `31_acceso_pendiente.png` ← solicitud pendiente + comprobar
 
 ## 2. Pega el HTML
 Abre `docs/manual-web-cms.html`, selecciona todo, copia y pégalo en el campo **contenido** del CMS (modo código/HTML si existe).
@@ -43,8 +50,9 @@ En la app el manual de texto está en `lib/help/help_content.dart` (guía, manua
 
 ### Novedades documentadas
 - Cabecera con wordmark TiroAMG en las capturas
-- Condiciones de tiro plegadas hasta que se pulsa el título (entrenamiento y competición)
-- Objetivo Entrenar / Corregir miras
-- Impactos de referencia (azul) en entrenamiento y competición; capas; pregunta al cambiar de fase
-- Selección múltiple de entrenamientos para estadísticas
-- Acta oficial del árbitro (total, desglose, series, tiros)
+- Cuenta AMG: login, registro, pendiente con auto-comprobación, recuperación
+- Entrar con huella / biometría; sesión se cierra al cerrar la app
+- Configuración → Cuenta AMG (usuario, huella, contraseña, cerrar sesión)
+- Condiciones de tiro plegadas; Objetivo Entrenar / Corregir miras
+- Impactos de referencia (azul); capas; pregunta al cambiar de fase
+- Selección múltiple de entrenamientos; acta oficial del árbitro

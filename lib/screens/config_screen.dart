@@ -9,6 +9,9 @@ import 'perfil_form_screen.dart';
 import 'avisos_tiro_screen.dart';
 import 'estado_app_screen.dart';
 import 'ayuda_screen.dart';
+import 'cuenta_amg_screen.dart';
+import '../main.dart';
+import '../services/app_auth_service.dart';
 import '../services/license_service.dart';
 import '../services/license_permissions_service.dart';
 import '../models/licencia_model.dart';
@@ -239,6 +242,22 @@ class _ConfigScreenState extends State<ConfigScreen> {
               AppNavGroup(
                 header: 'SISTEMA',
                 children: [
+                  if (AppAuthService.isConfigured)
+                    AppNavTile(
+                      title: 'Cuenta AMG',
+                      subtitle: 'Usuario, contraseña y cerrar sesión',
+                      icon: Icons.manage_accounts_outlined,
+                      color: AppColors.primary,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CuentaAmgScreen(
+                            onSignedOut: () =>
+                                TiroTrackerApp.signOut(context),
+                          ),
+                        ),
+                      ),
+                    ),
                   AppNavTile(
                     title: 'Estado de la aplicación',
                     subtitle: 'Licencia, actualizaciones y versiones',

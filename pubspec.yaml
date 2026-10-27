@@ -1,7 +1,7 @@
 name: tiro_deportivo_amg
 description: TiroAMG — Tiro deportivo · entrenamientos y competiciones (ISSF). Registro, análisis, simulador, estadísticas e informes.
 publish_to: 'none'
-version: 1.0.0+10
+version: 1.0.0+12
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -48,6 +48,8 @@ dependencies:
   flutter_tts: ^3.2.2
   shared_preferences: ^2.5.5
   audioplayers: ^6.8.1
+  local_auth: ^2.3.0
+  flutter_secure_storage: ^9.2.4
 
 dev_dependencies:
   flutter_test:

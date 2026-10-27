@@ -30,6 +30,8 @@
   27_tiroamg_privacidad.png
   28_tiroamg_condiciones.png
   29_tiroamg_recuperar.png
+  30_cuenta_amg.png
+  31_acceso_pendiente.png
 -->
 <article class="manual-tiroamg">
   <style>
@@ -86,19 +88,24 @@
     </ul>
   </nav>
 
-  <div class="note">Algunas pantallas (Competición, Historial, Backup, Detección, catálogos) dependen de los <strong>módulos de tu licencia</strong>. Si no las ves, revisa Estado de la aplicación. El acceso puede requerir <strong>cuenta AMG</strong> (usuario/contraseña) sujeta a aprobación.</div>
+  <div class="note">Algunas pantallas (Competición, Historial, Backup, Detección, catálogos) dependen de los <strong>módulos de tu licencia</strong>. Si no las ves, revisa Estado de la aplicación. El acceso usa <strong>cuenta AMG</strong> (usuario/contraseña o huella) sujeta a aprobación. Al cerrar la app se cierra la sesión.</div>
 
   <!-- 1 -->
   <h2 id="intro">1. Introducción, cuenta AMG y licencia</h2>
   <p>TiroAMG permite preparar la sesión, ejecutar series con avisos de tiempo, anotar impactos o puntos, y consultar historial y estadísticas.</p>
-  <p>Si el build tiene autenticación AMG, al abrir la app debes <strong>registrarte o iniciar sesión</strong> (usuario y contraseña), aceptar la política de privacidad y las condiciones de uso de TiroAMG, y guardar el <strong>código de recuperación</strong>. La cuenta puede quedar <strong>pendiente</strong> hasta que un administrador la active en el panel.</p>
+  <p>Al abrir la app debes <strong>registrarte o iniciar sesión</strong> (usuario y contraseña), aceptar la política de privacidad y las condiciones de uso, y guardar el <strong>código de recuperación</strong>. La cuenta puede quedar <strong>pendiente</strong> hasta que un administrador la active: la pantalla de pendiente <strong>comprueba sola</strong> y te avisa cuando puedas entrar.</p>
+  <p>Opcionalmente puedes activar <strong>Entrar con huella</strong>. <strong>Al cerrar la aplicación se cierra la sesión</strong>: al volver a abrir hay que identificarse otra vez (huella o contraseña).</p>
   <figure>
     <img src="/uploads/cms/25_tiroamg_login.png" alt="Inicio de sesión TiroAMG" />
-    <figcaption>Acceso AMG: entrar con usuario y contraseña</figcaption>
+    <figcaption>Acceso AMG: entrar con usuario/contraseña o huella</figcaption>
   </figure>
   <figure>
     <img src="/uploads/cms/26_tiroamg_registro.png" alt="Registro TiroAMG" />
     <figcaption>Crear cuenta: aceptar privacidad y condiciones</figcaption>
+  </figure>
+  <figure>
+    <img src="/uploads/cms/31_acceso_pendiente.png" alt="Cuenta pendiente de aprobación" />
+    <figcaption>Pendiente de aprobación: comprobación automática y «Comprobar ahora»</figcaption>
   </figure>
   <figure>
     <img src="/uploads/cms/27_tiroamg_privacidad.png" alt="Política de privacidad TiroAMG" />
@@ -110,14 +117,15 @@
   </figure>
   <figure>
     <img src="/uploads/cms/29_tiroamg_recuperar.png" alt="Recuperar acceso TiroAMG" />
-    <figcaption>Recuperación con código</figcaption>
+    <figcaption>Recuperación / cambio de contraseña con código</figcaption>
   </figure>
   <p>La instalación se valida con el servidor de licencias. En <strong>Configuración → Estado de la aplicación</strong> ves si está activa, qué módulos tienes, email, última sync, device, versión de app y de base de datos.</p>
   <ul>
+    <li><strong>Cuenta AMG</strong> (Configuración): usuario, huella, cambiar contraseña, cerrar sesión.</li>
     <li><strong>Identificar (email)</strong>: asocia el dispositivo (opcional) para soporte y módulos.</li>
     <li><strong>Refrescar</strong>: vuelve a consultar el servidor.</li>
-    <li><strong>Buscar actualizaciones</strong>: comprueba si hay una versión nueva y abre la descarga.</li>
-    <li><strong>Ayuda</strong>: guía, manual, FAQ y textos legales propios de TiroAMG.</li>
+    <li><strong>Buscar actualizaciones</strong>: canal propio o ficha de Google Play según el build.</li>
+    <li><strong>Ayuda</strong>: guía, manual, FAQ y textos legales.</li>
   </ul>
   <figure>
     <img src="/uploads/cms/03_estado_app.png" alt="Estado de la aplicación" />
@@ -143,41 +151,48 @@
 
   <!-- 3 -->
   <h2 id="config">3. Configuración</h2>
-  <p>Desde aquí gestionas perfil, material, plantillas, catálogos, avisos y el estado del sistema.</p>
+  <p>Desde aquí gestionas cuenta AMG, perfil de tirador, material, plantillas, catálogos, avisos y el estado del sistema.</p>
   <figure>
     <img src="/uploads/cms/02_configuracion.png" alt="Configuración" />
-    <figcaption>Menú de configuración</figcaption>
+    <figcaption>Menú de configuración (incluye Cuenta AMG en Sistema)</figcaption>
   </figure>
 
-  <h3>3.1 Perfil del tirador</h3>
+  <h3>3.1 Cuenta AMG</h3>
+  <p>Gestión de la cuenta de acceso (distinta del perfil deportivo): usuario, estado, código de recuperación, <strong>entrar con huella</strong>, cambiar contraseña y cerrar sesión.</p>
+  <figure>
+    <img src="/uploads/cms/30_cuenta_amg.png" alt="Cuenta AMG" />
+    <figcaption>Cuenta AMG: sesión, huella y contraseña</figcaption>
+  </figure>
+
+  <h3>3.2 Perfil del tirador</h3>
   <p>Mis Datos: nombre, licencia federativa, club y categoría. Aparecen en actas y PDFs.</p>
   <figure>
     <img src="/uploads/cms/12_perfil.png" alt="Perfil del tirador" />
     <figcaption>Mis Datos de Tirador</figcaption>
   </figure>
 
-  <h3>3.2 Armas</h3>
+  <h3>3.3 Armas</h3>
   <p>Gestión de Armas: crea un perfil por arma (tipo, calibre, diámetro de impacto). El tamaño visual del impacto en sesión depende de estos datos.</p>
   <figure>
     <img src="/uploads/cms/13_gestion_armas.png" alt="Gestión de armas" />
     <figcaption>Lista de armas</figcaption>
   </figure>
 
-  <h3>3.3 Munición</h3>
+  <h3>3.4 Munición</h3>
   <p>Registra marca, lote y stock. Puedes anotar compras, usos manuales y ver en qué sesiones se usó cada lote.</p>
   <figure>
     <img src="/uploads/cms/14_gestion_municion.png" alt="Gestión de munición" />
     <figcaption>Municiones y stock</figcaption>
   </figure>
 
-  <h3>3.4 Plantillas de tiempos y series</h3>
+  <h3>3.5 Plantillas de tiempos y series</h3>
   <p>Definen la disciplina: Atención / Fuego / Alto y disparos por serie. Sin al menos una plantilla no puedes iniciar un entrenamiento.</p>
   <figure>
     <img src="/uploads/cms/15_tiempos_series.png" alt="Plantillas de tiempos" />
     <figcaption>Plantillas de tiempos (precisión, duelo, aire…)</figcaption>
   </figure>
 
-  <h3>3.5 Catálogos</h3>
+  <h3>3.6 Catálogos</h3>
   <p>Datos maestros (suelen requerir módulo): tipos de arma, calibres y dianas (anillos, zona negra, mosca X).</p>
   <figure>
     <img src="/uploads/cms/16_catalogo_tipos.png" alt="Catálogo tipos de arma" />
@@ -192,7 +207,7 @@
     <figcaption>Catálogo: dianas</figcaption>
   </figure>
 
-  <h3>3.6 Avisos de tiro</h3>
+  <h3>3.7 Avisos de tiro</h3>
   <ul>
     <li><strong>Competición</strong>: solo pitidos.</li>
     <li><strong>Entrenamiento</strong>: pitidos + voz.</li>
@@ -375,11 +390,19 @@
   </details>
   <details>
     <summary>¿Qué es la cuenta AMG?</summary>
-    <p>Usuario y contraseña para acceder cuando el build tiene autenticación. Al registrarte aceptas privacidad y condiciones; la cuenta puede quedar pendiente de aprobación. Guarda el código de recuperación.</p>
+    <p>Usuario y contraseña para acceder. Al registrarte aceptas privacidad y condiciones; la cuenta puede quedar pendiente. Guarda el código de recuperación. Gestiona la cuenta en Configuración → Cuenta AMG.</p>
   </details>
   <details>
     <summary>Me he registrado y no puedo entrar</summary>
-    <p>Es normal si la cuenta está pendiente. Cuando el administrador la active en el panel, inicia sesión con tu usuario y contraseña.</p>
+    <p>Es normal si la cuenta está pendiente. La pantalla de pendiente comprueba sola y te avisa al aprobarte. También puedes pulsar «Comprobar ahora».</p>
+  </details>
+  <details>
+    <summary>¿Cómo activo la huella?</summary>
+    <p>Tras el primer login la app puede ofrecerlo, o en Configuración → Cuenta AMG. El teléfono debe tener huella configurada en Ajustes del sistema.</p>
+  </details>
+  <details>
+    <summary>¿Por qué me pide acceso al abrir la app?</summary>
+    <p>Al cerrar la aplicación se cierra la sesión. Vuelve a identificarte con huella (si la activaste) o con usuario y contraseña.</p>
   </details>
   <details>
     <summary>¿Cómo identifico la instalación?</summary>
