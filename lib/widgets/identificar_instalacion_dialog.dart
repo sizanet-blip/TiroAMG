@@ -133,15 +133,9 @@ class _IdentificarInstalacionDialogState
       );
 
       if (email.isNotEmpty) {
-        final res = await widget.licenseService.identificarEmail(email: email);
-        if (!mounted) return;
-        if (!(res.esValida || res.licencia != null)) {
-          setState(() {
-            _cargando = false;
-            _mensaje = res.mensaje;
-          });
-          return;
-        }
+        try {
+          await widget.licenseService.identificarEmail(email: email);
+        } catch (_) {}
       }
 
       if (!mounted) return;

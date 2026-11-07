@@ -272,10 +272,11 @@ class _HomeScreenState extends State<HomeScreen> {
       emailRegex: _emailRegex,
     );
     if (!ok || !mounted) return false;
-    final quick = await _licenseService.revisarLicencia(forzarServidor: false);
-    if (!mounted) return false;
-    _actualizarLicencia(quick.licencia);
-    return _licenciaActual?.puedeUsarApp == true;
+    try {
+      final quick = await _licenseService.revisarLicencia(forzarServidor: false);
+      if (mounted) _actualizarLicencia(quick.licencia);
+    } catch (_) {}
+    return true;
   }
 
   @override

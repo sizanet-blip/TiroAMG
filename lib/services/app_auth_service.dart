@@ -186,6 +186,8 @@ class AppAuthService {
       // Si ya se aceptó en esta instalación (o el usuario marca el checkbox),
       // reenviamos las versiones al panel: el login 428 no se resuelve solo
       // con privacy_current_version.
+      // No enviar privacy_current_version: el panel responde 428 y no
+      // entrega token, así que la casilla no sirve y el login entra en bucle.
       final sendAcceptance =
           acceptedLegal || await hasLocalLegalAcceptance();
       final body = <String, dynamic>{
@@ -196,8 +198,6 @@ class AppAuthService {
         'platform': _platformKey,
         'app_version': package.version,
         'build_number': package.buildNumber,
-        'privacy_current_version': privacyPolicyVersion,
-        'terms_current_version': termsVersion,
         if (sendAcceptance) ...{
           'privacy_accepted_version': privacyPolicyVersion,
           'terms_accepted_version': termsVersion,
@@ -257,11 +257,13 @@ class AppAuthService {
           response.statusCode < 300 &&
           data['token'] != null) {
         final p = await _prefs;
-        await _setSessionToken(data['token'].toString());
+        final token = data['token'].toString();
+        await _setSessionToken(token);
         await p.setString(_kUsername, username.trim());
         await p.setString(_kStatus, status ?? 'active');
         await _syncLocalLegalAcceptance();
         await _unlock.save(username: username, password: password);
+        await _acceptLegalOnServer(token);
         return AppAuthResult(
           ok: true,
           message: data['message']?.toString() ?? 'Login correcto.',
@@ -293,6 +295,7 @@ class AppAuthService {
         await p.setString(_kUsername, username.trim());
         await p.setString(_kStatus, 'active');
         await _setSessionToken(null);
+        await _syncLocalLegalAcceptance();
         _offlineUnlockNotice = true;
         return const AppAuthResult(
           ok: true,
@@ -452,6 +455,21 @@ class AppAuthService {
 
   Future<String?> lastRecoveryCode() async =>
       (await _prefs).getString(_kRecoveryShown);
+
+  /// Avisa al panel de la versión aceptada. Si el servidor no lo admite, no bloquea.
+  Future<void> _acceptLegalOnServer(String token) async {
+    try {
+      await _post(
+        '/app-auth/accept-legal',
+        {
+          'privacy_accepted_version': privacyPolicyVersion,
+          'terms_accepted_version': termsVersion,
+        },
+        bearer: token,
+        timeout: const Duration(seconds: 6),
+      );
+    } catch (_) {}
+  }
 
   /// Marca privacidad/condiciones en la instalación local (mismo gate que Home).
   Future<void> _syncLocalLegalAcceptance({String? email}) async {
